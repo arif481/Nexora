@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus,
@@ -87,6 +88,7 @@ const colorOptions = [
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export default function HabitsPage() {
+  const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const { habits, loading, createHabit, deleteHabit, toggleCompletion } = useHabits();
   const completionData = useHabitCompletions(habits as any, 7);
@@ -242,7 +244,7 @@ export default function HabitsPage() {
             title="Sign in to track habits"
             description="Create an account to start building better habits"
             action={
-              <Button variant="glow" onClick={() => window.location.href = '/auth/login'}>
+              <Button variant="glow" onClick={() => router.push('/auth/login')}>
                 Sign In
               </Button>
             }

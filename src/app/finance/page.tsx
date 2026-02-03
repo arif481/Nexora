@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Wallet,
@@ -71,6 +72,7 @@ const categoryConfig: Record<string, { label: string; icon: any; color: string }
 };
 
 export default function FinancePage() {
+  const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const { transactions, loading: transactionsLoading, createTransaction, deleteTransaction: deleteTransactionFn } = useTransactions();
   const { budgets, loading: budgetsLoading } = useBudgets();
@@ -109,7 +111,7 @@ export default function FinancePage() {
             <p className="text-dark-400 mb-6">
               Track your income, expenses, and budgets with real-time sync across devices.
             </p>
-            <Button variant="glow" onClick={() => window.location.href = '/auth/login'}>
+            <Button variant="glow" onClick={() => router.push('/auth/login')}>
               Sign In
             </Button>
           </Card>

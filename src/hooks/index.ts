@@ -12,3 +12,7 @@ export * from './useFinance';
 export * from './useStudy';
 export * from './useWellness';
 export * from './useUser';
+export * from './useNotifications';
+export * from './useAI';
+export * from './useFocus';
+export * from './useIntegrations';

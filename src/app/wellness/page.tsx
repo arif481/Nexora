@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Heart,
@@ -48,6 +49,7 @@ import { cn } from '@/lib/utils';
 import type { Exercise, Meal } from '@/types';
 
 export default function WellnessPage() {
+  const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const {
@@ -131,7 +133,7 @@ export default function WellnessPage() {
             <p className="text-dark-400 mb-6">
               Track sleep, exercise, nutrition, and monitor your overall health.
             </p>
-            <Button variant="glow" onClick={() => window.location.href = '/auth/login'}>
+            <Button variant="glow" onClick={() => router.push('/auth/login')}>
               Sign In
             </Button>
           </Card>

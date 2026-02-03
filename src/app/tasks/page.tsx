@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus,
@@ -52,6 +53,7 @@ const statusOptions: { label: string; value: TaskStatus }[] = [
 ];
 
 export default function TasksPage() {
+  const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const { tasks, loading, createTask, updateTask, deleteTask, completeTask, reopenTask } = useTasks();
   const stats = useTaskStats();
@@ -234,7 +236,7 @@ export default function TasksPage() {
             title="Sign in to manage tasks"
             description="Create an account to start organizing your tasks"
             action={
-              <Button variant="glow" onClick={() => window.location.href = '/auth/login'}>
+              <Button variant="glow" onClick={() => router.push('/auth/login')}>
                 Sign In
               </Button>
             }

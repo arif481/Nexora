@@ -11,3 +11,6 @@ export * from './finance';
 export * from './study';
 export * from './wellness';
 export * from './user';
+export * from './notifications';
+export * from './ai';
+export * from './integrations';

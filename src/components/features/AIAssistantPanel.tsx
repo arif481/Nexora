@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useUIStore } from '@/stores/uiStore';
+import { useSimpleAI } from '@/hooks/useAI';
 import {
   X,
   Sparkles,
@@ -25,35 +26,16 @@ import {
 import { Button } from '../ui/Button';
 import { AIThinkingAnimation } from '../ui/Loading';
 
-interface Message {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: Date;
-  suggestions?: string[];
-}
-
 const quickActions = [
   { label: 'Plan my day', icon: Zap },
   { label: 'Analyze my habits', icon: Brain },
   { label: 'Suggest focus time', icon: Lightbulb },
 ];
 
-const initialMessages: Message[] = [
-  {
-    id: '1',
-    role: 'assistant',
-    content: "Hello! I'm Nexora, your AI assistant. I'm here to help you stay organized, productive, and balanced. How can I assist you today?",
-    timestamp: new Date(),
-    suggestions: ['Plan my day', 'What are my priorities?', 'How am I doing this week?'],
-  },
-];
-
 export function AIAssistantPanel() {
   const { aiPanelOpen, toggleAIPanel, aiMinimized, setAIMinimized } = useUIStore();
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
+  const { messages, isThinking, sendMessage, clearMessages } = useSimpleAI();
   const [input, setInput] = useState('');
-  const [isThinking, setIsThinking] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -67,48 +49,9 @@ export function AIAssistantPanel() {
 
   const handleSend = async () => {
     if (!input.trim() || isThinking) return;
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: input.trim(),
-      timestamp: new Date(),
-    };
-
-    setMessages((prev) => [...prev, userMessage]);
+    const messageContent = input.trim();
     setInput('');
-    setIsThinking(true);
-
-    // Simulate AI response (in real app, call AI API)
-    setTimeout(() => {
-      const aiResponse: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: getAIResponse(input.trim()),
-        timestamp: new Date(),
-        suggestions: ['Tell me more', 'What else?', 'Show my tasks'],
-      };
-      setMessages((prev) => [...prev, aiResponse]);
-      setIsThinking(false);
-    }, 1500);
-  };
-
-  const getAIResponse = (query: string): string => {
-    const lowerQuery = query.toLowerCase();
-    
-    if (lowerQuery.includes('plan') || lowerQuery.includes('day')) {
-      return "Based on your schedule and energy patterns, here's my suggested plan for today:\n\n🌅 **Morning (High Energy)**\n• 9:00 AM - Deep work on project proposal\n• 11:00 AM - Team standup\n\n☀️ **Afternoon (Medium Energy)**\n• 1:00 PM - Review and respond to emails\n• 3:00 PM - Research task\n\n🌙 **Evening (Recovery)**\n• 5:00 PM - Light admin work\n• 6:00 PM - Journal reflection\n\nWould you like me to create these as calendar blocks?";
-    }
-    
-    if (lowerQuery.includes('priority') || lowerQuery.includes('important')) {
-      return "Looking at your tasks and deadlines, here are your top priorities:\n\n🔴 **Critical**\n• Complete project proposal (Due: Today)\n\n🟠 **High Priority**\n• Review budget report (Due: Tomorrow)\n• Prepare presentation slides (Due: Friday)\n\n🟡 **Medium Priority**\n• Update documentation\n• Schedule team meeting\n\nYour project proposal is most urgent. Would you like me to help break it down into smaller steps?";
-    }
-
-    if (lowerQuery.includes('habit') || lowerQuery.includes('analyze')) {
-      return "Here's your habit analysis for this week:\n\n✅ **Strong Performance**\n• Morning meditation: 6/7 days (86%)\n• Reading: 5/7 days (71%)\n\n⚠️ **Needs Attention**\n• Exercise: 3/7 days (43%)\n• Sleep schedule: Irregular patterns detected\n\n💡 **Insight**: Your exercise habit tends to drop on busy workdays. Consider scheduling shorter 15-min sessions on those days.\n\nWould you like personalized suggestions to improve your exercise consistency?";
-    }
-
-    return "I understand you're asking about that. Based on my analysis of your patterns and data, I can provide insights tailored to your needs. Could you tell me a bit more about what specific aspect you'd like me to focus on? I can help with:\n\n• Task planning and prioritization\n• Habit tracking and improvement\n• Schedule optimization\n• Wellness recommendations\n• Learning and study planning";
+    await sendMessage(messageContent);
   };
 
   const handleQuickAction = (action: string) => {
@@ -116,9 +59,8 @@ export function AIAssistantPanel() {
     inputRef.current?.focus();
   };
 
-  const handleSuggestion = (suggestion: string) => {
-    setInput(suggestion);
-    handleSend();
+  const handleSuggestion = async (suggestion: string) => {
+    await sendMessage(suggestion);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

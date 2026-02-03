@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useUIStore } from '@/stores/uiStore';
-import { useAuthStore } from '@/stores/authStore';
+import { useAuth } from '@/hooks/useAuth';
 import {
   Search,
   Bell,
@@ -26,6 +27,7 @@ import { Avatar } from '../ui/Avatar';
 import { Badge, CountBadge } from '../ui/Badge';
 
 export function Header() {
+  const router = useRouter();
   const { 
     toggleSidebar, 
     toggleCommandPalette, 
@@ -34,9 +36,19 @@ export function Header() {
     theme,
     setTheme 
   } = useUIStore();
-  const { user } = useAuthStore();
+  const { user, logout } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
+
+  const handleSignOut = async () => {
+    try {
+      await logout();
+      setShowUserMenu(false);
+      router.push('/');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
 
   const notificationCount = 3; // This would come from a notification store
 
@@ -182,7 +194,7 @@ export function Header() {
               className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-glass-medium transition-colors"
             >
               <Avatar
-                src={user?.photoURL}
+                src={user?.photoURL || undefined}
                 name={user?.displayName || 'User'}
                 size="sm"
                 status="online"
@@ -212,7 +224,7 @@ export function Header() {
                     <div className="p-4 border-b border-glass-border">
                       <div className="flex items-center gap-3">
                         <Avatar
-                          src={user?.photoURL}
+                          src={user?.photoURL || undefined}
                           name={user?.displayName || 'User'}
                           size="md"
                           status="online"
@@ -227,10 +239,7 @@ export function Header() {
                         </div>
                       </div>
                       <div className="mt-3 flex items-center gap-2">
-                        <Badge variant="cyan" size="sm">Level {user?.stats?.level || 1}</Badge>
-                        <span className="text-xs text-white/40">
-                          {user?.stats?.experience || 0} XP
-                        </span>
+                        <Badge variant="cyan" size="sm">Pro User</Badge>
                       </div>
                     </div>
 
@@ -259,7 +268,7 @@ export function Header() {
                     {/* Sign Out */}
                     <div className="p-2 border-t border-glass-border">
                       <button
-                        onClick={() => setShowUserMenu(false)}
+                        onClick={handleSignOut}
                         className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-neon-red/80 hover:text-neon-red hover:bg-neon-red/10 transition-colors"
                       >
                         <LogOut className="w-4 h-4" />

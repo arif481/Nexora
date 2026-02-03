@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   GraduationCap,
@@ -62,6 +63,7 @@ const resourceTypeIcons: Record<string, any> = {
 };
 
 export default function StudyPage() {
+  const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const { 
     subjects, 
@@ -147,7 +149,7 @@ export default function StudyPage() {
             <p className="text-dark-400 mb-6">
               Organize subjects, track topics, and monitor your academic progress.
             </p>
-            <Button variant="glow" onClick={() => window.location.href = '/auth/login'}>
+            <Button variant="glow" onClick={() => router.push('/auth/login')}>
               Sign In
             </Button>
           </Card>

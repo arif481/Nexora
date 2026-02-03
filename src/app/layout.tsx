@@ -18,6 +18,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://iamarif.me/Nexora'),
   title: {
     default: 'Nexora - AI Life Operating System',
     template: '%s | Nexora',

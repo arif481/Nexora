@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus,
@@ -44,6 +45,7 @@ const getMoodIcon = (score: number) => {
 };
 
 export default function JournalPage() {
+  const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const { entries, loading, createEntry, updateEntry, deleteEntry } = useJournal();
   const moodTrend = useMoodTrend(7);
@@ -180,7 +182,7 @@ export default function JournalPage() {
             title="Sign in to journal"
             description="Create an account to start your journaling journey"
             action={
-              <Button variant="glow" onClick={() => window.location.href = '/auth/login'}>
+              <Button variant="glow" onClick={() => router.push('/auth/login')}>
                 Sign In
               </Button>
             }

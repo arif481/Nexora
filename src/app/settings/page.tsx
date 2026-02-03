@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
   User,
@@ -49,6 +50,7 @@ import {
   AlertTriangle,
   Info,
   Save,
+  Loader2,
 } from 'lucide-react';
 import { MainLayout, PageContainer } from '@/components/layout/MainLayout';
 import { Card, CardHeader, CardContent } from '@/components/ui/Card';
@@ -58,6 +60,8 @@ import { Badge } from '@/components/ui/Badge';
 import { Avatar } from '@/components/ui/Avatar';
 import { Modal } from '@/components/ui/Modal';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/useAuth';
+import { useIntegrations, useLinkedAccounts } from '@/hooks/useIntegrations';
 
 type SettingsSection =
   | 'profile'
@@ -80,8 +84,19 @@ interface SettingItem {
 }
 
 export default function SettingsPage() {
+  const router = useRouter();
+  const { logout } = useAuth();
   const [activeSection, setActiveSection] = useState<SettingsSection>('profile');
   const [isDirty, setIsDirty] = useState(false);
+
+  const handleSignOut = async () => {
+    try {
+      await logout();
+      router.push('/');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
 
   const sections = [
     { id: 'profile', label: 'Profile', icon: User },
@@ -155,6 +170,7 @@ export default function SettingsPage() {
               {/* Danger Zone */}
               <div className="mt-4 pt-4 border-t border-dark-700/50">
                 <button
+                  onClick={handleSignOut}
                   className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left text-status-error hover:bg-status-error/10 transition-colors"
                 >
                   <LogOut className="w-5 h-5" />
@@ -293,36 +309,58 @@ function ProfileSection({ onDirty }: { onDirty: () => void }) {
       </Card>
 
       {/* Connected Accounts */}
-      <Card variant="glass">
-        <CardHeader title="Connected Accounts" icon={<Link2 className="w-5 h-5 text-neon-purple" />} />
-        <CardContent className="p-6 space-y-3">
-          {[
-            { name: 'Google', icon: Globe, connected: true },
-            { name: 'GitHub', icon: Github, connected: true },
-            { name: 'Twitter', icon: Twitter, connected: false },
-            { name: 'LinkedIn', icon: Linkedin, connected: false },
-          ].map(account => (
-            <div
-              key={account.name}
-              className="flex items-center justify-between p-4 rounded-xl bg-dark-800/30"
-            >
-              <div className="flex items-center gap-3">
-                <account.icon className="w-5 h-5 text-dark-300" />
-                <span className="font-medium text-white">{account.name}</span>
-              </div>
-              {account.connected ? (
-                <div className="flex items-center gap-2">
-                  <Badge variant="green" size="sm">Connected</Badge>
-                  <Button variant="ghost" size="sm">Disconnect</Button>
-                </div>
-              ) : (
-                <Button variant="outline" size="sm">Connect</Button>
-              )}
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+      <ConnectedAccountsCard />
     </div>
+  );
+}
+
+// Connected Accounts Component - Shows Google sign-in status
+function ConnectedAccountsCard() {
+  const { 
+    linkedAccounts, 
+    loading, 
+    isGoogleLinked, 
+    connectAccount,
+    disconnectAccount 
+  } = useLinkedAccounts();
+
+  return (
+    <Card variant="glass">
+      <CardHeader title="Connected Account" icon={<Link2 className="w-5 h-5 text-neon-purple" />} />
+      <CardContent className="p-6">
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-6 h-6 text-neon-cyan animate-spin" />
+          </div>
+        ) : (
+          <div className="flex items-center justify-between p-4 rounded-xl bg-dark-800/30">
+            <div className="flex items-center gap-3">
+              <Globe className="w-5 h-5 text-dark-300" />
+              <div>
+                <span className="font-medium text-white">Google</span>
+                {isGoogleLinked && linkedAccounts.google?.email && (
+                  <p className="text-xs text-dark-400">{linkedAccounts.google.email}</p>
+                )}
+              </div>
+            </div>
+            {isGoogleLinked ? (
+              <Badge variant="green" size="sm">Connected</Badge>
+            ) : (
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => connectAccount('google')}
+              >
+                Sign in with Google
+              </Button>
+            )}
+          </div>
+        )}
+        <p className="text-xs text-dark-500 mt-3">
+          Sign in with Google to link your account and access Google Calendar sync.
+        </p>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -875,45 +913,105 @@ function AISettingsSection({ onDirty }: { onDirty: () => void }) {
   );
 }
 
-// Integrations Section
+// Integrations Section with real data
 function IntegrationsSection() {
-  const integrations = [
-    { name: 'Google Calendar', icon: Calendar, connected: true, description: 'Sync your events' },
-    { name: 'Notion', icon: FileText, connected: true, description: 'Import notes and docs' },
-    { name: 'Slack', icon: MessageSquare, connected: false, description: 'Get notifications' },
-    { name: 'Spotify', icon: Heart, connected: false, description: 'Music for focus mode' },
-    { name: 'Fitbit', icon: Target, connected: false, description: 'Sync health data' },
-    { name: 'Stripe', icon: CreditCard, connected: false, description: 'Track expenses' },
+  const { 
+    integrations,
+    loading,
+    isGoogleCalendarConnected,
+    connectGoogleCalendar,
+    disconnect,
+  } = useIntegrations();
+  
+  const [disconnecting, setDisconnecting] = useState<string | null>(null);
+
+  const integrationsList = [
+    { 
+      name: 'Google Calendar', 
+      key: 'googleCalendar' as const,
+      icon: Calendar, 
+      connected: isGoogleCalendarConnected, 
+      description: 'Sync your events with Nexora',
+      details: integrations.googleCalendar?.email,
+      onConnect: connectGoogleCalendar,
+    },
   ];
+
+  const handleDisconnect = async (key: string) => {
+    setDisconnecting(key);
+    try {
+      await disconnect(key as keyof typeof integrations);
+    } catch (error) {
+      console.error('Failed to disconnect:', error);
+    } finally {
+      setDisconnecting(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
       <Card variant="glass">
         <CardHeader title="Connected Apps" icon={<Link2 className="w-5 h-5 text-neon-cyan" />} />
         <CardContent className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {integrations.map(integration => (
-              <div
-                key={integration.name}
-                className="flex items-center justify-between p-4 rounded-xl bg-dark-800/30"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-dark-700/50">
-                    <integration.icon className="w-5 h-5 text-dark-300" />
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 text-neon-cyan animate-spin" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {integrationsList.map(integration => (
+                <div
+                  key={integration.name}
+                  className="flex items-center justify-between p-4 rounded-xl bg-dark-800/30"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={cn(
+                      "p-2 rounded-lg",
+                      integration.connected ? "bg-neon-cyan/20" : "bg-dark-700/50"
+                    )}>
+                      <integration.icon className={cn(
+                        "w-5 h-5",
+                        integration.connected ? "text-neon-cyan" : "text-dark-300"
+                      )} />
+                    </div>
+                    <div>
+                      <p className="font-medium text-white">{integration.name}</p>
+                      <p className="text-xs text-dark-400">
+                        {integration.connected && integration.details 
+                          ? integration.details 
+                          : integration.description}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium text-white">{integration.name}</p>
-                    <p className="text-xs text-dark-400">{integration.description}</p>
-                  </div>
+                  {integration.connected ? (
+                    <div className="flex items-center gap-2">
+                      <Badge variant="green" size="sm">Connected</Badge>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleDisconnect(integration.key)}
+                        disabled={disconnecting === integration.key}
+                      >
+                        {disconnecting === integration.key ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          'Disconnect'
+                        )}
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={integration.onConnect}
+                    >
+                      Connect
+                    </Button>
+                  )}
                 </div>
-                {integration.connected ? (
-                  <Badge variant="green" size="sm">Connected</Badge>
-                ) : (
-                  <Button variant="outline" size="sm">Connect</Button>
-                )}
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 

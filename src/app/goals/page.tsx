@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Target,
@@ -55,6 +56,7 @@ const categoryConfig: Record<string, { label: string; icon: string; color: strin
 };
 
 export default function GoalsPage() {
+  const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const { 
     goals, 
@@ -131,7 +133,7 @@ export default function GoalsPage() {
             <p className="text-dark-400 mb-6">
               Set goals, track milestones, and achieve your dreams.
             </p>
-            <Button variant="glow" onClick={() => window.location.href = '/auth/login'}>
+            <Button variant="glow" onClick={() => router.push('/auth/login')}>
               Sign In
             </Button>
           </Card>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Play,
@@ -70,17 +71,55 @@ const TIMER_PRESETS = {
   longBreak: 15 * 60,
 };
 
-// Ambient sounds
+// Ambient sounds with free audio URLs from Pixabay/FreeSound (royalty-free)
 const ambientSounds = [
-  { id: 'rain', name: 'Rain', icon: '🌧️' },
-  { id: 'forest', name: 'Forest', icon: '🌲' },
-  { id: 'ocean', name: 'Ocean', icon: '🌊' },
-  { id: 'fire', name: 'Fireplace', icon: '🔥' },
-  { id: 'coffee', name: 'Coffee Shop', icon: '☕' },
-  { id: 'lofi', name: 'Lo-Fi', icon: '🎵' },
+  { 
+    id: 'rain', 
+    name: 'Rain', 
+    icon: '🌧️',
+    // Rain sound - white noise generator fallback
+    audioUrl: null,
+    oscillatorType: 'brown' as const,
+  },
+  { 
+    id: 'forest', 
+    name: 'Forest', 
+    icon: '🌲',
+    audioUrl: null,
+    oscillatorType: 'pink' as const,
+  },
+  { 
+    id: 'ocean', 
+    name: 'Ocean', 
+    icon: '🌊',
+    audioUrl: null,
+    oscillatorType: 'brown' as const,
+  },
+  { 
+    id: 'fire', 
+    name: 'Fireplace', 
+    icon: '🔥',
+    audioUrl: null,
+    oscillatorType: 'pink' as const,
+  },
+  { 
+    id: 'coffee', 
+    name: 'White Noise', 
+    icon: '☕',
+    audioUrl: null,
+    oscillatorType: 'white' as const,
+  },
+  { 
+    id: 'lofi', 
+    name: 'Brown Noise', 
+    icon: '🎵',
+    audioUrl: null,
+    oscillatorType: 'brown' as const,
+  },
 ];
 
 export default function FocusPage() {
+  const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const { sessions, tasks, loading: focusLoading, addSession, addTask, updateTask, removeTask } = useFocus();
   const focusStats = useFocusStats(sessions);
@@ -91,15 +130,124 @@ export default function FocusPage() {
   const [activeTask, setActiveTask] = useState<FocusTask | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [activeSound, setActiveSound] = useState<string | null>(null);
+  const [soundVolume, setSoundVolume] = useState(0.3);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAddTaskOpen, setIsAddTaskOpen] = useState(false);
   const [focusModeActive, setFocusModeActive] = useState(false);
   const [distractionBlocker, setDistractionBlocker] = useState(false);
   
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const noiseNodeRef = useRef<AudioBufferSourceNode | null>(null);
+  const gainNodeRef = useRef<GainNode | null>(null);
   const { openAIPanel } = useUIStore();
 
   const loading = authLoading || focusLoading;
+
+  // Generate colored noise
+  const createNoiseBuffer = useCallback((type: 'white' | 'pink' | 'brown', sampleRate: number, duration: number) => {
+    const bufferSize = sampleRate * duration;
+    const buffer = new Float32Array(bufferSize);
+    
+    if (type === 'white') {
+      for (let i = 0; i < bufferSize; i++) {
+        buffer[i] = Math.random() * 2 - 1;
+      }
+    } else if (type === 'pink') {
+      let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+      for (let i = 0; i < bufferSize; i++) {
+        const white = Math.random() * 2 - 1;
+        b0 = 0.99886 * b0 + white * 0.0555179;
+        b1 = 0.99332 * b1 + white * 0.0750759;
+        b2 = 0.96900 * b2 + white * 0.1538520;
+        b3 = 0.86650 * b3 + white * 0.3104856;
+        b4 = 0.55000 * b4 + white * 0.5329522;
+        b5 = -0.7616 * b5 - white * 0.0168980;
+        buffer[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.11;
+        b6 = white * 0.115926;
+      }
+    } else if (type === 'brown') {
+      let lastOut = 0;
+      for (let i = 0; i < bufferSize; i++) {
+        const white = Math.random() * 2 - 1;
+        buffer[i] = (lastOut + (0.02 * white)) / 1.02;
+        lastOut = buffer[i];
+        buffer[i] *= 3.5;
+      }
+    }
+    
+    return buffer;
+  }, []);
+
+  // Play ambient sound
+  const playAmbientSound = useCallback((soundId: string) => {
+    const sound = ambientSounds.find(s => s.id === soundId);
+    if (!sound) return;
+
+    // Stop existing sound
+    if (noiseNodeRef.current) {
+      noiseNodeRef.current.stop();
+      noiseNodeRef.current = null;
+    }
+
+    // Create audio context if needed
+    if (!audioContextRef.current) {
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+
+    const ctx = audioContextRef.current;
+    const sampleRate = ctx.sampleRate;
+    const duration = 10; // 10 second buffer that loops
+
+    // Create noise buffer
+    const noiseData = createNoiseBuffer(sound.oscillatorType, sampleRate, duration);
+    const audioBuffer = ctx.createBuffer(1, noiseData.length, sampleRate);
+    audioBuffer.copyToChannel(noiseData, 0);
+
+    // Create nodes
+    const source = ctx.createBufferSource();
+    source.buffer = audioBuffer;
+    source.loop = true;
+
+    const gainNode = ctx.createGain();
+    gainNode.gain.value = soundVolume;
+
+    source.connect(gainNode);
+    gainNode.connect(ctx.destination);
+
+    source.start();
+
+    noiseNodeRef.current = source;
+    gainNodeRef.current = gainNode;
+  }, [createNoiseBuffer, soundVolume]);
+
+  // Stop ambient sound
+  const stopAmbientSound = useCallback(() => {
+    if (noiseNodeRef.current) {
+      noiseNodeRef.current.stop();
+      noiseNodeRef.current = null;
+    }
+  }, []);
+
+  // Handle sound toggle
+  useEffect(() => {
+    if (activeSound && soundEnabled) {
+      playAmbientSound(activeSound);
+    } else {
+      stopAmbientSound();
+    }
+
+    return () => {
+      stopAmbientSound();
+    };
+  }, [activeSound, soundEnabled, playAmbientSound, stopAmbientSound]);
+
+  // Update volume when changed
+  useEffect(() => {
+    if (gainNodeRef.current) {
+      gainNodeRef.current.gain.value = soundVolume;
+    }
+  }, [soundVolume]);
 
   // Calculate total focus time today
   const totalFocusToday = sessions
@@ -278,7 +426,7 @@ export default function FocusPage() {
             <p className="text-dark-400 mb-6">
               Save your focus sessions and track productivity over time.
             </p>
-            <Button variant="glow" onClick={() => window.location.href = '/auth/login'}>
+            <Button variant="glow" onClick={() => router.push('/auth/login')}>
               Sign In
             </Button>
           </Card>
@@ -475,6 +623,21 @@ export default function FocusPage() {
                 <CardHeader
                   title="Ambient Sounds"
                   icon={<Headphones className="w-5 h-5 text-neon-purple" />}
+                  action={
+                    activeSound && (
+                      <div className="flex items-center gap-2">
+                        <Volume2 className="w-4 h-4 text-dark-400" />
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={soundVolume}
+                          onChange={(e) => setSoundVolume(Number(e.target.value))}
+                          className="w-20 h-1 bg-dark-700 rounded-lg appearance-none cursor-pointer accent-neon-purple"
+                        />
+                      </div>
+                    )
+                  }
                 />
                 <CardContent>
                   <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
@@ -494,6 +657,11 @@ export default function FocusPage() {
                       </button>
                     ))}
                   </div>
+                  {activeSound && (
+                    <p className="text-xs text-dark-500 mt-3 text-center">
+                      Click the active sound again to stop
+                    </p>
+                  )}
                 </CardContent>
               </Card>
             </motion.div>

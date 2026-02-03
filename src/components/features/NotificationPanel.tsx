@@ -3,6 +3,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useUIStore } from '@/stores/uiStore';
+import { useNotifications } from '@/hooks/useNotifications';
 import {
   X,
   Bell,
@@ -16,62 +17,11 @@ import {
   Settings,
   Check,
   Trash2,
+  Flame,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
-
-interface Notification {
-  id: string;
-  type: 'task' | 'calendar' | 'ai' | 'achievement' | 'wellness' | 'system';
-  title: string;
-  body: string;
-  timestamp: Date;
-  read: boolean;
-  actionUrl?: string;
-}
-
-// Mock notifications
-const mockNotifications: Notification[] = [
-  {
-    id: '1',
-    type: 'ai',
-    title: 'AI Insight Available',
-    body: 'Based on your patterns, you\'re most productive between 9-11 AM. Consider scheduling important tasks during this time.',
-    timestamp: new Date(Date.now() - 1000 * 60 * 5),
-    read: false,
-  },
-  {
-    id: '2',
-    type: 'task',
-    title: 'Task Due Soon',
-    body: '"Complete project proposal" is due in 2 hours',
-    timestamp: new Date(Date.now() - 1000 * 60 * 30),
-    read: false,
-  },
-  {
-    id: '3',
-    type: 'calendar',
-    title: 'Upcoming Event',
-    body: 'Team standup meeting starts in 15 minutes',
-    timestamp: new Date(Date.now() - 1000 * 60 * 45),
-    read: false,
-  },
-  {
-    id: '4',
-    type: 'achievement',
-    title: 'Achievement Unlocked! 🎉',
-    body: 'You\'ve completed 7 days streak! Keep up the great work.',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2),
-    read: true,
-  },
-  {
-    id: '5',
-    type: 'wellness',
-    title: 'Time for a Break',
-    body: 'You\'ve been focused for 90 minutes. Consider taking a short break.',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 3),
-    read: true,
-  },
-];
+import { LoadingSpinner } from '../ui/Loading';
+import type { Notification } from '@/lib/services/notifications';
 
 const getRelativeTime = (date: Date): string => {
   const now = new Date();
@@ -88,6 +38,7 @@ const getRelativeTime = (date: Date): string => {
 
 export function NotificationPanel() {
   const { notificationPanelOpen, toggleNotificationPanel } = useUIStore();
+  const { notifications, loading, unreadCount, markAsRead, markAllAsRead, removeNotification, clearAll } = useNotifications();
 
   const getNotificationIcon = (type: Notification['type']) => {
     switch (type) {
@@ -101,6 +52,8 @@ export function NotificationPanel() {
         return <Trophy className="w-4 h-4" />;
       case 'wellness':
         return <Heart className="w-4 h-4" />;
+      case 'habit':
+        return <Flame className="w-4 h-4" />;
       default:
         return <Bell className="w-4 h-4" />;
     }
@@ -118,12 +71,12 @@ export function NotificationPanel() {
         return 'text-neon-yellow bg-neon-yellow/10';
       case 'wellness':
         return 'text-neon-pink bg-neon-pink/10';
+      case 'habit':
+        return 'text-neon-orange bg-neon-orange/10';
       default:
         return 'text-white/60 bg-glass-medium';
     }
   };
-
-  const unreadCount = mockNotifications.filter((n) => !n.read).length;
 
   return (
     <AnimatePresence>
@@ -174,17 +127,28 @@ export function NotificationPanel() {
 
             {/* Actions */}
             <div className="flex items-center justify-between px-4 py-2 border-b border-glass-border">
-              <button className="text-sm text-neon-cyan hover:text-neon-cyan/80 transition-colors">
+              <button 
+                onClick={markAllAsRead}
+                className="text-sm text-neon-cyan hover:text-neon-cyan/80 transition-colors"
+              >
                 Mark all as read
               </button>
-              <button className="text-sm text-white/50 hover:text-white transition-colors">
+              <button 
+                onClick={clearAll}
+                className="text-sm text-white/50 hover:text-white transition-colors"
+              >
                 Clear all
               </button>
             </div>
 
             {/* Notifications List */}
             <div className="overflow-y-auto h-[calc(100%-120px)] scrollbar-thin">
-              {mockNotifications.length === 0 ? (
+              {loading ? (
+                <div className="flex flex-col items-center justify-center h-full p-8">
+                  <LoadingSpinner size="lg" />
+                  <p className="text-white/40 mt-4">Loading notifications...</p>
+                </div>
+              ) : notifications.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full p-8 text-center">
                   <div className="w-16 h-16 rounded-2xl bg-glass-medium flex items-center justify-center mb-4">
                     <Bell className="w-8 h-8 text-white/30" />
@@ -196,7 +160,7 @@ export function NotificationPanel() {
                 </div>
               ) : (
                 <div className="divide-y divide-glass-border">
-                  {mockNotifications.map((notification) => (
+                  {notifications.map((notification) => (
                     <motion.div
                       key={notification.id}
                       initial={{ opacity: 0, y: 10 }}
@@ -247,12 +211,18 @@ export function NotificationPanel() {
                       {/* Actions */}
                       <div className="flex items-center gap-2 mt-3 ml-11">
                         {!notification.read && (
-                          <button className="text-xs text-neon-cyan hover:text-neon-cyan/80 transition-colors flex items-center gap-1">
+                          <button 
+                            onClick={() => markAsRead(notification.id)}
+                            className="text-xs text-neon-cyan hover:text-neon-cyan/80 transition-colors flex items-center gap-1"
+                          >
                             <Check className="w-3 h-3" />
                             Mark as read
                           </button>
                         )}
-                        <button className="text-xs text-white/40 hover:text-neon-red transition-colors flex items-center gap-1">
+                        <button 
+                          onClick={() => removeNotification(notification.id)}
+                          className="text-xs text-white/40 hover:text-neon-red transition-colors flex items-center gap-1"
+                        >
                           <Trash2 className="w-3 h-3" />
                           Dismiss
                         </button>

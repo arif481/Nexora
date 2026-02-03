@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus,
@@ -43,6 +44,7 @@ const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 export default function CalendarPage() {
+  const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -194,7 +196,7 @@ export default function CalendarPage() {
             title="Sign in to use calendar"
             description="Create an account to start planning your schedule"
             action={
-              <Button variant="glow" onClick={() => window.location.href = '/auth/login'}>
+              <Button variant="glow" onClick={() => router.push('/auth/login')}>
                 Sign In
               </Button>
             }

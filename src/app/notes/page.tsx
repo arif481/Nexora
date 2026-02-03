@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus,
@@ -42,6 +43,7 @@ const categoryOptions = [
 ];
 
 export default function NotesPage() {
+  const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const { notes, loading, createNote, updateNote, deleteNote, togglePin, toggleFavorite, archiveNote } = useNotes();
   const notesByCategory = useNotesByCategory(notes);
@@ -184,7 +186,7 @@ export default function NotesPage() {
             title="Sign in to take notes"
             description="Create an account to start organizing your thoughts"
             action={
-              <Button variant="glow" onClick={() => window.location.href = '/auth/login'}>
+              <Button variant="glow" onClick={() => router.push('/auth/login')}>
                 Sign In
               </Button>
             }
