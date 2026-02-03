@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import { Loader2 } from 'lucide-react';
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline' | 'glass';
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline' | 'glass' | 'glow';
   size?: 'sm' | 'md' | 'lg' | 'xl' | 'icon';
   glow?: boolean;
   loading?: boolean;
@@ -65,6 +65,11 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         'backdrop-blur-xl bg-glass-medium border border-glass-border text-white',
         'hover:bg-glass-heavy hover:border-neon-cyan/30',
         glow && 'shadow-inner-glow'
+      ),
+      glow: cn(
+        'bg-gradient-to-r from-neon-cyan to-neon-purple text-white',
+        'shadow-glow hover:shadow-glow-lg hover:brightness-110',
+        'animate-pulse-glow'
       ),
     };
 

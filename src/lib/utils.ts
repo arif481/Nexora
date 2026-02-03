@@ -109,6 +109,38 @@ export function isPast(date: Date | string): boolean {
 }
 
 /**
+ * Get deadline status for a task
+ */
+export function getDeadlineStatus(dueDate: Date | string | undefined): 'overdue' | 'today' | 'tomorrow' | 'upcoming' | 'none' {
+  if (!dueDate) return 'none';
+  const d = typeof dueDate === 'string' ? new Date(dueDate) : dueDate;
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const dueDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
+  if (dueDay < today) return 'overdue';
+  if (dueDay.getTime() === today.getTime()) return 'today';
+  if (dueDay.getTime() === tomorrow.getTime()) return 'tomorrow';
+  return 'upcoming';
+}
+
+/**
+ * Format a date relative to today
+ */
+export function formatRelativeDate(date: Date | string): string {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  if (isToday(d)) return 'Today';
+  if (isTomorrow(d)) return 'Tomorrow';
+  const now = new Date();
+  const diffDays = Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays < 0) return `${Math.abs(diffDays)} days ago`;
+  if (diffDays < 7) return d.toLocaleDateString('en-US', { weekday: 'long' });
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+/**
  * Get the start of the day
  */
 export function startOfDay(date: Date): Date {
