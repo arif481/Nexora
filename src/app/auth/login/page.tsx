@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
@@ -15,28 +15,42 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function LoginPage() {
   const router = useRouter();
+  const { signIn, signInWithGoogle, user, loading: authLoading, error: authError, clearError } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user && !authLoading) {
+      router.push('/dashboard');
+    }
+  }, [user, authLoading, router]);
+
+  // Sync auth error to local error state
+  useEffect(() => {
+    if (authError) {
+      setError(authError);
+    }
+  }, [authError]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
+    clearError();
 
     try {
-      // TODO: Implement Firebase auth
-      // Simulate login for now
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await signIn(email, password);
       router.push('/dashboard');
-    } catch (err) {
-      setError('Invalid email or password');
+    } catch (err: any) {
+      setError(err.message || 'Invalid email or password');
     } finally {
       setIsLoading(false);
     }
@@ -44,16 +58,27 @@ export default function LoginPage() {
 
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
+    setError('');
+    clearError();
+
     try {
-      // TODO: Implement Google auth
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await signInWithGoogle();
       router.push('/dashboard');
-    } catch (err) {
-      setError('Failed to sign in with Google');
+    } catch (err: any) {
+      setError(err.message || 'Failed to sign in with Google');
     } finally {
       setIsLoading(false);
     }
   };
+
+  // Show loading while checking auth state
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-neon-cyan"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex">
@@ -172,12 +197,13 @@ export default function LoginPage() {
           </div>
 
           {/* Social Login */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4">
             <Button
               type="button"
               variant="glass"
               onClick={handleGoogleSignIn}
               disabled={isLoading}
+              className="w-full"
             >
               <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
                 <path
@@ -197,19 +223,13 @@ export default function LoginPage() {
                   d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                 />
               </svg>
-              Google
-            </Button>
-            <Button type="button" variant="glass" disabled={isLoading}>
-              <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.87 1.52 2.34 1.07 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.92 0-1.11.38-2 1.03-2.71-.1-.25-.45-1.29.1-2.64 0 0 .84-.27 2.75 1.02.79-.22 1.65-.33 2.5-.33.85 0 1.71.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.35.2 2.39.1 2.64.65.71 1.03 1.6 1.03 2.71 0 3.82-2.34 4.66-4.57 4.91.36.31.69.92.69 1.85V21c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0012 2z" />
-              </svg>
-              GitHub
+              Continue with Google
             </Button>
           </div>
 
           {/* Sign Up Link */}
           <p className="text-center text-dark-400 mt-8">
-            Don't have an account?{' '}
+            Don&apos;t have an account?{' '}
             <Link href="/auth/signup" className="text-neon-cyan hover:underline">
               Sign up
             </Link>

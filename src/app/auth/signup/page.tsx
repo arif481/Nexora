@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 
 const passwordRequirements = [
@@ -28,6 +29,7 @@ const passwordRequirements = [
 
 export default function SignupPage() {
   const router = useRouter();
+  const { signUp, signInWithGoogle, user, loading: authLoading, error: authError, clearError } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -35,15 +37,29 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [step, setStep] = useState<'form' | 'verify'>('form');
 
   const passwordStrength = passwordRequirements.filter(req => req.test(password)).length;
   const isPasswordValid = passwordStrength === passwordRequirements.length;
   const doPasswordsMatch = password === confirmPassword && password.length > 0;
 
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user && !authLoading) {
+      router.push('/dashboard');
+    }
+  }, [user, authLoading, router]);
+
+  // Sync auth error to local error state
+  useEffect(() => {
+    if (authError) {
+      setError(authError);
+    }
+  }, [authError]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    clearError();
 
     if (!isPasswordValid) {
       setError('Please meet all password requirements');
@@ -58,11 +74,10 @@ export default function SignupPage() {
     setIsLoading(true);
 
     try {
-      // TODO: Implement Firebase auth
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setStep('verify');
-    } catch (err) {
-      setError('Failed to create account');
+      await signUp(email, password, name);
+      router.push('/dashboard');
+    } catch (err: any) {
+      setError(err.message || 'Failed to create account');
     } finally {
       setIsLoading(false);
     }
@@ -70,49 +85,24 @@ export default function SignupPage() {
 
   const handleGoogleSignUp = async () => {
     setIsLoading(true);
+    setError('');
+    clearError();
+
     try {
-      // TODO: Implement Google auth
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await signInWithGoogle();
       router.push('/dashboard');
-    } catch (err) {
-      setError('Failed to sign up with Google');
+    } catch (err: any) {
+      setError(err.message || 'Failed to sign up with Google');
     } finally {
       setIsLoading(false);
     }
   };
 
-  if (step === 'verify') {
+  // Show loading while checking auth state
+  if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="max-w-md w-full text-center"
-        >
-          <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-neon-green/20 flex items-center justify-center">
-            <Mail className="w-10 h-10 text-neon-green" />
-          </div>
-
-          <h1 className="text-2xl font-bold text-white mb-2">Check your email</h1>
-          <p className="text-dark-400 mb-6">
-            We've sent a verification link to <span className="text-white">{email}</span>
-          </p>
-
-          <div className="p-4 rounded-xl bg-dark-800/50 border border-dark-700/50 mb-6">
-            <p className="text-sm text-dark-300">
-              Click the link in the email to verify your account and get started with Nexora.
-            </p>
-          </div>
-
-          <Button variant="glass" className="w-full" onClick={() => router.push('/auth/login')}>
-            Back to Sign In
-          </Button>
-
-          <p className="text-sm text-dark-500 mt-4">
-            Didn't receive the email?{' '}
-            <button className="text-neon-cyan hover:underline">Resend</button>
-          </p>
-        </motion.div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-neon-cyan"></div>
       </div>
     );
   }
@@ -152,7 +142,7 @@ export default function SignupPage() {
           {/* Testimonial */}
           <div className="p-6 rounded-xl bg-dark-800/50 border border-dark-700/50 text-left">
             <p className="text-dark-200 mb-4 italic">
-              "Nexora has completely transformed how I manage my daily life. The AI suggestions are incredibly helpful!"
+              &quot;Nexora has completely transformed how I manage my daily life. The AI suggestions are incredibly helpful!&quot;
             </p>
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-gradient-to-r from-neon-cyan to-neon-purple" />
@@ -351,12 +341,13 @@ export default function SignupPage() {
           </div>
 
           {/* Social Login */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4">
             <Button
               type="button"
               variant="glass"
               onClick={handleGoogleSignUp}
               disabled={isLoading}
+              className="w-full"
             >
               <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
                 <path
@@ -376,13 +367,7 @@ export default function SignupPage() {
                   d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                 />
               </svg>
-              Google
-            </Button>
-            <Button type="button" variant="glass" disabled={isLoading}>
-              <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.87 1.52 2.34 1.07 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.92 0-1.11.38-2 1.03-2.71-.1-.25-.45-1.29.1-2.64 0 0 .84-.27 2.75 1.02.79-.22 1.65-.33 2.5-.33.85 0 1.71.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.35.2 2.39.1 2.64.65.71 1.03 1.6 1.03 2.71 0 3.82-2.34 4.66-4.57 4.91.36.31.69.92.69 1.85V21c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0012 2z" />
-              </svg>
-              GitHub
+              Continue with Google
             </Button>
           </div>
 
