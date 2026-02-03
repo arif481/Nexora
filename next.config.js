@@ -7,8 +7,10 @@ const nextConfig = {
     domains: ['firebasestorage.googleapis.com'],
     unoptimized: true,
   },
-  basePath: process.env.NODE_ENV === 'production' ? '/Nexora' : '',
-  assetPrefix: process.env.NODE_ENV === 'production' ? '/Nexora/' : '',
+  // Remove basePath if deploying to root domain (iamarif.me)
+  // Uncomment below if deploying to subdirectory (iamarif.me/Nexora)
+  // basePath: '/Nexora',
+  // assetPrefix: '/Nexora/',
 };
 
 module.exports = nextConfig;
