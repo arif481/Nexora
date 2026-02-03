@@ -24,6 +24,7 @@ import {
   ChevronRight,
   AlertCircle,
   Loader2,
+  RefreshCw,
 } from 'lucide-react';
 import { MainLayout, PageContainer } from '@/components/layout/MainLayout';
 import { Card } from '@/components/ui/Card';
@@ -55,7 +56,7 @@ const statusOptions: { label: string; value: TaskStatus }[] = [
 export default function TasksPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const { tasks, loading, createTask, updateTask, deleteTask, completeTask, reopenTask } = useTasks();
+  const { tasks, loading, error, createTask, updateTask, deleteTask, completeTask, reopenTask } = useTasks();
   const stats = useTaskStats();
   
   const [searchQuery, setSearchQuery] = useState('');
@@ -220,6 +221,38 @@ export default function TasksPage() {
           <div className="flex flex-col items-center justify-center min-h-[400px]">
             <LoadingSpinner size="lg" />
             <p className="mt-4 text-gray-600">Loading tasks...</p>
+          </div>
+        </PageContainer>
+      </MainLayout>
+    );
+  }
+
+  // Show error state
+  if (error && !loading) {
+    return (
+      <MainLayout>
+        <PageContainer title="Tasks" subtitle="Organize and accomplish your goals">
+          <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+            <div className="p-4 rounded-full bg-red-500/10">
+              <AlertCircle className="w-12 h-12 text-red-500" />
+            </div>
+            <h2 className="text-xl font-semibold text-white">Unable to Load Tasks</h2>
+            <p className="text-dark-400 text-center max-w-md">
+              {error.includes('index') 
+                ? 'Database indexes are being built. This usually takes 2-5 minutes. Please try again shortly.'
+                : error.includes('permission')
+                ? 'You don\'t have permission to access this data. Please sign out and sign in again.'
+                : error}
+            </p>
+            <div className="flex gap-3 mt-4">
+              <Button variant="outline" onClick={() => window.location.reload()}>
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Try Again
+              </Button>
+              <Button variant="glow" onClick={() => router.push('/auth/login')}>
+                Sign In Again
+              </Button>
+            </div>
           </div>
         </PageContainer>
       </MainLayout>

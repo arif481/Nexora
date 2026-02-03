@@ -17,6 +17,8 @@ import {
   Activity,
   Flame,
   Loader2,
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardHeader, CardContent } from '@/components/ui/Card';
@@ -35,12 +37,15 @@ import { useRouter } from 'next/navigation';
 export default function DashboardPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const { tasks, loading: tasksLoading } = useTasks();
+  const { tasks, loading: tasksLoading, error: tasksError } = useTasks();
   const taskStats = useTaskStats();
-  const { habits, loading: habitsLoading } = useHabits();
+  const { habits, loading: habitsLoading, error: habitsError } = useHabits();
   const completionData = useHabitCompletions(habits as any, 1);
-  const { events: todayEvents, loading: eventsLoading } = useTodayEvents();
+  const { events: todayEvents, loading: eventsLoading, error: eventsError } = useTodayEvents();
   const { openAIPanel } = useUIStore();
+  
+  // Combine errors for display
+  const dataError = tasksError || habitsError || eventsError;
 
   const today = new Date();
   const todayKey = today.toISOString().split('T')[0];
@@ -82,6 +87,36 @@ export default function DashboardPage() {
   }, [todayEvents]);
 
   const loading = authLoading || tasksLoading || habitsLoading || eventsLoading;
+
+  // Show error state if data fetching failed
+  if (dataError && !loading) {
+    return (
+      <MainLayout>
+        <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+          <div className="p-4 rounded-full bg-red-500/10">
+            <AlertCircle className="w-12 h-12 text-red-500" />
+          </div>
+          <h2 className="text-xl font-semibold text-white">Unable to Load Dashboard</h2>
+          <p className="text-dark-400 text-center max-w-md">
+            {dataError.includes('index') 
+              ? 'Database indexes are being built. This usually takes 2-5 minutes. Please try again shortly.'
+              : dataError.includes('permission')
+              ? 'You don\'t have permission to access this data. Please sign out and sign in again.'
+              : dataError}
+          </p>
+          <div className="flex gap-3 mt-4">
+            <Button variant="outline" onClick={() => window.location.reload()}>
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Try Again
+            </Button>
+            <Button variant="glow" onClick={() => router.push('/auth/login')}>
+              Sign In Again
+            </Button>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
 
   // Show loading state
   if (loading) {
