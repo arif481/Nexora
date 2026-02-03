@@ -18,7 +18,6 @@ import {
   Trash2,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
-import { formatRelativeTime } from '@/lib/utils';
 
 interface Notification {
   id: string;

@@ -6,7 +6,7 @@ interface ProgressProps {
   value: number;
   max?: number;
   size?: 'sm' | 'md' | 'lg';
-  variant?: 'default' | 'gradient' | 'success' | 'warning' | 'danger';
+  variant?: 'default' | 'gradient' | 'success' | 'warning' | 'danger' | 'cyan' | 'purple' | 'pink' | 'green' | 'orange' | 'blue';
   showValue?: boolean;
   animated?: boolean;
   glow?: boolean;
@@ -37,6 +37,12 @@ export function Progress({
     success: 'bg-neon-green',
     warning: 'bg-neon-orange',
     danger: 'bg-neon-red',
+    cyan: 'bg-neon-cyan',
+    purple: 'bg-neon-purple',
+    pink: 'bg-neon-pink',
+    green: 'bg-neon-green',
+    orange: 'bg-neon-orange',
+    blue: 'bg-neon-blue',
   };
 
   return (
@@ -72,10 +78,11 @@ interface CircularProgressProps {
   max?: number;
   size?: number;
   strokeWidth?: number;
-  variant?: 'default' | 'gradient' | 'success' | 'warning' | 'danger';
+  variant?: 'default' | 'gradient' | 'success' | 'warning' | 'danger' | 'cyan' | 'purple' | 'pink' | 'green' | 'orange' | 'blue';
   showValue?: boolean;
   label?: string;
   className?: string;
+  children?: React.ReactNode;
 }
 
 export function CircularProgress({
@@ -87,6 +94,7 @@ export function CircularProgress({
   showValue = true,
   label,
   className,
+  children,
 }: CircularProgressProps) {
   const percentage = Math.min(Math.max((value / max) * 100, 0), 100);
   const radius = (size - strokeWidth) / 2;
@@ -99,6 +107,12 @@ export function CircularProgress({
     success: { stroke: '#00ff88', id: 'green' },
     warning: { stroke: '#ffaa00', id: 'orange' },
     danger: { stroke: '#ff4466', id: 'red' },
+    cyan: { stroke: '#00fff5', id: 'cyan' },
+    purple: { stroke: '#bf00ff', id: 'purple' },
+    pink: { stroke: '#ff00aa', id: 'pink' },
+    green: { stroke: '#00ff88', id: 'green' },
+    orange: { stroke: '#ff8800', id: 'orange' },
+    blue: { stroke: '#00aaff', id: 'blue' },
   };
 
   const colorConfig = variantColors[variant];
@@ -143,15 +157,19 @@ export function CircularProgress({
           }}
         />
       </svg>
-      {(showValue || label) && (
+      {(showValue || label || children) && (
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          {showValue && (
-            <span className="text-lg font-bold text-white">
-              {Math.round(percentage)}%
-            </span>
-          )}
-          {label && (
-            <span className="text-xs text-white/50">{label}</span>
+          {children ? children : (
+            <>
+              {showValue && (
+                <span className="text-lg font-bold text-white">
+                  {Math.round(percentage)}%
+                </span>
+              )}
+              {label && (
+                <span className="text-xs text-white/50">{label}</span>
+              )}
+            </>
           )}
         </div>
       )}

@@ -105,10 +105,14 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 Button.displayName = 'Button';
 
 // Animated Button with Framer Motion
+interface AnimatedButtonProps extends Omit<ButtonProps, 'ref'> {
+  className?: string;
+}
+
 export const AnimatedButton = forwardRef<
   HTMLButtonElement,
-  ButtonProps & Omit<HTMLMotionProps<'button'>, keyof ButtonProps>
->(({ className, variant = 'primary', size = 'md', glow = false, ...props }, ref) => {
+  AnimatedButtonProps
+>(({ className, variant = 'primary', size = 'md', glow = false, children, ...props }, ref) => {
   return (
     <motion.button
       ref={ref}
@@ -116,8 +120,9 @@ export const AnimatedButton = forwardRef<
       whileTap={{ scale: 0.98 }}
       transition={{ type: 'spring', stiffness: 400, damping: 17 }}
       className={className}
-      {...props}
-    />
+    >
+      {children}
+    </motion.button>
   );
 });
 

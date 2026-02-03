@@ -37,6 +37,7 @@ import {
   ChevronRight,
   BarChart3,
   PieChart,
+  LogIn,
 } from 'lucide-react';
 import { MainLayout, PageContainer } from '@/components/layout/MainLayout';
 import { Card, CardHeader, CardContent } from '@/components/ui/Card';
@@ -45,38 +46,12 @@ import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { Progress, CircularProgress } from '@/components/ui/Progress';
 import { Modal } from '@/components/ui/Modal';
-import { EmptyState } from '@/components/ui/Loading';
+import { LoadingSpinner, EmptyState } from '@/components/ui/Loading';
 import { useUIStore } from '@/stores/uiStore';
 import { cn } from '@/lib/utils';
-
-// Types
-interface Transaction {
-  id: string;
-  type: 'income' | 'expense';
-  amount: number;
-  category: string;
-  description: string;
-  date: Date;
-  recurring?: boolean;
-}
-
-interface Budget {
-  id: string;
-  category: string;
-  limit: number;
-  spent: number;
-  color: string;
-  icon: any;
-}
-
-interface SavingsGoal {
-  id: string;
-  name: string;
-  target: number;
-  current: number;
-  deadline?: Date;
-  color: string;
-}
+import { useAuth } from '@/hooks/useAuth';
+import { useTransactions, useBudgets, useSubscriptions, useFinanceStats } from '@/hooks/useFinance';
+import type { Transaction, Budget } from '@/types';
 
 // Category config
 const categoryConfig: Record<string, { label: string; icon: any; color: string }> = {
@@ -95,48 +70,60 @@ const categoryConfig: Record<string, { label: string; icon: any; color: string }
   investment: { label: 'Investment', icon: TrendingUp, color: '#a855f7' },
 };
 
-// Mock data
-const mockTransactions: Transaction[] = [
-  { id: '1', type: 'expense', amount: 45.50, category: 'food', description: 'Grocery shopping', date: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000) },
-  { id: '2', type: 'expense', amount: 120.00, category: 'utilities', description: 'Electric bill', date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), recurring: true },
-  { id: '3', type: 'income', amount: 3500.00, category: 'salary', description: 'Monthly salary', date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), recurring: true },
-  { id: '4', type: 'expense', amount: 15.99, category: 'entertainment', description: 'Netflix subscription', date: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000), recurring: true },
-  { id: '5', type: 'expense', amount: 65.00, category: 'transport', description: 'Gas', date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000) },
-  { id: '6', type: 'expense', amount: 89.99, category: 'shopping', description: 'New headphones', date: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000) },
-  { id: '7', type: 'income', amount: 500.00, category: 'freelance', description: 'Side project', date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
-  { id: '8', type: 'expense', amount: 32.50, category: 'food', description: 'Restaurant dinner', date: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000) },
-];
-
-const mockBudgets: Budget[] = [
-  { id: '1', category: 'food', limit: 500, spent: 340, color: '#f97316', icon: Utensils },
-  { id: '2', category: 'shopping', limit: 300, spent: 280, color: '#ec4899', icon: ShoppingCart },
-  { id: '3', category: 'transport', limit: 200, spent: 120, color: '#3b82f6', icon: Car },
-  { id: '4', category: 'entertainment', limit: 150, spent: 75, color: '#a855f7', icon: Music },
-  { id: '5', category: 'utilities', limit: 250, spent: 220, color: '#fbbf24', icon: Zap },
-];
-
-const mockSavingsGoals: SavingsGoal[] = [
-  { id: '1', name: 'Emergency Fund', target: 10000, current: 7500, color: '#00f0ff' },
-  { id: '2', name: 'Vacation', target: 3000, current: 1200, deadline: new Date('2026-08-01'), color: '#a855f7' },
-  { id: '3', name: 'New Laptop', target: 2000, current: 800, color: '#f97316' },
-];
-
 export default function FinancePage() {
-  const [transactions, setTransactions] = useState<Transaction[]>(mockTransactions);
-  const [budgets] = useState<Budget[]>(mockBudgets);
-  const [savingsGoals] = useState<SavingsGoal[]>(mockSavingsGoals);
+  const { user, loading: authLoading } = useAuth();
+  const { transactions, loading: transactionsLoading, createTransaction, deleteTransaction: deleteTransactionFn } = useTransactions();
+  const { budgets, loading: budgetsLoading } = useBudgets();
+  const stats = useFinanceStats(transactions, budgets);
+  
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [isAddTransactionOpen, setIsAddTransactionOpen] = useState(false);
   const [filter, setFilter] = useState<'all' | 'income' | 'expense'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const { openAIPanel } = useUIStore();
 
-  // Calculate stats
-  const stats = useMemo(() => {
+  const loading = authLoading || transactionsLoading || budgetsLoading;
+
+  // Show loading state
+  if (loading) {
+    return (
+      <MainLayout>
+        <PageContainer title="Finance" subtitle="Track spending, grow wealth">
+          <div className="flex flex-col items-center justify-center min-h-[400px]">
+            <LoadingSpinner size="lg" />
+            <p className="mt-4 text-gray-600">Loading finance data...</p>
+          </div>
+        </PageContainer>
+      </MainLayout>
+    );
+  }
+
+  // Show login prompt if not authenticated
+  if (!user) {
+    return (
+      <MainLayout>
+        <PageContainer title="Finance" subtitle="Track spending, grow wealth">
+          <Card variant="glass" className="max-w-md mx-auto p-8 text-center">
+            <LogIn className="w-12 h-12 text-neon-cyan mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-white mb-2">Sign in to track finances</h3>
+            <p className="text-dark-400 mb-6">
+              Track your income, expenses, and budgets with real-time sync across devices.
+            </p>
+            <Button variant="glow" onClick={() => window.location.href = '/auth/login'}>
+              Sign In
+            </Button>
+          </Card>
+        </PageContainer>
+      </MainLayout>
+    );
+  }
+
+  // Calculate monthly stats
+  const monthlyStats = useMemo(() => {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     
-    const monthlyTransactions = transactions.filter(t => t.date >= startOfMonth);
+    const monthlyTransactions = transactions.filter(t => new Date(t.date) >= startOfMonth);
     const income = monthlyTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
     const expenses = monthlyTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
     const balance = income - expenses;
@@ -151,10 +138,10 @@ export default function FinancePage() {
       .filter(t => filter === 'all' || t.type === filter)
       .filter(t => 
         searchQuery === '' ||
-        t.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (t.description && t.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
         categoryConfig[t.category]?.label.toLowerCase().includes(searchQuery.toLowerCase())
       )
-      .sort((a, b) => b.date.getTime() - a.date.getTime());
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [transactions, filter, searchQuery]);
 
   const formatCurrency = (amount: number) => {
@@ -238,7 +225,7 @@ export default function FinancePage() {
               <span className="text-sm text-dark-400">Monthly Income</span>
               <ArrowUpRight className="w-6 h-6 text-neon-green" />
             </div>
-            <p className="text-2xl font-bold text-neon-green">{formatCurrency(stats.income)}</p>
+            <p className="text-2xl font-bold text-neon-green">{formatCurrency(monthlyStats.income)}</p>
             <p className="text-xs text-dark-500">this month</p>
           </Card>
 
@@ -247,7 +234,7 @@ export default function FinancePage() {
               <span className="text-sm text-dark-400">Monthly Expenses</span>
               <ArrowDownLeft className="w-6 h-6 text-neon-orange" />
             </div>
-            <p className="text-2xl font-bold text-neon-orange">{formatCurrency(stats.expenses)}</p>
+            <p className="text-2xl font-bold text-neon-orange">{formatCurrency(monthlyStats.expenses)}</p>
             <p className="text-xs text-dark-500">this month</p>
           </Card>
 
@@ -258,9 +245,9 @@ export default function FinancePage() {
             </div>
             <p className={cn(
               'text-2xl font-bold',
-              stats.balance >= 0 ? 'text-neon-green' : 'text-status-error'
+              monthlyStats.balance >= 0 ? 'text-neon-green' : 'text-status-error'
             )}>
-              {formatCurrency(stats.balance)}
+              {formatCurrency(monthlyStats.balance)}
             </p>
             <p className="text-xs text-dark-500">this month</p>
           </Card>
@@ -268,9 +255,9 @@ export default function FinancePage() {
           <Card variant="glass" className="p-4">
             <div className="flex items-center justify-between mb-4">
               <span className="text-sm text-dark-400">Savings Rate</span>
-              <CircularProgress value={stats.savingsRate} size={48} strokeWidth={4} />
+              <CircularProgress value={monthlyStats.savingsRate} size={48} strokeWidth={4} />
             </div>
-            <p className="text-2xl font-bold text-white">{stats.savingsRate}%</p>
+            <p className="text-2xl font-bold text-white">{monthlyStats.savingsRate}%</p>
             <p className="text-xs text-dark-500">of income saved</p>
           </Card>
         </motion.div>
@@ -362,19 +349,20 @@ export default function FinancePage() {
                 }
               />
               <CardContent className="space-y-4">
-                {budgets.map(budget => {
-                  const percentage = Math.round((budget.spent / budget.limit) * 100);
+                {budgets.length > 0 ? budgets.map(budget => {
+                  const percentage = Math.round((budget.spent / budget.amount) * 100);
                   const isOverBudget = percentage > 100;
                   const isNearLimit = percentage >= 80 && percentage <= 100;
-                  const Icon = budget.icon;
+                  const config = categoryConfig[budget.category] || categoryConfig.other;
+                  const Icon = config.icon;
 
                   return (
                     <div key={budget.id}>
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
-                          <Icon className="w-4 h-4" style={{ color: budget.color }} />
+                          <Icon className="w-4 h-4" style={{ color: config.color }} />
                           <span className="text-sm text-white">
-                            {categoryConfig[budget.category]?.label}
+                            {budget.name || config.label}
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
@@ -385,7 +373,7 @@ export default function FinancePage() {
                             )} />
                           )}
                           <span className="text-xs text-dark-400">
-                            {formatCurrency(budget.spent)} / {formatCurrency(budget.limit)}
+                            {formatCurrency(budget.spent)} / {formatCurrency(budget.amount)}
                           </span>
                         </div>
                       </div>
@@ -396,45 +384,9 @@ export default function FinancePage() {
                       />
                     </div>
                   );
-                })}
-              </CardContent>
-            </Card>
-
-            {/* Savings Goals */}
-            <Card variant="glass">
-              <CardHeader
-                title="Savings Goals"
-                icon={<PiggyBank className="w-5 h-5 text-neon-green" />}
-              />
-              <CardContent className="space-y-4">
-                {savingsGoals.map(goal => {
-                  const percentage = Math.round((goal.current / goal.target) * 100);
-
-                  return (
-                    <div key={goal.id} className="p-3 rounded-lg bg-dark-800/30">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium text-white">{goal.name}</span>
-                        <span className="text-xs" style={{ color: goal.color }}>
-                          {percentage}%
-                        </span>
-                      </div>
-                      <Progress value={percentage} variant="green" size="sm" />
-                      <div className="flex items-center justify-between mt-2">
-                        <span className="text-xs text-dark-400">
-                          {formatCurrency(goal.current)} saved
-                        </span>
-                        <span className="text-xs text-dark-500">
-                          {formatCurrency(goal.target)} goal
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-
-                <Button variant="ghost" size="sm" className="w-full">
-                  <Plus className="w-4 h-4 mr-1" />
-                  New Goal
-                </Button>
+                }) : (
+                  <p className="text-sm text-dark-400 text-center py-4">No budgets set. Create one to track spending.</p>
+                )}
               </CardContent>
             </Card>
 
@@ -445,35 +397,39 @@ export default function FinancePage() {
                 icon={<Brain className="w-5 h-5 text-neon-purple" />}
               />
               <CardContent className="space-y-3">
-                <div className="p-3 rounded-lg bg-neon-green/10 border border-neon-green/20">
-                  <div className="flex items-center gap-2 mb-1">
-                    <TrendingUp className="w-4 h-4 text-neon-green" />
-                    <span className="text-xs font-medium text-neon-green">Good News!</span>
+                {stats.budgetUtilization > 80 ? (
+                  <div className="p-3 rounded-lg bg-neon-orange/10 border border-neon-orange/20">
+                    <div className="flex items-center gap-2 mb-1">
+                      <AlertTriangle className="w-4 h-4 text-neon-orange" />
+                      <span className="text-xs font-medium text-neon-orange">Watch Out</span>
+                    </div>
+                    <p className="text-sm text-dark-300">
+                      You've used {Math.round(stats.budgetUtilization)}% of your total budget this period.
+                    </p>
                   </div>
-                  <p className="text-sm text-dark-300">
-                    You're spending 15% less on food compared to last month. Great budgeting!
-                  </p>
-                </div>
+                ) : monthlyStats.savingsRate > 20 ? (
+                  <div className="p-3 rounded-lg bg-neon-green/10 border border-neon-green/20">
+                    <div className="flex items-center gap-2 mb-1">
+                      <TrendingUp className="w-4 h-4 text-neon-green" />
+                      <span className="text-xs font-medium text-neon-green">Good News!</span>
+                    </div>
+                    <p className="text-sm text-dark-300">
+                      Great job! You're saving {monthlyStats.savingsRate}% of your income this month.
+                    </p>
+                  </div>
+                ) : null}
 
-                <div className="p-3 rounded-lg bg-neon-orange/10 border border-neon-orange/20">
-                  <div className="flex items-center gap-2 mb-1">
-                    <AlertTriangle className="w-4 h-4 text-neon-orange" />
-                    <span className="text-xs font-medium text-neon-orange">Watch Out</span>
+                {stats.topCategories.length > 0 && (
+                  <div className="p-3 rounded-lg bg-dark-800/30">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Sparkles className="w-4 h-4 text-neon-cyan" />
+                      <span className="text-xs font-medium text-dark-200">Top Spending</span>
+                    </div>
+                    <p className="text-sm text-dark-400">
+                      Your highest expense category is {categoryConfig[stats.topCategories[0]?.category]?.label || stats.topCategories[0]?.category} at {formatCurrency(stats.topCategories[0]?.amount || 0)}.
+                    </p>
                   </div>
-                  <p className="text-sm text-dark-300">
-                    Shopping expenses are 93% of your budget. Consider holding off on purchases.
-                  </p>
-                </div>
-
-                <div className="p-3 rounded-lg bg-dark-800/30">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Sparkles className="w-4 h-4 text-neon-cyan" />
-                    <span className="text-xs font-medium text-dark-200">Suggestion</span>
-                  </div>
-                  <p className="text-sm text-dark-400">
-                    At your current rate, you'll reach your Emergency Fund goal in 3 months!
-                  </p>
-                </div>
+                )}
 
                 <Button variant="ghost" size="sm" className="w-full" onClick={openAIPanel}>
                   <Sparkles className="w-4 h-4 mr-1" />
@@ -492,8 +448,8 @@ export default function FinancePage() {
           size="md"
         >
           <AddTransactionForm
-            onAdd={transaction => {
-              setTransactions(prev => [transaction, ...prev]);
+            onAdd={async (data) => {
+              await createTransaction(data);
               setIsAddTransactionOpen(false);
             }}
             onClose={() => setIsAddTransactionOpen(false)}
@@ -511,8 +467,8 @@ export default function FinancePage() {
             <TransactionDetails
               transaction={selectedTransaction}
               onClose={() => setSelectedTransaction(null)}
-              onDelete={() => {
-                setTransactions(prev => prev.filter(t => t.id !== selectedTransaction.id));
+              onDelete={async () => {
+                await deleteTransactionFn(selectedTransaction.id);
                 setSelectedTransaction(null);
               }}
             />
@@ -524,11 +480,20 @@ export default function FinancePage() {
 }
 
 // Add Transaction Form
+interface CreateTransactionData {
+  amount: number;
+  type: 'income' | 'expense';
+  category: string;
+  description?: string;
+  date?: Date;
+  recurring?: boolean;
+}
+
 function AddTransactionForm({
   onAdd,
   onClose,
 }: {
-  onAdd: (transaction: Transaction) => void;
+  onAdd: (data: CreateTransactionData) => Promise<void>;
   onClose: () => void;
 }) {
   const [type, setType] = useState<'income' | 'expense'>('expense');
@@ -537,22 +502,27 @@ function AddTransactionForm({
   const [description, setDescription] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [recurring, setRecurring] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const categories = type === 'income'
     ? ['salary', 'freelance', 'investment', 'other']
     : ['food', 'shopping', 'transport', 'utilities', 'entertainment', 'health', 'travel', 'housing', 'phone', 'other'];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onAdd({
-      id: Date.now().toString(),
-      type,
-      amount: parseFloat(amount),
-      category,
-      description,
-      date: new Date(date),
-      recurring,
-    });
+    setIsSubmitting(true);
+    try {
+      await onAdd({
+        type,
+        amount: parseFloat(amount),
+        category,
+        description,
+        date: new Date(date),
+        recurring,
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -666,7 +636,9 @@ function AddTransactionForm({
 
       <div className="flex justify-end gap-3 pt-4">
         <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
-        <Button type="submit" variant="glow">Add Transaction</Button>
+        <Button type="submit" variant="glow" disabled={isSubmitting}>
+          {isSubmitting ? 'Adding...' : 'Add Transaction'}
+        </Button>
       </div>
     </form>
   );

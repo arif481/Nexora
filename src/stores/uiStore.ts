@@ -43,6 +43,8 @@ interface UIState {
   toggleQuickActions: () => void;
   toggleNotificationPanel: () => void;
   toggleAIPanel: () => void;
+  openAIPanel: () => void;
+  closeAIPanel: () => void;
   setAIMinimized: (minimized: boolean) => void;
   setTheme: (theme: 'dark' | 'light' | 'system') => void;
   toggleFocusMode: () => void;
@@ -109,6 +111,10 @@ export const useUIStore = create<UIState>()(
 
       toggleAIPanel: () =>
         set((state) => ({ aiPanelOpen: !state.aiPanelOpen, aiMinimized: false })),
+
+      openAIPanel: () => set({ aiPanelOpen: true, aiMinimized: false }),
+
+      closeAIPanel: () => set({ aiPanelOpen: false }),
 
       setAIMinimized: (minimized) => set({ aiMinimized: minimized }),
 

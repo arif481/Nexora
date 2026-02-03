@@ -37,6 +37,7 @@ import {
   EyeOff,
   Moon,
   Sun,
+  LogIn,
 } from 'lucide-react';
 import { MainLayout, PageContainer } from '@/components/layout/MainLayout';
 import { Card, CardHeader, CardContent } from '@/components/ui/Card';
@@ -45,8 +46,11 @@ import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { Progress, CircularProgress } from '@/components/ui/Progress';
 import { Modal } from '@/components/ui/Modal';
+import { LoadingSpinner } from '@/components/ui/Loading';
 import { useUIStore } from '@/stores/uiStore';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/useAuth';
+import { useFocus, useFocusStats } from '@/hooks/useFocus';
 
 type TimerMode = 'focus' | 'shortBreak' | 'longBreak';
 type TimerStatus = 'idle' | 'running' | 'paused';
@@ -57,14 +61,6 @@ interface FocusTask {
   estimatedPomodoros: number;
   completedPomodoros: number;
   completed: boolean;
-}
-
-interface FocusSession {
-  id: string;
-  mode: TimerMode;
-  duration: number;
-  completedAt: Date;
-  taskId?: string;
 }
 
 // Timer presets in seconds
@@ -84,27 +80,15 @@ const ambientSounds = [
   { id: 'lofi', name: 'Lo-Fi', icon: '🎵' },
 ];
 
-// Mock data
-const mockTasks: FocusTask[] = [
-  { id: '1', name: 'Complete Nexora dashboard', estimatedPomodoros: 4, completedPomodoros: 2, completed: false },
-  { id: '2', name: 'Review pull requests', estimatedPomodoros: 2, completedPomodoros: 0, completed: false },
-  { id: '3', name: 'Write documentation', estimatedPomodoros: 3, completedPomodoros: 3, completed: true },
-];
-
-const mockSessions: FocusSession[] = [
-  { id: '1', mode: 'focus', duration: 25 * 60, completedAt: new Date(Date.now() - 60 * 60 * 1000), taskId: '1' },
-  { id: '2', mode: 'shortBreak', duration: 5 * 60, completedAt: new Date(Date.now() - 55 * 60 * 1000) },
-  { id: '3', mode: 'focus', duration: 25 * 60, completedAt: new Date(Date.now() - 30 * 60 * 1000), taskId: '1' },
-];
-
 export default function FocusPage() {
+  const { user, loading: authLoading } = useAuth();
+  const { sessions, tasks, loading: focusLoading, addSession, addTask, updateTask, removeTask } = useFocus();
+  const focusStats = useFocusStats(sessions);
+  
   const [mode, setMode] = useState<TimerMode>('focus');
   const [status, setStatus] = useState<TimerStatus>('idle');
   const [timeLeft, setTimeLeft] = useState(TIMER_PRESETS.focus);
-  const [sessions, setSessions] = useState<FocusSession[]>(mockSessions);
-  const [tasks, setTasks] = useState<FocusTask[]>(mockTasks);
   const [activeTask, setActiveTask] = useState<FocusTask | null>(null);
-  const [completedToday, setCompletedToday] = useState(4);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [activeSound, setActiveSound] = useState<string | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -115,10 +99,12 @@ export default function FocusPage() {
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const { openAIPanel } = useUIStore();
 
+  const loading = authLoading || focusLoading;
+
   // Calculate total focus time today
   const totalFocusToday = sessions
-    .filter(s => s.mode === 'focus' && s.completedAt.toDateString() === new Date().toDateString())
-    .reduce((acc, s) => acc + s.duration, 0);
+    .filter(s => s.type === 'pomodoro' && s.endTime && new Date(s.endTime).toDateString() === new Date().toDateString())
+    .reduce((acc, s) => acc + (s.duration || 0), 0);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -160,34 +146,35 @@ export default function FocusPage() {
     };
   }, [status]);
 
-  const handleTimerComplete = () => {
+  const handleTimerComplete = async () => {
     setStatus('idle');
     
-    // Add session
-    const newSession: FocusSession = {
-      id: Date.now().toString(),
-      mode,
-      duration: TIMER_PRESETS[mode],
-      completedAt: new Date(),
-      taskId: activeTask?.id,
-    };
-    setSessions(prev => [...prev, newSession]);
+    // Add session to Firebase
+    const now = new Date();
+    try {
+      await addSession({
+        type: mode === 'focus' ? 'pomodoro' : mode === 'shortBreak' ? 'pomodoro' : 'deep-work',
+        duration: Math.floor(TIMER_PRESETS[mode] / 60), // convert to minutes
+        startTime: new Date(now.getTime() - TIMER_PRESETS[mode] * 1000),
+        endTime: now,
+        distractions: 0,
+        quality: 5,
+        taskId: activeTask?.id,
+      });
+    } catch (error) {
+      console.error('Failed to save session:', error);
+    }
 
     // Update task if focus session
     if (mode === 'focus' && activeTask) {
-      setTasks(prev =>
-        prev.map(t =>
-          t.id === activeTask.id
-            ? { ...t, completedPomodoros: t.completedPomodoros + 1 }
-            : t
-        )
-      );
-      setCompletedToday(prev => prev + 1);
+      updateTask(activeTask.id, { 
+        completedPomodoros: activeTask.completedPomodoros + 1 
+      });
     }
 
     // Auto-switch mode
     if (mode === 'focus') {
-      const focusCount = sessions.filter(s => s.mode === 'focus').length + 1;
+      const focusCount = sessions.filter(s => s.type === 'pomodoro').length + 1;
       if (focusCount % 4 === 0) {
         setMode('longBreak');
         setTimeLeft(TIMER_PRESETS.longBreak);
@@ -265,6 +252,40 @@ export default function FocusPage() {
 
   const currentMode = modeConfig[mode];
   const ModeIcon = currentMode.icon;
+
+  // Loading state
+  if (loading) {
+    return (
+      <MainLayout>
+        <PageContainer title="Focus Mode" subtitle="Deep work, zero distractions">
+          <div className="flex flex-col items-center justify-center min-h-[400px]">
+            <LoadingSpinner size="lg" />
+            <p className="mt-4 text-gray-600">Loading focus data...</p>
+          </div>
+        </PageContainer>
+      </MainLayout>
+    );
+  }
+
+  // Show login prompt if not authenticated
+  if (!user) {
+    return (
+      <MainLayout>
+        <PageContainer title="Focus Mode" subtitle="Deep work, zero distractions">
+          <Card variant="glass" className="max-w-md mx-auto p-8 text-center">
+            <LogIn className="w-12 h-12 text-neon-cyan mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-white mb-2">Sign in to track focus</h3>
+            <p className="text-dark-400 mb-6">
+              Save your focus sessions and track productivity over time.
+            </p>
+            <Button variant="glow" onClick={() => window.location.href = '/auth/login'}>
+              Sign In
+            </Button>
+          </Card>
+        </PageContainer>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
@@ -496,14 +517,14 @@ export default function FocusPage() {
                   <div className="p-3 rounded-lg bg-dark-800/30 text-center">
                     <div className="flex items-center justify-center gap-1 mb-1">
                       <Flame className="w-4 h-4 text-neon-orange" />
-                      <span className="text-2xl font-bold text-white">{completedToday}</span>
+                      <span className="text-2xl font-bold text-white">{focusStats.todayPomodoros}</span>
                     </div>
                     <p className="text-xs text-dark-400">Pomodoros</p>
                   </div>
                   <div className="p-3 rounded-lg bg-dark-800/30 text-center">
                     <div className="flex items-center justify-center gap-1 mb-1">
                       <Clock className="w-4 h-4 text-neon-cyan" />
-                      <span className="text-2xl font-bold text-white">{formatDuration(totalFocusToday)}</span>
+                      <span className="text-2xl font-bold text-white">{formatDuration(focusStats.todayMinutes * 60)}</span>
                     </div>
                     <p className="text-xs text-dark-400">Focus Time</p>
                   </div>
@@ -513,9 +534,9 @@ export default function FocusPage() {
                 <div className="mt-4">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm text-dark-400">Daily Goal</span>
-                    <span className="text-sm text-dark-300">{completedToday}/8 sessions</span>
+                    <span className="text-sm text-dark-300">{focusStats.todayPomodoros}/8 sessions</span>
                   </div>
-                  <Progress value={(completedToday / 8) * 100} variant="cyan" />
+                  <Progress value={(focusStats.todayPomodoros / 8) * 100} variant="cyan" />
                 </div>
               </CardContent>
             </Card>
@@ -676,7 +697,7 @@ export default function FocusPage() {
         >
           <AddFocusTask
             onAdd={task => {
-              setTasks(prev => [...prev, task]);
+              addTask(task);
               setIsAddTaskOpen(false);
             }}
             onClose={() => setIsAddTaskOpen(false)}

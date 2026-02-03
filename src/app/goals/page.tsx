@@ -29,6 +29,7 @@ import {
   Play,
   Pause,
   RefreshCw,
+  LogIn,
 } from 'lucide-react';
 import { MainLayout, PageContainer } from '@/components/layout/MainLayout';
 import { Card, CardHeader, CardContent } from '@/components/ui/Card';
@@ -37,109 +38,14 @@ import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { Progress, CircularProgress } from '@/components/ui/Progress';
 import { Modal } from '@/components/ui/Modal';
-import { EmptyState } from '@/components/ui/Loading';
+import { LoadingSpinner, EmptyState } from '@/components/ui/Loading';
 import { useUIStore } from '@/stores/uiStore';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/useAuth';
+import { useGoals, useGoalStats } from '@/hooks/useGoals';
+import type { Goal, Milestone as MilestoneType } from '@/lib/services/goals';
 
-// Types
-interface Milestone {
-  id: string;
-  title: string;
-  completed: boolean;
-  dueDate?: Date;
-}
-
-interface Goal {
-  id: string;
-  title: string;
-  description?: string;
-  category: 'health' | 'career' | 'finance' | 'personal' | 'education' | 'relationships';
-  priority: 'low' | 'medium' | 'high';
-  status: 'not-started' | 'in-progress' | 'completed' | 'paused';
-  progress: number;
-  targetDate?: Date;
-  startDate: Date;
-  milestones: Milestone[];
-  color: string;
-}
-
-// Mock data
-const mockGoals: Goal[] = [
-  {
-    id: '1',
-    title: 'Run a Marathon',
-    description: 'Complete a full marathon by the end of the year',
-    category: 'health',
-    priority: 'high',
-    status: 'in-progress',
-    progress: 65,
-    targetDate: new Date('2026-12-31'),
-    startDate: new Date('2026-01-01'),
-    color: '#10b981',
-    milestones: [
-      { id: 'm1', title: 'Run 5K without stopping', completed: true },
-      { id: 'm2', title: 'Complete 10K race', completed: true },
-      { id: 'm3', title: 'Run half marathon', completed: false },
-      { id: 'm4', title: 'Complete full marathon', completed: false },
-    ],
-  },
-  {
-    id: '2',
-    title: 'Learn Spanish to B2 Level',
-    description: 'Achieve conversational fluency in Spanish',
-    category: 'education',
-    priority: 'medium',
-    status: 'in-progress',
-    progress: 40,
-    targetDate: new Date('2026-06-30'),
-    startDate: new Date('2025-09-01'),
-    color: '#f97316',
-    milestones: [
-      { id: 'm1', title: 'Complete A1 course', completed: true },
-      { id: 'm2', title: 'Complete A2 course', completed: true },
-      { id: 'm3', title: 'Complete B1 course', completed: false },
-      { id: 'm4', title: 'Pass B2 exam', completed: false },
-    ],
-  },
-  {
-    id: '3',
-    title: 'Save $10,000 Emergency Fund',
-    description: 'Build a solid financial safety net',
-    category: 'finance',
-    priority: 'high',
-    status: 'in-progress',
-    progress: 75,
-    targetDate: new Date('2026-06-01'),
-    startDate: new Date('2025-06-01'),
-    color: '#00f0ff',
-    milestones: [
-      { id: 'm1', title: 'Save first $2,500', completed: true },
-      { id: 'm2', title: 'Reach $5,000', completed: true },
-      { id: 'm3', title: 'Reach $7,500', completed: true },
-      { id: 'm4', title: 'Complete $10,000', completed: false },
-    ],
-  },
-  {
-    id: '4',
-    title: 'Get Promoted to Senior Developer',
-    description: 'Advance career to senior position',
-    category: 'career',
-    priority: 'high',
-    status: 'in-progress',
-    progress: 55,
-    targetDate: new Date('2026-12-31'),
-    startDate: new Date('2025-01-01'),
-    color: '#a855f7',
-    milestones: [
-      { id: 'm1', title: 'Complete advanced certifications', completed: true },
-      { id: 'm2', title: 'Lead 3 major projects', completed: false },
-      { id: 'm3', title: 'Mentor junior developers', completed: true },
-      { id: 'm4', title: 'Get promotion', completed: false },
-    ],
-  },
-];
-
-const categoryConfig = {
+const categoryConfig: Record<string, { label: string; icon: string; color: string }> = {
   health: { label: 'Health', icon: '💪', color: '#10b981' },
   career: { label: 'Career', icon: '💼', color: '#a855f7' },
   finance: { label: 'Finance', icon: '💰', color: '#00f0ff' },
@@ -149,24 +55,25 @@ const categoryConfig = {
 };
 
 export default function GoalsPage() {
-  const [goals, setGoals] = useState<Goal[]>(mockGoals);
+  const { user, loading: authLoading } = useAuth();
+  const { 
+    goals, 
+    loading: goalsLoading, 
+    createGoal, 
+    updateGoal, 
+    deleteGoal, 
+    toggleMilestone: toggleMilestoneService,
+    addMilestone: addMilestoneService,
+  } = useGoals();
+  const goalStats = useGoalStats(goals);
+  
   const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
   const [expandedGoals, setExpandedGoals] = useState<Set<string>>(new Set());
   const { openAIPanel } = useUIStore();
 
-  // Stats
-  const stats = useMemo(() => {
-    const total = goals.length;
-    const completed = goals.filter(g => g.status === 'completed').length;
-    const inProgress = goals.filter(g => g.status === 'in-progress').length;
-    const avgProgress = goals.length > 0
-      ? Math.round(goals.reduce((sum, g) => sum + g.progress, 0) / goals.length)
-      : 0;
-
-    return { total, completed, inProgress, avgProgress };
-  }, [goals]);
+  const loading = authLoading || goalsLoading;
 
   const filteredGoals = useMemo(() => {
     switch (filter) {
@@ -191,19 +98,47 @@ export default function GoalsPage() {
     });
   };
 
-  const toggleMilestone = (goalId: string, milestoneId: string) => {
-    setGoals(prev =>
-      prev.map(goal => {
-        if (goal.id !== goalId) return goal;
-        const milestones = goal.milestones.map(m =>
-          m.id === milestoneId ? { ...m, completed: !m.completed } : m
-        );
-        const completedCount = milestones.filter(m => m.completed).length;
-        const progress = Math.round((completedCount / milestones.length) * 100);
-        return { ...goal, milestones, progress };
-      })
-    );
+  const handleToggleMilestone = async (goalId: string, milestoneId: string, currentCompleted: boolean) => {
+    try {
+      await toggleMilestoneService(goalId, milestoneId, !currentCompleted);
+    } catch (error) {
+      console.error('Failed to toggle milestone:', error);
+    }
   };
+
+  // Loading state
+  if (loading) {
+    return (
+      <MainLayout>
+        <PageContainer title="Goals" subtitle="Track your progress towards meaningful goals">
+          <div className="flex flex-col items-center justify-center min-h-[400px]">
+            <LoadingSpinner size="lg" />
+            <p className="mt-4 text-gray-600">Loading goals...</p>
+          </div>
+        </PageContainer>
+      </MainLayout>
+    );
+  }
+
+  // Show login prompt if not authenticated
+  if (!user) {
+    return (
+      <MainLayout>
+        <PageContainer title="Goals" subtitle="Track your progress towards meaningful goals">
+          <Card variant="glass" className="max-w-md mx-auto p-8 text-center">
+            <LogIn className="w-12 h-12 text-neon-cyan mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-white mb-2">Sign in to track goals</h3>
+            <p className="text-dark-400 mb-6">
+              Set goals, track milestones, and achieve your dreams.
+            </p>
+            <Button variant="glow" onClick={() => window.location.href = '/auth/login'}>
+              Sign In
+            </Button>
+          </Card>
+        </PageContainer>
+      </MainLayout>
+    );
+  }
 
   const getDaysRemaining = (targetDate?: Date) => {
     if (!targetDate) return null;
@@ -337,7 +272,7 @@ export default function GoalsPage() {
                       className="flex items-center gap-3 py-2"
                     >
                       <button
-                        onClick={() => toggleMilestone(goal.id, milestone.id)}
+                        onClick={() => handleToggleMilestone(goal.id, milestone.id, milestone.completed)}
                         className={cn(
                           'w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center transition-all',
                           milestone.completed
@@ -383,7 +318,7 @@ export default function GoalsPage() {
               <span className="text-sm text-dark-400">Total Goals</span>
               <Target className="w-6 h-6 text-neon-cyan" />
             </div>
-            <p className="text-2xl font-bold text-white">{stats.total}</p>
+            <p className="text-2xl font-bold text-white">{goalStats.total}</p>
             <p className="text-xs text-dark-500">goals set</p>
           </Card>
 
@@ -392,7 +327,7 @@ export default function GoalsPage() {
               <span className="text-sm text-dark-400">In Progress</span>
               <TrendingUp className="w-6 h-6 text-neon-orange" />
             </div>
-            <p className="text-2xl font-bold text-white">{stats.inProgress}</p>
+            <p className="text-2xl font-bold text-white">{goalStats.inProgress}</p>
             <p className="text-xs text-dark-500">actively working</p>
           </Card>
 
@@ -401,16 +336,16 @@ export default function GoalsPage() {
               <span className="text-sm text-dark-400">Completed</span>
               <Trophy className="w-6 h-6 text-neon-green" />
             </div>
-            <p className="text-2xl font-bold text-white">{stats.completed}</p>
+            <p className="text-2xl font-bold text-white">{goalStats.completed}</p>
             <p className="text-xs text-dark-500">goals achieved</p>
           </Card>
 
           <Card variant="glass" className="p-4">
             <div className="flex items-center justify-between mb-4">
               <span className="text-sm text-dark-400">Avg Progress</span>
-              <CircularProgress value={stats.avgProgress} size={48} strokeWidth={4} />
+              <CircularProgress value={goalStats.averageProgress} size={48} strokeWidth={4} />
             </div>
-            <p className="text-2xl font-bold text-white">{stats.avgProgress}%</p>
+            <p className="text-2xl font-bold text-white">{goalStats.averageProgress}%</p>
             <p className="text-xs text-dark-500">overall progress</p>
           </Card>
         </motion.div>

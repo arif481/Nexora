@@ -93,8 +93,8 @@ export interface AnimatedCardProps extends CardProps {
   animate?: boolean;
 }
 
-const AnimatedCard = forwardRef<HTMLDivElement, AnimatedCardProps & Omit<HTMLMotionProps<'div'>, keyof AnimatedCardProps>>(
-  ({ className, variant = 'default', padding = 'md', glow = false, glowColor = 'cyan', delay = 0, animate = true, children, ...props }, ref) => {
+const AnimatedCard = forwardRef<HTMLDivElement, AnimatedCardProps>(
+  ({ className, variant = 'default', padding = 'md', glow = false, glowColor = 'cyan', delay = 0, animate = true, children }, ref) => {
     const variantStyles = {
       default: cn(
         'backdrop-blur-xl border border-glass-border rounded-2xl',
@@ -147,7 +147,6 @@ const AnimatedCard = forwardRef<HTMLDivElement, AnimatedCardProps & Omit<HTMLMot
           glow && glowStyles[glowColor],
           className
         )}
-        {...props}
       >
         {children}
       </motion.div>

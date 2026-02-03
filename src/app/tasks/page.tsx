@@ -6,8 +6,6 @@ import {
   Plus,
   Search,
   Filter,
-  SortAsc,
-  SortDesc,
   Calendar,
   Tag,
   Clock,
@@ -15,186 +13,69 @@ import {
   Circle,
   MoreHorizontal,
   Trash2,
-  Edit3,
-  Copy,
   Flag,
   Sparkles,
   Brain,
   Target,
   ListTodo,
-  Grid3X3,
   List,
   ChevronDown,
   ChevronRight,
   AlertCircle,
-  Timer,
-  Repeat,
-  Link2,
-  MessageSquare,
+  Loader2,
 } from 'lucide-react';
-import { MainLayout, PageContainer, Section } from '@/components/layout/MainLayout';
-import { Card, CardHeader, CardContent } from '@/components/ui/Card';
+import { MainLayout, PageContainer } from '@/components/layout/MainLayout';
+import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge, PriorityBadge, StatusBadge } from '@/components/ui/Badge';
 import { Progress, CircularProgress } from '@/components/ui/Progress';
-import { Modal, ConfirmModal } from '@/components/ui/Modal';
-import { EmptyState } from '@/components/ui/Loading';
-import { useTaskStore } from '@/stores/taskStore';
+import { Modal } from '@/components/ui/Modal';
+import { EmptyState, LoadingSpinner } from '@/components/ui/Loading';
 import { useUIStore } from '@/stores/uiStore';
-import { cn, formatDate, formatRelativeDate, getDeadlineStatus } from '@/lib/utils';
-import type { Task, Priority, TaskStatus } from '@/types';
+import { cn, formatRelativeDate, getDeadlineStatus } from '@/lib/utils';
+import { useTasks, useTaskStats } from '@/hooks/useTasks';
+import { useAuth } from '@/hooks/useAuth';
+import type { Task, TaskPriority, TaskStatus } from '@/types';
 
-// Mock tasks for demonstration
-const mockTasks: Task[] = [
-  {
-    id: '1',
-    userId: 'user1',
-    title: 'Complete project proposal',
-    description: 'Write and finalize the Q2 project proposal for the client meeting',
-    priority: 'high',
-    status: 'in-progress',
-    dueDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // 2 days from now
-    tags: ['work', 'important', 'client'],
-    subtasks: [
-      { id: 's1', title: 'Research market trends', completed: true },
-      { id: 's2', title: 'Draft executive summary', completed: true },
-      { id: 's3', title: 'Create timeline & budget', completed: false },
-      { id: 's4', title: 'Review with team', completed: false },
-    ],
-    contextTriggers: ['at office', 'high energy'],
-    estimatedMinutes: 120,
-    aiSuggested: false,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '2',
-    userId: 'user1',
-    title: 'Schedule dentist appointment',
-    description: 'Annual checkup - call Dr. Smith\'s office',
-    priority: 'medium',
-    status: 'pending',
-    dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 1 week from now
-    tags: ['health', 'personal'],
-    subtasks: [],
-    contextTriggers: ['phone available'],
-    estimatedMinutes: 15,
-    aiSuggested: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '3',
-    userId: 'user1',
-    title: 'Review team performance reports',
-    description: 'Go through quarterly performance metrics and prepare feedback',
-    priority: 'high',
-    status: 'pending',
-    dueDate: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000), // tomorrow
-    tags: ['work', 'management'],
-    subtasks: [
-      { id: 's1', title: 'Review sales team metrics', completed: false },
-      { id: 's2', title: 'Review engineering metrics', completed: false },
-      { id: 's3', title: 'Prepare feedback notes', completed: false },
-    ],
-    contextTriggers: [],
-    estimatedMinutes: 90,
-    aiSuggested: false,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '4',
-    userId: 'user1',
-    title: 'Buy groceries',
-    description: 'Weekly grocery shopping - milk, eggs, bread, vegetables',
-    priority: 'low',
-    status: 'pending',
-    dueDate: new Date(),
-    tags: ['personal', 'shopping'],
-    subtasks: [],
-    contextTriggers: ['near store', 'weekend'],
-    estimatedMinutes: 45,
-    aiSuggested: false,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '5',
-    userId: 'user1',
-    title: 'Morning meditation',
-    description: '15-minute guided meditation session',
-    priority: 'medium',
-    status: 'completed',
-    dueDate: new Date(),
-    tags: ['wellness', 'habit'],
-    subtasks: [],
-    contextTriggers: ['morning'],
-    estimatedMinutes: 15,
-    aiSuggested: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    completedAt: new Date(),
-  },
-  {
-    id: '6',
-    userId: 'user1',
-    title: 'Read 30 minutes',
-    description: 'Continue reading "Atomic Habits"',
-    priority: 'low',
-    status: 'completed',
-    dueDate: new Date(),
-    tags: ['personal', 'learning', 'habit'],
-    subtasks: [],
-    contextTriggers: ['evening', 'relaxed'],
-    estimatedMinutes: 30,
-    aiSuggested: false,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    completedAt: new Date(),
-  },
+const priorityOptions: { label: string; value: TaskPriority; color: string }[] = [
+  { label: 'Critical', value: 'critical', color: 'text-red-500' },
+  { label: 'High', value: 'high', color: 'text-neon-orange' },
+  { label: 'Medium', value: 'medium', color: 'text-neon-purple' },
+  { label: 'Low', value: 'low', color: 'text-neon-cyan' },
 ];
 
-type ViewMode = 'list' | 'board' | 'calendar';
-type SortOption = 'dueDate' | 'priority' | 'createdAt' | 'title';
-
-const priorityOrder: Record<Priority, number> = {
-  urgent: 0,
-  high: 1,
-  medium: 2,
-  low: 3,
-};
-
-const statusOrder: Record<TaskStatus, number> = {
-  'in-progress': 0,
-  pending: 1,
-  completed: 2,
-  cancelled: 3,
-};
+const statusOptions: { label: string; value: TaskStatus }[] = [
+  { label: 'Pending', value: 'pending' },
+  { label: 'In Progress', value: 'in-progress' },
+  { label: 'Completed', value: 'completed' },
+];
 
 export default function TasksPage() {
-  const [tasks, setTasks] = useState<Task[]>(mockTasks);
+  const { user, loading: authLoading } = useAuth();
+  const { tasks, loading, createTask, updateTask, deleteTask, completeTask, reopenTask } = useTasks();
+  const stats = useTaskStats();
+  
   const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState<ViewMode>('list');
-  const [sortBy, setSortBy] = useState<SortOption>('dueDate');
-  const [sortAsc, setSortAsc] = useState(true);
-  const [filterPriority, setFilterPriority] = useState<Priority | 'all'>('all');
   const [filterStatus, setFilterStatus] = useState<TaskStatus | 'all'>('all');
-  const [filterTags, setFilterTags] = useState<string[]>([]);
+  const [filterPriority, setFilterPriority] = useState<TaskPriority | 'all'>('all');
+  const [sortBy, setSortBy] = useState<'dueDate' | 'priority' | 'createdAt'>('dueDate');
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const { openAIPanel } = useUIStore();
 
-  // Get all unique tags
-  const allTags = useMemo(() => {
-    const tags = new Set<string>();
-    tasks.forEach(task => task.tags.forEach(tag => tags.add(tag)));
-    return Array.from(tags).sort();
-  }, [tasks]);
+  // Form state for new task
+  const [newTask, setNewTask] = useState({
+    title: '',
+    description: '',
+    priority: 'medium' as TaskPriority,
+    dueDate: '',
+    tags: '',
+  });
 
   // Filter and sort tasks
   const filteredTasks = useMemo(() => {
@@ -207,13 +88,8 @@ export default function TasksPage() {
         task =>
           task.title.toLowerCase().includes(query) ||
           task.description?.toLowerCase().includes(query) ||
-          task.tags.some(tag => tag.toLowerCase().includes(query))
+          task.tags?.some(tag => tag.toLowerCase().includes(query))
       );
-    }
-
-    // Priority filter
-    if (filterPriority !== 'all') {
-      result = result.filter(task => task.priority === filterPriority);
     }
 
     // Status filter
@@ -221,338 +97,371 @@ export default function TasksPage() {
       result = result.filter(task => task.status === filterStatus);
     }
 
-    // Tags filter
-    if (filterTags.length > 0) {
-      result = result.filter(task =>
-        filterTags.every(tag => task.tags.includes(tag))
-      );
+    // Priority filter
+    if (filterPriority !== 'all') {
+      result = result.filter(task => task.priority === filterPriority);
     }
 
     // Sort
+    const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
     result.sort((a, b) => {
-      let comparison = 0;
-      switch (sortBy) {
-        case 'dueDate':
-          const dateA = a.dueDate?.getTime() || Infinity;
-          const dateB = b.dueDate?.getTime() || Infinity;
-          comparison = dateA - dateB;
-          break;
-        case 'priority':
-          comparison = priorityOrder[a.priority] - priorityOrder[b.priority];
-          break;
-        case 'createdAt':
-          comparison = a.createdAt.getTime() - b.createdAt.getTime();
-          break;
-        case 'title':
-          comparison = a.title.localeCompare(b.title);
-          break;
+      if (sortBy === 'dueDate') {
+        const aDate = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+        const bDate = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+        return aDate - bDate;
       }
-      return sortAsc ? comparison : -comparison;
+      if (sortBy === 'priority') {
+        return priorityOrder[a.priority] - priorityOrder[b.priority];
+      }
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
 
     return result;
-  }, [tasks, searchQuery, filterPriority, filterStatus, filterTags, sortBy, sortAsc]);
+  }, [tasks, searchQuery, filterStatus, filterPriority, sortBy]);
 
-  // Group tasks by status for board view
-  const tasksByStatus = useMemo(() => {
-    return {
-      pending: filteredTasks.filter(t => t.status === 'pending'),
-      'in-progress': filteredTasks.filter(t => t.status === 'in-progress'),
-      completed: filteredTasks.filter(t => t.status === 'completed'),
-    };
+  // Group by status
+  const taskGroups = useMemo(() => {
+    const pending = filteredTasks.filter(t => t.status === 'pending');
+    const inProgress = filteredTasks.filter(t => t.status === 'in-progress');
+    const completed = filteredTasks.filter(t => t.status === 'completed');
+    return { pending, inProgress, completed };
   }, [filteredTasks]);
 
-  // Stats
-  const stats = useMemo(() => {
-    const total = tasks.length;
-    const completed = tasks.filter(t => t.status === 'completed').length;
-    const inProgress = tasks.filter(t => t.status === 'in-progress').length;
-    const overdue = tasks.filter(t => {
-      if (!t.dueDate || t.status === 'completed') return false;
-      return t.dueDate < new Date();
-    }).length;
-    const aiSuggested = tasks.filter(t => t.aiSuggested).length;
-
-    return { total, completed, inProgress, overdue, aiSuggested };
-  }, [tasks]);
-
-  const toggleTaskExpand = (taskId: string) => {
-    setExpandedTasks(prev => {
-      const next = new Set(prev);
-      if (next.has(taskId)) {
-        next.delete(taskId);
+  // Handle task completion toggle
+  const handleToggleComplete = async (task: Task) => {
+    try {
+      if (task.status === 'completed') {
+        await reopenTask(task.id);
       } else {
-        next.add(taskId);
+        await completeTask(task.id);
       }
-      return next;
-    });
-  };
-
-  const toggleTaskComplete = (taskId: string) => {
-    setTasks(prev =>
-      prev.map(task =>
-        task.id === taskId
-          ? {
-              ...task,
-              status: task.status === 'completed' ? 'pending' : 'completed',
-              completedAt: task.status === 'completed' ? undefined : new Date(),
-            }
-          : task
-      )
-    );
-  };
-
-  const toggleSubtaskComplete = (taskId: string, subtaskId: string) => {
-    setTasks(prev =>
-      prev.map(task =>
-        task.id === taskId
-          ? {
-              ...task,
-              subtasks: task.subtasks.map(st =>
-                st.id === subtaskId ? { ...st, completed: !st.completed } : st
-              ),
-            }
-          : task
-      )
-    );
-  };
-
-  const handleDeleteTask = () => {
-    if (taskToDelete) {
-      setTasks(prev => prev.filter(t => t.id !== taskToDelete.id));
-      setTaskToDelete(null);
-      setIsDeleteModalOpen(false);
+    } catch (err) {
+      console.error('Failed to toggle task:', err);
     }
   };
 
-  const TaskCard = ({ task, compact = false }: { task: Task; compact?: boolean }) => {
+  // Create new task
+  const handleCreateTask = async () => {
+    if (!newTask.title.trim()) return;
+    
+    setIsSaving(true);
+    try {
+      await createTask({
+        title: newTask.title,
+        description: newTask.description,
+        priority: newTask.priority,
+        status: 'pending',
+        dueDate: newTask.dueDate ? new Date(newTask.dueDate) : undefined,
+        tags: newTask.tags ? newTask.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
+        subtasks: [],
+      });
+      
+      setIsCreateModalOpen(false);
+      setNewTask({
+        title: '',
+        description: '',
+        priority: 'medium',
+        dueDate: '',
+        tags: '',
+      });
+    } catch (err) {
+      console.error('Failed to create task:', err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Delete task
+  const handleDeleteTask = async () => {
+    if (!selectedTask) return;
+    
+    setIsSaving(true);
+    try {
+      await deleteTask(selectedTask.id);
+      setIsDeleteModalOpen(false);
+      setSelectedTask(null);
+    } catch (err) {
+      console.error('Failed to delete task:', err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Update task status
+  const handleUpdateStatus = async (taskId: string, status: TaskStatus) => {
+    try {
+      if (status === 'completed') {
+        await completeTask(taskId);
+      } else {
+        await updateTask(taskId, { status });
+      }
+    } catch (err) {
+      console.error('Failed to update status:', err);
+    }
+  };
+
+  const toggleTaskExpanded = (taskId: string) => {
+    const newExpanded = new Set(expandedTasks);
+    if (newExpanded.has(taskId)) {
+      newExpanded.delete(taskId);
+    } else {
+      newExpanded.add(taskId);
+    }
+    setExpandedTasks(newExpanded);
+  };
+
+  // Show loading state
+  if (authLoading || loading) {
+    return (
+      <MainLayout>
+        <PageContainer title="Tasks" subtitle="Organize and accomplish your goals">
+          <div className="flex flex-col items-center justify-center min-h-[400px]">
+            <LoadingSpinner size="lg" />
+            <p className="mt-4 text-gray-600">Loading tasks...</p>
+          </div>
+        </PageContainer>
+      </MainLayout>
+    );
+  }
+
+  // Show login prompt if not authenticated
+  if (!user) {
+    return (
+      <MainLayout>
+        <PageContainer title="Tasks" subtitle="Organize and accomplish your goals">
+          <EmptyState
+            icon={<ListTodo className="w-12 h-12" />}
+            title="Sign in to manage tasks"
+            description="Create an account to start organizing your tasks"
+            action={
+              <Button variant="glow" onClick={() => window.location.href = '/auth/login'}>
+                Sign In
+              </Button>
+            }
+          />
+        </PageContainer>
+      </MainLayout>
+    );
+  }
+
+  const TaskCard = ({ task }: { task: Task }) => {
     const isExpanded = expandedTasks.has(task.id);
-    const deadlineStatus = task.dueDate ? getDeadlineStatus(task.dueDate) : null;
-    const completedSubtasks = task.subtasks.filter(st => st.completed).length;
-    const totalSubtasks = task.subtasks.length;
-    const subtaskProgress = totalSubtasks > 0 ? (completedSubtasks / totalSubtasks) * 100 : 0;
+    const hasSubtasks = task.subtasks && task.subtasks.length > 0;
+    const completedSubtasks = task.subtasks?.filter(s => s.completed).length || 0;
+    const totalSubtasks = task.subtasks?.length || 0;
+    const deadlineStatus = task.dueDate ? getDeadlineStatus(new Date(task.dueDate)) : null;
 
     return (
       <motion.div
         layout
-        initial={{ opacity: 0, y: 10 }}
+        initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95 }}
+        exit={{ opacity: 0, x: -100 }}
         className={cn(
-          'group relative rounded-xl transition-all duration-200',
+          'group rounded-xl transition-all duration-200',
           'bg-dark-900/50 border border-dark-700/50 backdrop-blur-sm',
-          'hover:border-neon-cyan/30 hover:bg-dark-800/50',
+          'hover:border-neon-cyan/30',
           task.status === 'completed' && 'opacity-60'
         )}
       >
         <div className="p-4">
-          {/* Header */}
           <div className="flex items-start gap-3">
             {/* Checkbox */}
             <button
-              onClick={() => toggleTaskComplete(task.id)}
+              onClick={() => handleToggleComplete(task)}
               className={cn(
-                'mt-0.5 w-5 h-5 rounded-full border-2 flex-shrink-0',
+                'mt-0.5 w-6 h-6 rounded-lg flex-shrink-0',
                 'flex items-center justify-center transition-all',
                 task.status === 'completed'
-                  ? 'bg-neon-green border-neon-green'
-                  : 'border-dark-500 hover:border-neon-cyan'
+                  ? 'bg-neon-green text-dark-900'
+                  : 'border-2 border-dark-500 hover:border-neon-cyan'
               )}
             >
-              {task.status === 'completed' && (
-                <CheckCircle2 className="w-3 h-3 text-dark-900" />
-              )}
+              {task.status === 'completed' && <CheckCircle2 className="w-4 h-4" />}
             </button>
 
             {/* Content */}
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <h3
-                  className={cn(
-                    'text-sm font-medium truncate',
-                    task.status === 'completed'
-                      ? 'text-dark-400 line-through'
-                      : 'text-white'
-                  )}
-                >
+              <div className="flex items-start justify-between gap-2 mb-1">
+                <h3 className={cn(
+                  'font-medium text-white',
+                  task.status === 'completed' && 'line-through text-dark-400'
+                )}>
                   {task.title}
                 </h3>
-                {task.aiSuggested && (
-                  <Sparkles className="w-3.5 h-3.5 text-neon-purple flex-shrink-0" />
-                )}
+                <PriorityBadge priority={task.priority} />
               </div>
 
-              {/* Description */}
-              {task.description && !compact && (
-                <p className="text-xs text-dark-400 line-clamp-2 mb-2">
-                  {task.description}
-                </p>
+              {task.description && (
+                <p className="text-sm text-dark-400 line-clamp-2 mb-2">{task.description}</p>
               )}
 
               {/* Meta info */}
-              <div className="flex flex-wrap items-center gap-2">
-                {/* Due date */}
+              <div className="flex flex-wrap items-center gap-2 mt-2">
                 {task.dueDate && (
-                  <span
-                    className={cn(
-                      'inline-flex items-center gap-1 text-xs',
-                      deadlineStatus === 'overdue' && 'text-status-error',
-                      deadlineStatus === 'today' && 'text-neon-orange',
-                      deadlineStatus === 'upcoming' && 'text-dark-300'
-                    )}
+                  <Badge
+                    variant={
+                      deadlineStatus === 'overdue' ? 'red' :
+                      deadlineStatus === 'today' ? 'orange' :
+                      deadlineStatus === 'tomorrow' ? 'purple' :
+                      deadlineStatus === 'upcoming' ? 'blue' : 'default'
+                    }
+                    size="sm"
                   >
-                    <Calendar className="w-3 h-3" />
-                    {formatRelativeDate(task.dueDate)}
-                  </span>
-                )}
-
-                {/* Time estimate */}
-                {task.estimatedMinutes && (
-                  <span className="inline-flex items-center gap-1 text-xs text-dark-400">
-                    <Clock className="w-3 h-3" />
-                    {task.estimatedMinutes}m
-                  </span>
-                )}
-
-                {/* Subtasks progress */}
-                {totalSubtasks > 0 && (
-                  <span className="inline-flex items-center gap-1 text-xs text-dark-400">
-                    <ListTodo className="w-3 h-3" />
-                    {completedSubtasks}/{totalSubtasks}
-                  </span>
-                )}
-
-                {/* Tags */}
-                {task.tags.slice(0, 2).map(tag => (
-                  <Badge key={tag} variant="outline" size="sm">
-                    {tag}
+                    <Calendar className="w-3 h-3 mr-1" />
+                    {formatRelativeDate(new Date(task.dueDate))}
                   </Badge>
-                ))}
-                {task.tags.length > 2 && (
-                  <span className="text-xs text-dark-500">+{task.tags.length - 2}</span>
+                )}
+
+                {task.tags && task.tags.length > 0 && (
+                  <div className="flex items-center gap-1">
+                    {task.tags.slice(0, 2).map(tag => (
+                      <Badge key={tag} variant="default" size="sm">
+                        <Tag className="w-3 h-3 mr-1" />
+                        {tag}
+                      </Badge>
+                    ))}
+                    {task.tags.length > 2 && (
+                      <span className="text-xs text-dark-500">+{task.tags.length - 2}</span>
+                    )}
+                  </div>
+                )}
+
+                {task.estimatedDuration && (
+                  <Badge variant="default" size="sm">
+                    <Clock className="w-3 h-3 mr-1" />
+                    {task.estimatedDuration}m
+                  </Badge>
                 )}
               </div>
-            </div>
 
-            {/* Right side */}
-            <div className="flex items-center gap-2">
-              <PriorityBadge priority={task.priority} />
-
-              {/* Expand button for subtasks */}
-              {totalSubtasks > 0 && (
-                <button
-                  onClick={() => toggleTaskExpand(task.id)}
-                  className="p-1 rounded hover:bg-dark-700/50 transition-colors"
-                >
-                  <ChevronDown
-                    className={cn(
-                      'w-4 h-4 text-dark-400 transition-transform',
-                      isExpanded && 'rotate-180'
+              {/* Subtasks */}
+              {hasSubtasks && (
+                <div className="mt-3">
+                  <button
+                    onClick={() => toggleTaskExpanded(task.id)}
+                    className="flex items-center gap-2 text-sm text-dark-400 hover:text-white transition-colors"
+                  >
+                    {isExpanded ? (
+                      <ChevronDown className="w-4 h-4" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4" />
                     )}
-                  />
-                </button>
-              )}
+                    <span>{completedSubtasks}/{totalSubtasks} subtasks</span>
+                  </button>
 
-              {/* More menu */}
-              <div className="relative">
-                <button className="p-1 rounded hover:bg-dark-700/50 opacity-0 group-hover:opacity-100 transition-all">
-                  <MoreHorizontal className="w-4 h-4 text-dark-400" />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Subtasks (expanded) */}
-          <AnimatePresence>
-            {isExpanded && totalSubtasks > 0 && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                className="overflow-hidden"
-              >
-                <div className="mt-4 pt-3 border-t border-dark-700/50">
-                  {/* Progress bar */}
-                  <div className="flex items-center gap-3 mb-3">
-                    <Progress value={subtaskProgress} size="sm" className="flex-1" />
-                    <span className="text-xs text-dark-400">
-                      {Math.round(subtaskProgress)}%
-                    </span>
-                  </div>
-
-                  {/* Subtask list */}
-                  <div className="space-y-2">
-                    {task.subtasks.map(subtask => (
-                      <div
-                        key={subtask.id}
-                        className="flex items-center gap-2 pl-2"
+                  <AnimatePresence>
+                    {isExpanded && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="overflow-hidden"
                       >
-                        <button
-                          onClick={() => toggleSubtaskComplete(task.id, subtask.id)}
-                          className={cn(
-                            'w-4 h-4 rounded border flex-shrink-0',
-                            'flex items-center justify-center transition-all',
-                            subtask.completed
-                              ? 'bg-neon-cyan/20 border-neon-cyan'
-                              : 'border-dark-500 hover:border-neon-cyan'
-                          )}
-                        >
-                          {subtask.completed && (
-                            <CheckCircle2 className="w-3 h-3 text-neon-cyan" />
-                          )}
-                        </button>
-                        <span
-                          className={cn(
-                            'text-sm',
-                            subtask.completed
-                              ? 'text-dark-500 line-through'
-                              : 'text-dark-200'
-                          )}
-                        >
-                          {subtask.title}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+                        <div className="mt-2 space-y-1 pl-4 border-l border-dark-700">
+                          {task.subtasks?.map(subtask => (
+                            <div
+                              key={subtask.id}
+                              className="flex items-center gap-2 py-1"
+                            >
+                              {subtask.completed ? (
+                                <CheckCircle2 className="w-4 h-4 text-neon-green flex-shrink-0" />
+                              ) : (
+                                <Circle className="w-4 h-4 text-dark-500 flex-shrink-0" />
+                              )}
+                              <span className={cn(
+                                'text-sm',
+                                subtask.completed ? 'text-dark-500 line-through' : 'text-dark-300'
+                              )}>
+                                {subtask.title}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+              )}
+            </div>
+
+            {/* Actions */}
+            <button
+              onClick={() => {
+                setSelectedTask(task);
+                setIsDeleteModalOpen(true);
+              }}
+              className="p-1.5 rounded-lg hover:bg-dark-700/50 opacity-0 group-hover:opacity-100 transition-all"
+            >
+              <MoreHorizontal className="w-4 h-4 text-dark-400" />
+            </button>
+          </div>
         </div>
       </motion.div>
     );
   };
 
+  const TaskGroup = ({ title, tasks, icon: Icon }: { title: string; tasks: Task[]; icon: any }) => {
+    if (tasks.length === 0) return null;
+
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Icon className="w-5 h-5 text-neon-cyan" />
+          <h3 className="font-medium text-white">{title}</h3>
+          <Badge variant="default" size="sm">{tasks.length}</Badge>
+        </div>
+        <div className="space-y-2">
+          <AnimatePresence>
+            {tasks.map(task => (
+              <TaskCard key={task.id} task={task} />
+            ))}
+          </AnimatePresence>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <MainLayout>
-      <PageContainer title="Tasks" subtitle="Manage your tasks and priorities">
+      <PageContainer title="Tasks" subtitle="Organize and accomplish your goals">
         {/* Stats Row */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6"
+          className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6"
         >
-          {[
-            { label: 'Total', value: stats.total, icon: ListTodo, color: 'neon-cyan' },
-            { label: 'In Progress', value: stats.inProgress, icon: Timer, color: 'neon-purple' },
-            { label: 'Completed', value: stats.completed, icon: CheckCircle2, color: 'neon-green' },
-            { label: 'Overdue', value: stats.overdue, icon: AlertCircle, color: 'status-error' },
-            { label: 'AI Suggested', value: stats.aiSuggested, icon: Sparkles, color: 'neon-pink' },
-          ].map((stat, index) => (
-            <motion.div
-              key={stat.label}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05 }}
-              className="p-4 rounded-xl bg-dark-900/50 border border-dark-700/50 backdrop-blur-sm"
-            >
-              <div className="flex items-center justify-between mb-2">
-                <stat.icon className={`w-4 h-4 text-${stat.color}`} />
-              </div>
-              <p className="text-2xl font-bold text-white">{stat.value}</p>
-              <p className="text-xs text-dark-400">{stat.label}</p>
-            </motion.div>
-          ))}
+          <Card variant="glass" className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-dark-400">Total Tasks</span>
+              <ListTodo className="w-5 h-5 text-neon-cyan" />
+            </div>
+            <p className="text-2xl font-bold text-white">{stats.total}</p>
+          </Card>
+
+          <Card variant="glass" className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-dark-400">In Progress</span>
+              <Target className="w-5 h-5 text-neon-purple" />
+            </div>
+            <p className="text-2xl font-bold text-white">{stats.inProgress}</p>
+          </Card>
+
+          <Card variant="glass" className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-dark-400">Completed</span>
+              <CheckCircle2 className="w-5 h-5 text-neon-green" />
+            </div>
+            <p className="text-2xl font-bold text-white">{stats.completed}</p>
+          </Card>
+
+          <Card variant="glass" className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-dark-400">Overdue</span>
+              <AlertCircle className="w-5 h-5 text-red-500" />
+            </div>
+            <p className="text-2xl font-bold text-white">{stats.overdue}</p>
+          </Card>
         </motion.div>
 
         {/* Toolbar */}
@@ -560,391 +469,283 @@ export default function TasksPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6"
+          className="flex flex-wrap items-center gap-3 mb-6"
         >
-          {/* Search */}
-          <div className="flex items-center gap-3 flex-1">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-dark-400" />
-              <Input
-                type="text"
-                placeholder="Search tasks..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-
-            {/* Filters */}
-            <div className="flex items-center gap-2">
-              <select
-                value={filterPriority}
-                onChange={e => setFilterPriority(e.target.value as Priority | 'all')}
-                className="px-3 py-2 rounded-lg bg-dark-800/50 border border-dark-700/50 text-sm text-dark-200 focus:outline-none focus:ring-2 focus:ring-neon-cyan/50"
-              >
-                <option value="all">All Priorities</option>
-                <option value="urgent">Urgent</option>
-                <option value="high">High</option>
-                <option value="medium">Medium</option>
-                <option value="low">Low</option>
-              </select>
-
-              <select
-                value={filterStatus}
-                onChange={e => setFilterStatus(e.target.value as TaskStatus | 'all')}
-                className="px-3 py-2 rounded-lg bg-dark-800/50 border border-dark-700/50 text-sm text-dark-200 focus:outline-none focus:ring-2 focus:ring-neon-cyan/50"
-              >
-                <option value="all">All Status</option>
-                <option value="pending">Pending</option>
-                <option value="in-progress">In Progress</option>
-                <option value="completed">Completed</option>
-              </select>
-            </div>
+          <div className="flex-1 min-w-[200px]">
+            <Input
+              placeholder="Search tasks..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              leftIcon={<Search className="w-4 h-4" />}
+            />
           </div>
 
-          {/* View mode & Actions */}
-          <div className="flex items-center gap-3">
-            {/* Sort */}
-            <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-dark-800/50 border border-dark-700/50">
-              <select
-                value={sortBy}
-                onChange={e => setSortBy(e.target.value as SortOption)}
-                className="bg-transparent text-sm text-dark-200 focus:outline-none"
-              >
-                <option value="dueDate">Due Date</option>
-                <option value="priority">Priority</option>
-                <option value="createdAt">Created</option>
-                <option value="title">Title</option>
-              </select>
-              <button
-                onClick={() => setSortAsc(!sortAsc)}
-                className="p-1 rounded hover:bg-dark-700/50"
-              >
-                {sortAsc ? (
-                  <SortAsc className="w-4 h-4 text-dark-400" />
-                ) : (
-                  <SortDesc className="w-4 h-4 text-dark-400" />
-                )}
-              </button>
-            </div>
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value as TaskStatus | 'all')}
+            className="bg-dark-800 border border-dark-700 rounded-lg px-3 py-2 text-sm text-white focus:border-neon-cyan outline-none"
+          >
+            <option value="all">All Status</option>
+            {statusOptions.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
 
-            {/* View mode toggle */}
-            <div className="flex items-center p-1 rounded-lg bg-dark-800/50 border border-dark-700/50">
-              {[
-                { mode: 'list' as ViewMode, icon: List },
-                { mode: 'board' as ViewMode, icon: Grid3X3 },
-              ].map(({ mode, icon: Icon }) => (
-                <button
-                  key={mode}
-                  onClick={() => setViewMode(mode)}
-                  className={cn(
-                    'p-2 rounded-md transition-colors',
-                    viewMode === mode
-                      ? 'bg-neon-cyan/20 text-neon-cyan'
-                      : 'text-dark-400 hover:text-white'
-                  )}
-                >
-                  <Icon className="w-4 h-4" />
-                </button>
-              ))}
-            </div>
+          <select
+            value={filterPriority}
+            onChange={(e) => setFilterPriority(e.target.value as TaskPriority | 'all')}
+            className="bg-dark-800 border border-dark-700 rounded-lg px-3 py-2 text-sm text-white focus:border-neon-cyan outline-none"
+          >
+            <option value="all">All Priority</option>
+            {priorityOptions.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
 
-            {/* AI Suggest */}
-            <Button variant="ghost" size="sm" onClick={openAIPanel}>
-              <Brain className="w-4 h-4 mr-1" />
-              AI Suggest
-            </Button>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+            className="bg-dark-800 border border-dark-700 rounded-lg px-3 py-2 text-sm text-white focus:border-neon-cyan outline-none"
+          >
+            <option value="dueDate">Sort by Due Date</option>
+            <option value="priority">Sort by Priority</option>
+            <option value="createdAt">Sort by Created</option>
+          </select>
 
-            {/* New Task */}
-            <Button
-              variant="glow"
-              size="sm"
-              onClick={() => setIsCreateModalOpen(true)}
-            >
-              <Plus className="w-4 h-4 mr-1" />
-              New Task
-            </Button>
-          </div>
+          <Button variant="glow" onClick={() => setIsCreateModalOpen(true)}>
+            <Plus className="w-4 h-4 mr-1" />
+            New Task
+          </Button>
         </motion.div>
 
-        {/* Task List View */}
-        {viewMode === 'list' && (
+        {/* Main Content */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Tasks List */}
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="space-y-3"
+            className="lg:col-span-2 space-y-6"
           >
-            <AnimatePresence mode="popLayout">
-              {filteredTasks.length > 0 ? (
-                filteredTasks.map(task => (
-                  <TaskCard key={task.id} task={task} />
-                ))
-              ) : (
-                <EmptyState
-                  icon={<ListTodo className="w-12 h-12" />}
-                  title="No tasks found"
-                  description="Try adjusting your filters or create a new task"
-                  action={
-                    <Button variant="glow" onClick={() => setIsCreateModalOpen(true)}>
-                      <Plus className="w-4 h-4 mr-1" />
-                      Create Task
-                    </Button>
-                  }
-                />
-              )}
-            </AnimatePresence>
+            {filteredTasks.length > 0 ? (
+              <>
+                <TaskGroup title="In Progress" tasks={taskGroups.inProgress} icon={Target} />
+                <TaskGroup title="Pending" tasks={taskGroups.pending} icon={Clock} />
+                <TaskGroup title="Completed" tasks={taskGroups.completed} icon={CheckCircle2} />
+              </>
+            ) : tasks.length > 0 ? (
+              <EmptyState
+                icon={<Search className="w-12 h-12" />}
+                title="No tasks found"
+                description="Try adjusting your filters or search query"
+              />
+            ) : (
+              <EmptyState
+                icon={<ListTodo className="w-12 h-12" />}
+                title="No tasks yet"
+                description="Create your first task to get started"
+                action={
+                  <Button variant="glow" onClick={() => setIsCreateModalOpen(true)}>
+                    <Plus className="w-4 h-4 mr-1" />
+                    Create Task
+                  </Button>
+                }
+              />
+            )}
           </motion.div>
-        )}
 
-        {/* Board View */}
-        {viewMode === 'board' && (
+          {/* Sidebar */}
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.2 }}
-            className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="space-y-4"
           >
-            {/* Pending Column */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 p-3 rounded-xl bg-dark-900/50 border border-dark-700/50">
-                <div className="w-2 h-2 rounded-full bg-neon-orange" />
-                <h3 className="font-medium text-white">Pending</h3>
-                <Badge variant="secondary" size="sm">
-                  {tasksByStatus.pending.length}
-                </Badge>
+            {/* AI Suggestions */}
+            <Card variant="glass" className="p-4">
+              <div className="flex items-center gap-2 mb-4">
+                <Brain className="w-5 h-5 text-neon-purple" />
+                <h3 className="font-medium text-white">AI Insights</h3>
               </div>
               <div className="space-y-3">
-                <AnimatePresence>
-                  {tasksByStatus.pending.map(task => (
-                    <TaskCard key={task.id} task={task} compact />
-                  ))}
-                </AnimatePresence>
+                <div className="p-3 rounded-lg bg-dark-800/50 border border-dark-700/50">
+                  <p className="text-sm text-dark-300">
+                    {stats.overdue > 0
+                      ? `⚠️ You have ${stats.overdue} overdue task${stats.overdue > 1 ? 's' : ''}. Consider prioritizing these first.`
+                      : stats.total === 0
+                      ? "🚀 Ready to be productive? Add your first task!"
+                      : stats.completionRate >= 80
+                      ? "🎉 Great progress! You're crushing your task list."
+                      : "💪 Keep going! Focus on high-priority items first."}
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={openAIPanel}
+                >
+                  <Sparkles className="w-4 h-4 mr-1" />
+                  Get AI Help
+                </Button>
               </div>
-            </div>
+            </Card>
 
-            {/* In Progress Column */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 p-3 rounded-xl bg-dark-900/50 border border-dark-700/50">
-                <div className="w-2 h-2 rounded-full bg-neon-purple" />
-                <h3 className="font-medium text-white">In Progress</h3>
-                <Badge variant="secondary" size="sm">
-                  {tasksByStatus['in-progress'].length}
-                </Badge>
-              </div>
-              <div className="space-y-3">
-                <AnimatePresence>
-                  {tasksByStatus['in-progress'].map(task => (
-                    <TaskCard key={task.id} task={task} compact />
-                  ))}
-                </AnimatePresence>
-              </div>
-            </div>
+            {/* Progress Overview */}
+            <Card variant="glass" className="p-4">
+              <h3 className="font-medium text-white mb-4">Progress Overview</h3>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-dark-400">Completion Rate</span>
+                  <span className="text-sm font-medium text-neon-cyan">{stats.completionRate}%</span>
+                </div>
+                <Progress value={stats.completionRate} variant="cyan" size="sm" />
 
-            {/* Completed Column */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 p-3 rounded-xl bg-dark-900/50 border border-dark-700/50">
-                <div className="w-2 h-2 rounded-full bg-neon-green" />
-                <h3 className="font-medium text-white">Completed</h3>
-                <Badge variant="secondary" size="sm">
-                  {tasksByStatus.completed.length}
-                </Badge>
+                <div className="grid grid-cols-2 gap-3 pt-2">
+                  <div className="p-3 rounded-lg bg-dark-800/50 text-center">
+                    <p className="text-lg font-bold text-neon-orange">{stats.highPriority}</p>
+                    <p className="text-xs text-dark-400">High Priority</p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-dark-800/50 text-center">
+                    <p className="text-lg font-bold text-neon-green">{stats.dueToday}</p>
+                    <p className="text-xs text-dark-400">Due Today</p>
+                  </div>
+                </div>
               </div>
-              <div className="space-y-3">
-                <AnimatePresence>
-                  {tasksByStatus.completed.map(task => (
-                    <TaskCard key={task.id} task={task} compact />
-                  ))}
-                </AnimatePresence>
-              </div>
-            </div>
+            </Card>
           </motion.div>
-        )}
+        </div>
 
         {/* Create Task Modal */}
         <Modal
           isOpen={isCreateModalOpen}
           onClose={() => setIsCreateModalOpen(false)}
           title="Create New Task"
-          size="lg"
         >
-          <CreateTaskForm onClose={() => setIsCreateModalOpen(false)} />
+          <div className="space-y-4">
+            <Input
+              label="Task Title"
+              placeholder="What needs to be done?"
+              value={newTask.title}
+              onChange={(e) => setNewTask(prev => ({ ...prev, title: e.target.value }))}
+            />
+            
+            <div>
+              <label className="block text-sm font-medium text-dark-300 mb-2">Description</label>
+              <textarea
+                placeholder="Add more details..."
+                value={newTask.description}
+                onChange={(e) => setNewTask(prev => ({ ...prev, description: e.target.value }))}
+                className="w-full bg-dark-800 border border-dark-700 rounded-lg px-3 py-2 text-white placeholder-dark-500 focus:border-neon-cyan outline-none resize-none"
+                rows={3}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-dark-300 mb-2">Priority</label>
+                <select
+                  value={newTask.priority}
+                  onChange={(e) => setNewTask(prev => ({ ...prev, priority: e.target.value as TaskPriority }))}
+                  className="w-full bg-dark-800 border border-dark-700 rounded-lg px-3 py-2 text-white focus:border-neon-cyan outline-none"
+                >
+                  {priorityOptions.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-dark-300 mb-2">Due Date</label>
+                <input
+                  type="date"
+                  value={newTask.dueDate}
+                  onChange={(e) => setNewTask(prev => ({ ...prev, dueDate: e.target.value }))}
+                  className="w-full bg-dark-800 border border-dark-700 rounded-lg px-3 py-2 text-white focus:border-neon-cyan outline-none"
+                />
+              </div>
+            </div>
+
+            <Input
+              label="Tags (comma separated)"
+              placeholder="work, important, project"
+              value={newTask.tags}
+              onChange={(e) => setNewTask(prev => ({ ...prev, tags: e.target.value }))}
+            />
+
+            <div className="flex gap-3 pt-4">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setIsCreateModalOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="glow"
+                className="flex-1"
+                onClick={handleCreateTask}
+                disabled={!newTask.title.trim() || isSaving}
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  'Create Task'
+                )}
+              </Button>
+            </div>
+          </div>
         </Modal>
 
-        {/* Delete Confirmation */}
-        <ConfirmModal
+        {/* Delete Confirmation Modal */}
+        <Modal
           isOpen={isDeleteModalOpen}
-          onClose={() => setIsDeleteModalOpen(false)}
-          onConfirm={handleDeleteTask}
+          onClose={() => {
+            setIsDeleteModalOpen(false);
+            setSelectedTask(null);
+          }}
           title="Delete Task"
-          description="Are you sure you want to delete this task? This action cannot be undone."
-          confirmLabel="Delete"
-          variant="danger"
-        />
+        >
+          <div className="space-y-4">
+            <p className="text-dark-300">
+              Are you sure you want to delete "{selectedTask?.title}"?
+            </p>
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  setIsDeleteModalOpen(false);
+                  setSelectedTask(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1 text-red-500 border-red-500/30 hover:bg-red-500/10"
+                onClick={handleDeleteTask}
+                disabled={isSaving}
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4 mr-1" />
+                    Delete
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </Modal>
       </PageContainer>
     </MainLayout>
-  );
-}
-
-// Create Task Form Component
-function CreateTaskForm({ onClose }: { onClose: () => void }) {
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [priority, setPriority] = useState<Priority>('medium');
-  const [dueDate, setDueDate] = useState('');
-  const [tags, setTags] = useState<string[]>([]);
-  const [newTag, setNewTag] = useState('');
-  const [estimatedMinutes, setEstimatedMinutes] = useState(30);
-
-  const handleAddTag = () => {
-    if (newTag && !tags.includes(newTag)) {
-      setTags([...tags, newTag]);
-      setNewTag('');
-    }
-  };
-
-  const handleRemoveTag = (tag: string) => {
-    setTags(tags.filter(t => t !== tag));
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // TODO: Add task to store
-    console.log({ title, description, priority, dueDate, tags, estimatedMinutes });
-    onClose();
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      {/* Title */}
-      <Input
-        label="Task Title"
-        placeholder="What needs to be done?"
-        value={title}
-        onChange={e => setTitle(e.target.value)}
-        required
-      />
-
-      {/* Description */}
-      <div>
-        <label className="block text-sm font-medium text-dark-200 mb-1.5">
-          Description
-        </label>
-        <textarea
-          placeholder="Add more details..."
-          value={description}
-          onChange={e => setDescription(e.target.value)}
-          rows={3}
-          className={cn(
-            'w-full px-4 py-3 rounded-xl text-sm',
-            'bg-dark-800/50 border border-dark-700/50',
-            'text-white placeholder:text-dark-500',
-            'focus:outline-none focus:ring-2 focus:ring-neon-cyan/50 focus:border-transparent',
-            'transition-all duration-200'
-          )}
-        />
-      </div>
-
-      {/* Priority & Due Date */}
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-dark-200 mb-1.5">
-            Priority
-          </label>
-          <select
-            value={priority}
-            onChange={e => setPriority(e.target.value as Priority)}
-            className={cn(
-              'w-full px-4 py-3 rounded-xl text-sm',
-              'bg-dark-800/50 border border-dark-700/50',
-              'text-white',
-              'focus:outline-none focus:ring-2 focus:ring-neon-cyan/50',
-              'transition-all duration-200'
-            )}
-          >
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-            <option value="urgent">Urgent</option>
-          </select>
-        </div>
-
-        <Input
-          type="date"
-          label="Due Date"
-          value={dueDate}
-          onChange={e => setDueDate(e.target.value)}
-        />
-      </div>
-
-      {/* Time Estimate */}
-      <div>
-        <label className="block text-sm font-medium text-dark-200 mb-1.5">
-          Time Estimate: {estimatedMinutes} minutes
-        </label>
-        <input
-          type="range"
-          min={5}
-          max={240}
-          step={5}
-          value={estimatedMinutes}
-          onChange={e => setEstimatedMinutes(parseInt(e.target.value))}
-          className="w-full accent-neon-cyan"
-        />
-      </div>
-
-      {/* Tags */}
-      <div>
-        <label className="block text-sm font-medium text-dark-200 mb-1.5">
-          Tags
-        </label>
-        <div className="flex flex-wrap gap-2 mb-2">
-          {tags.map(tag => (
-            <Badge key={tag} variant="cyan" size="sm">
-              {tag}
-              <button
-                type="button"
-                onClick={() => handleRemoveTag(tag)}
-                className="ml-1 hover:text-white"
-              >
-                ×
-              </button>
-            </Badge>
-          ))}
-        </div>
-        <div className="flex gap-2">
-          <Input
-            placeholder="Add a tag"
-            value={newTag}
-            onChange={e => setNewTag(e.target.value)}
-            onKeyPress={e => e.key === 'Enter' && (e.preventDefault(), handleAddTag())}
-          />
-          <Button type="button" variant="ghost" onClick={handleAddTag}>
-            Add
-          </Button>
-        </div>
-      </div>
-
-      {/* AI Suggestion */}
-      <div className="p-4 rounded-xl bg-neon-purple/10 border border-neon-purple/20">
-        <div className="flex items-center gap-2 mb-2">
-          <Sparkles className="w-4 h-4 text-neon-purple" />
-          <span className="text-sm font-medium text-neon-purple">AI Tip</span>
-        </div>
-        <p className="text-sm text-dark-300">
-          Based on your schedule, the best time to work on this task would be tomorrow afternoon between 2-4 PM when your energy levels are typically high.
-        </p>
-      </div>
-
-      {/* Actions */}
-      <div className="flex justify-end gap-3 pt-4">
-        <Button type="button" variant="ghost" onClick={onClose}>
-          Cancel
-        </Button>
-        <Button type="submit" variant="glow">
-          Create Task
-        </Button>
-      </div>
-    </form>
   );
 }

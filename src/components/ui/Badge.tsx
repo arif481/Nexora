@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 
 interface BadgeProps {
   children: React.ReactNode;
-  variant?: 'default' | 'cyan' | 'purple' | 'pink' | 'green' | 'orange' | 'red' | 'blue' | 'yellow';
+  variant?: 'default' | 'cyan' | 'purple' | 'pink' | 'green' | 'orange' | 'red' | 'blue' | 'yellow' | 'outline';
   size?: 'sm' | 'md' | 'lg';
   dot?: boolean;
   pulse?: boolean;
@@ -29,6 +29,7 @@ export function Badge({
     red: 'bg-neon-red/10 border-neon-red/30 text-neon-red',
     blue: 'bg-neon-blue/10 border-neon-blue/30 text-neon-blue',
     yellow: 'bg-neon-yellow/10 border-neon-yellow/30 text-neon-yellow',
+    outline: 'bg-transparent border-white/30 text-white/70',
   };
 
   const sizeStyles = {
@@ -47,6 +48,7 @@ export function Badge({
     red: 'bg-neon-red',
     blue: 'bg-neon-blue',
     yellow: 'bg-neon-yellow',
+    outline: 'bg-white/60',
   };
 
   return (
