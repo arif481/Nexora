@@ -7,6 +7,7 @@ import { Eye, EyeOff, Search, X } from 'lucide-react';
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
+  success?: string;
   hint?: string;
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
@@ -20,6 +21,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
       type = 'text',
       label,
       error,
+      success,
       hint,
       leftIcon,
       rightIcon,
@@ -37,17 +39,20 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
       default: cn(
         'bg-dark-300 border-glass-border',
         'focus:border-neon-cyan/50 focus:bg-dark-200',
-        error && 'border-neon-red/50 focus:border-neon-red'
+        error && 'border-neon-red/50 focus:border-neon-red',
+        success && 'border-neon-green/50 focus:border-neon-green'
       ),
       glass: cn(
         'backdrop-blur-xl bg-glass-light border-glass-border',
         'focus:bg-glass-medium focus:border-neon-cyan/30',
-        error && 'border-neon-red/30 focus:border-neon-red/50'
+        error && 'border-neon-red/30 focus:border-neon-red/50',
+        success && 'border-neon-green/30 focus:border-neon-green/50'
       ),
       minimal: cn(
         'bg-transparent border-b border-glass-border rounded-none',
         'focus:border-neon-cyan',
-        error && 'border-neon-red focus:border-neon-red'
+        error && 'border-neon-red focus:border-neon-red',
+        success && 'border-neon-green focus:border-neon-green'
       ),
     };
 
@@ -95,9 +100,9 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
             </div>
           )}
         </div>
-        {(error || hint) && (
-          <p className={cn('mt-2 text-sm', error ? 'text-neon-red' : 'text-white/50')}>
-            {error || hint}
+        {(error || success || hint) && (
+          <p className={cn('mt-2 text-sm', error ? 'text-neon-red' : success ? 'text-neon-green' : 'text-white/50')}>
+            {error || success || hint}
           </p>
         )}
       </div>

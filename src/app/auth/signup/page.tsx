@@ -212,7 +212,7 @@ export default function SignupPage() {
               placeholder="John Doe"
               value={name}
               onChange={e => setName(e.target.value)}
-              icon={<User className="w-4 h-4" />}
+              leftIcon={<User className="w-4 h-4" />}
               required
             />
 
@@ -222,7 +222,7 @@ export default function SignupPage() {
               placeholder="you@example.com"
               value={email}
               onChange={e => setEmail(e.target.value)}
-              icon={<Mail className="w-4 h-4" />}
+              leftIcon={<Mail className="w-4 h-4" />}
               required
             />
 
@@ -233,7 +233,7 @@ export default function SignupPage() {
                 placeholder="Create a password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                icon={<Lock className="w-4 h-4" />}
+                leftIcon={<Lock className="w-4 h-4" />}
                 required
               />
               <button
@@ -300,7 +300,7 @@ export default function SignupPage() {
                 placeholder="Confirm your password"
                 value={confirmPassword}
                 onChange={e => setConfirmPassword(e.target.value)}
-                icon={<Lock className="w-4 h-4" />}
+                leftIcon={<Lock className="w-4 h-4" />}
                 required
                 error={confirmPassword && !doPasswordsMatch ? "Passwords don't match" : undefined}
                 success={doPasswordsMatch ? 'Passwords match' : undefined}

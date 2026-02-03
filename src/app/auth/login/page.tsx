@@ -104,7 +104,7 @@ export default function LoginPage() {
               placeholder="you@example.com"
               value={email}
               onChange={e => setEmail(e.target.value)}
-              icon={<Mail className="w-4 h-4" />}
+              leftIcon={<Mail className="w-4 h-4" />}
               required
             />
 
@@ -115,7 +115,7 @@ export default function LoginPage() {
                 placeholder="Enter your password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                icon={<Lock className="w-4 h-4" />}
+                leftIcon={<Lock className="w-4 h-4" />}
                 required
               />
               <button

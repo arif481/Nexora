@@ -245,6 +245,14 @@ export function throttle<T extends (...args: unknown[]) => unknown>(
 }
 
 /**
+ * Truncate text to a specified length
+ */
+export function truncateText(text: string, maxLength: number): string {
+  if (text.length <= maxLength) return text;
+  return text.slice(0, maxLength).trim() + '...';
+}
+
+/**
  * Capitalize first letter of a string
  */
 export function capitalize(str: string): string {
