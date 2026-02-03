@@ -2,20 +2,21 @@
   "name": "Nexora - AI-Powered Life OS",
   "short_name": "Nexora",
   "description": "Your intelligent personal life operating system. Manage tasks, habits, goals, wellness, and more with AI assistance.",
-  "start_url": "/",
+  "start_url": "/Nexora/",
+  "scope": "/Nexora/",
   "display": "standalone",
   "background_color": "#0a0a0f",
   "theme_color": "#06b6d4",
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/icons/icon-512x512.svg",
+      "src": "/Nexora/icons/icon-512x512.svg",
       "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "/favicon.svg",
+      "src": "/Nexora/favicon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
