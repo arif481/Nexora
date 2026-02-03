@@ -176,7 +176,7 @@ export function Sidebar() {
         transition={{ type: 'spring', bounce: 0, duration: 0.3 }}
         className={cn(
           'fixed left-0 top-0 h-screen z-50',
-          'backdrop-blur-2xl bg-dark-300/90 border-r border-glass-border',
+          'backdrop-blur-2xl bg-dark-900/90 border-r border-glass-border',
           'flex flex-col',
           'lg:translate-x-0'
         )}
@@ -187,7 +187,7 @@ export function Sidebar() {
           sidebarCollapsed ? 'justify-center' : 'px-5'
         )}>
           <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-neon-cyan to-neon-purple flex items-center justify-center">
-            <Zap className="w-5 h-5 text-dark-500" />
+            <Zap className="w-5 h-5 text-dark-950" />
             <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-neon-cyan to-neon-purple opacity-50 blur-lg" />
           </div>
           {!sidebarCollapsed && (
@@ -266,7 +266,7 @@ export function MobileNavigation() {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 lg:hidden safe-bottom">
-      <div className="mx-3 mb-3 px-2 py-2 rounded-2xl backdrop-blur-2xl bg-dark-300/90 border border-glass-border">
+      <div className="mx-3 mb-3 px-2 py-2 rounded-2xl backdrop-blur-2xl bg-dark-900/90 border border-glass-border">
         <div className="flex items-center justify-around">
           {mobileNavItems.map((item) => {
             const isActive = pathname === item.href;

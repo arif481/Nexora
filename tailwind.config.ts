@@ -37,17 +37,17 @@ const config: Config = {
         },
         // Dark theme backgrounds
         dark: {
-          50: '#1e293b',
-          100: '#1a2234',
-          200: '#151c2c',
-          300: '#111827',
-          400: '#0d1421',
-          500: '#0a0f1a',
-          600: '#070b14',
-          700: '#05080f',
-          800: '#03050a',
-          900: '#010204',
-          950: '#000000',
+          50: '#e2e8f0',   // Very light gray for text
+          100: '#cbd5e1',  // Light gray
+          200: '#94a3b8',  // Medium light gray
+          300: '#64748b',  // Medium gray (secondary text)
+          400: '#475569',  // Darker gray (muted text)
+          500: '#334155',  // Dark gray
+          600: '#1e293b',  // Very dark (card backgrounds)
+          700: '#1a2234',  // Darker background
+          800: '#151c2c',  // Card/panel backgrounds
+          900: '#0f172a',  // Main background
+          950: '#0a0f1a',  // Darkest background
         },
         // Glass effect colors
         glass: {

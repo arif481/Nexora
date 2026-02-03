@@ -41,7 +41,7 @@
   }
 
   body {
-    @apply bg-dark-500 text-white font-sans;
+    @apply bg-dark-950 text-white font-sans;
     background-image: 
       radial-gradient(ellipse at top, rgba(0, 255, 245, 0.03) 0%, transparent 50%),
       radial-gradient(ellipse at bottom right, rgba(191, 0, 255, 0.03) 0%, transparent 50%);
@@ -54,11 +54,11 @@
   }
 
   ::-webkit-scrollbar-track {
-    @apply bg-dark-400 rounded-full;
+    @apply bg-dark-800 rounded-full;
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply bg-dark-100 rounded-full border-2 border-transparent;
+    @apply bg-dark-600 rounded-full border-2 border-transparent;
     background-clip: content-box;
   }
 
@@ -111,7 +111,7 @@
   /* Glow Button */
   .btn-glow {
     @apply relative overflow-hidden px-6 py-3 rounded-xl font-medium transition-all duration-300;
-    @apply bg-gradient-to-r from-neon-cyan to-neon-blue text-dark-500;
+    @apply bg-gradient-to-r from-neon-cyan to-neon-blue text-dark-950;
     @apply hover:shadow-glow-lg hover:scale-105;
   }
 
@@ -197,7 +197,7 @@
 
   /* Progress Bar */
   .progress-bar {
-    @apply relative h-2 bg-dark-300 rounded-full overflow-hidden;
+    @apply relative h-2 bg-dark-800 rounded-full overflow-hidden;
   }
 
   .progress-bar-fill {

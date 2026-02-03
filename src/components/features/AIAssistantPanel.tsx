@@ -86,7 +86,7 @@ export function AIAssistantPanel() {
           className={cn(
             'fixed bottom-24 right-4 lg:bottom-6 lg:right-6 z-50',
             'w-[calc(100%-2rem)] max-w-md',
-            'backdrop-blur-2xl bg-dark-200/95 border border-glass-border rounded-2xl',
+            'backdrop-blur-2xl bg-dark-800/95 border border-glass-border rounded-2xl',
             'shadow-glass-lg flex flex-col overflow-hidden'
           )}
         >

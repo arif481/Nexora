@@ -65,7 +65,7 @@ export function Tooltip({
             transition={{ duration: 0.15 }}
             className={cn(
               'absolute z-50 px-3 py-2 text-sm whitespace-nowrap',
-              'backdrop-blur-xl bg-dark-200/95 border border-glass-border rounded-lg',
+              'backdrop-blur-xl bg-dark-800/95 border border-glass-border rounded-lg',
               'text-white shadow-glass',
               sideStyles[side],
               className

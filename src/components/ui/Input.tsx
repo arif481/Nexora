@@ -37,8 +37,8 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
 
     const variantStyles = {
       default: cn(
-        'bg-dark-300 border-glass-border',
-        'focus:border-neon-cyan/50 focus:bg-dark-200',
+        'bg-dark-800 border-glass-border',
+        'focus:border-neon-cyan/50 focus:bg-dark-700',
         error && 'border-neon-red/50 focus:border-neon-red',
         success && 'border-neon-green/50 focus:border-neon-green'
       ),
@@ -178,8 +178,8 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
   ) => {
     const variantStyles = {
       default: cn(
-        'bg-dark-300 border-glass-border',
-        'focus:border-neon-cyan/50 focus:bg-dark-200',
+        'bg-dark-800 border-glass-border',
+        'focus:border-neon-cyan/50 focus:bg-dark-700',
         error && 'border-neon-red/50 focus:border-neon-red'
       ),
       glass: cn(

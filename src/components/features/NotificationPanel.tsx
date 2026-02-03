@@ -99,7 +99,7 @@ export function NotificationPanel() {
             transition={{ type: 'spring', damping: 30, stiffness: 300 }}
             className={cn(
               'absolute right-0 top-0 h-full w-full max-w-md',
-              'backdrop-blur-2xl bg-dark-200/95 border-l border-glass-border'
+              'backdrop-blur-2xl bg-dark-800/95 border-l border-glass-border'
             )}
           >
             {/* Header */}

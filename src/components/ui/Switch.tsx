@@ -50,7 +50,7 @@ const Switch = forwardRef<HTMLButtonElement, SwitchProps>(
         disabled={disabled}
         className={cn(
           'relative inline-flex items-center rounded-full transition-colors duration-200',
-          'bg-dark-200 border border-glass-border',
+          'bg-dark-700 border border-glass-border',
           'data-[state=checked]:bg-neon-cyan/20 data-[state=checked]:border-neon-cyan/50',
           'focus:outline-none focus:ring-2 focus:ring-neon-cyan/30 focus:ring-offset-2 focus:ring-offset-dark-500',
           'disabled:opacity-50 disabled:cursor-not-allowed',

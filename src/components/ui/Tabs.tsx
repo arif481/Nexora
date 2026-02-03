@@ -60,7 +60,7 @@ interface TabsListProps {
 
 export function TabsList({ children, variant = 'default', className }: TabsListProps) {
   const variantStyles = {
-    default: 'p-1 bg-dark-300 rounded-xl border border-glass-border',
+    default: 'p-1 bg-dark-800 rounded-xl border border-glass-border',
     pills: 'gap-2',
     underline: 'border-b border-glass-border gap-1',
   };

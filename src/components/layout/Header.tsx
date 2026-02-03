@@ -53,7 +53,7 @@ export function Header() {
   const notificationCount = 3; // This would come from a notification store
 
   return (
-    <header className="sticky top-0 z-30 backdrop-blur-xl bg-dark-500/80 border-b border-glass-border">
+    <header className="sticky top-0 z-30 backdrop-blur-xl bg-dark-950/80 border-b border-glass-border">
       <div className="flex items-center justify-between h-16 px-4 lg:px-6">
         {/* Left Section */}
         <div className="flex items-center gap-4">
@@ -79,8 +79,8 @@ export function Header() {
               <Search className="w-4 h-4" />
               <span className="text-sm">Search anything...</span>
               <div className="ml-auto flex items-center gap-1">
-                <kbd className="px-1.5 py-0.5 rounded bg-dark-300 text-xs text-white/40">⌘</kbd>
-                <kbd className="px-1.5 py-0.5 rounded bg-dark-300 text-xs text-white/40">K</kbd>
+                <kbd className="px-1.5 py-0.5 rounded bg-dark-800 text-xs text-white/40">⌘</kbd>
+                <kbd className="px-1.5 py-0.5 rounded bg-dark-800 text-xs text-white/40">K</kbd>
               </div>
             </button>
           </div>
@@ -101,7 +101,7 @@ export function Header() {
             </Button>
             <button
               onClick={() => setShowQuickAdd(!showQuickAdd)}
-              className="sm:hidden p-2 rounded-xl bg-gradient-to-r from-neon-cyan to-neon-blue text-dark-500"
+              className="sm:hidden p-2 rounded-xl bg-gradient-to-r from-neon-cyan to-neon-blue text-dark-950"
             >
               <Plus className="w-5 h-5" />
             </button>
@@ -121,7 +121,7 @@ export function Header() {
                     transition={{ duration: 0.15 }}
                     className={cn(
                       'absolute right-0 mt-2 w-56 z-50',
-                      'backdrop-blur-2xl bg-dark-200/95 border border-glass-border rounded-xl',
+                      'backdrop-blur-2xl bg-dark-800/95 border border-glass-border rounded-xl',
                       'shadow-glass-lg overflow-hidden'
                     )}
                   >
@@ -140,7 +140,7 @@ export function Header() {
                         >
                           <span className="text-lg">{item.icon}</span>
                           <span className="flex-1 text-sm text-left">{item.label}</span>
-                          <kbd className="px-1.5 py-0.5 rounded bg-dark-400 text-xs text-white/40">
+                          <kbd className="px-1.5 py-0.5 rounded bg-dark-700 text-xs text-white/40">
                             {item.shortcut}
                           </kbd>
                         </button>
@@ -216,7 +216,7 @@ export function Header() {
                     transition={{ duration: 0.15 }}
                     className={cn(
                       'absolute right-0 mt-2 w-64 z-50',
-                      'backdrop-blur-2xl bg-dark-200/95 border border-glass-border rounded-xl',
+                      'backdrop-blur-2xl bg-dark-800/95 border border-glass-border rounded-xl',
                       'shadow-glass-lg overflow-hidden'
                     )}
                   >

@@ -36,7 +36,7 @@ const Card = forwardRef<HTMLDivElement, CardProps>(
         'bg-glass-light'
       ),
       solid: cn(
-        'bg-dark-300 border border-glass-border rounded-2xl'
+        'bg-dark-800 border border-glass-border rounded-2xl'
       ),
       gradient: cn(
         'backdrop-blur-xl border border-glass-border rounded-2xl',
@@ -105,7 +105,7 @@ const AnimatedCard = forwardRef<HTMLDivElement, AnimatedCardProps>(
         'bg-glass-light'
       ),
       solid: cn(
-        'bg-dark-300 border border-glass-border rounded-2xl'
+        'bg-dark-800 border border-glass-border rounded-2xl'
       ),
       gradient: cn(
         'backdrop-blur-xl border border-glass-border rounded-2xl',

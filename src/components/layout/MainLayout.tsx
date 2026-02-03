@@ -18,7 +18,7 @@ export function MainLayout({ children }: MainLayoutProps) {
   const { sidebarCollapsed, focusModeActive } = useUIStore();
 
   return (
-    <div className="min-h-screen bg-dark-500">
+    <div className="min-h-screen bg-dark-950">
       {/* Background Effects */}
       <div className="fixed inset-0 pointer-events-none">
         {/* Grid Pattern */}
@@ -29,7 +29,7 @@ export function MainLayout({ children }: MainLayoutProps) {
         <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-neon-purple/5 rounded-full blur-[100px]" />
         
         {/* Vignette */}
-        <div className="absolute inset-0 bg-gradient-radial from-transparent via-transparent to-dark-500/50" />
+        <div className="absolute inset-0 bg-gradient-radial from-transparent via-transparent to-dark-950/50" />
       </div>
 
       {/* Sidebar */}

@@ -125,13 +125,13 @@ interface FullPageLoadingProps {
 
 export function FullPageLoading({ message = 'Loading...' }: FullPageLoadingProps) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-dark-500/95 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-dark-950/95 backdrop-blur-sm">
       <div className="flex flex-col items-center gap-6">
         {/* Nexora Logo Animation */}
         <div className="relative w-24 h-24">
           <div className="absolute inset-0 rounded-full bg-gradient-to-r from-neon-cyan to-neon-purple opacity-20 animate-ping" />
           <div className="absolute inset-2 rounded-full bg-gradient-to-r from-neon-cyan to-neon-purple opacity-40 animate-pulse" />
-          <div className="absolute inset-4 rounded-full bg-dark-400 flex items-center justify-center">
+          <div className="absolute inset-4 rounded-full bg-dark-800 flex items-center justify-center">
             <span className="text-2xl font-bold text-gradient">N</span>
           </div>
         </div>
@@ -168,7 +168,7 @@ export function CardLoadingOverlay({ visible }: CardLoadingOverlayProps) {
   if (!visible) return null;
 
   return (
-    <div className="absolute inset-0 z-10 flex items-center justify-center bg-dark-400/80 backdrop-blur-sm rounded-2xl">
+    <div className="absolute inset-0 z-10 flex items-center justify-center bg-dark-800/80 backdrop-blur-sm rounded-2xl">
       <LoadingSpinner size="lg" />
     </div>
   );
@@ -180,7 +180,7 @@ export function AIThinkingAnimation({ className }: { className?: string }) {
     <div className={cn('flex items-center gap-3', className)}>
       <div className="relative w-8 h-8">
         <div className="absolute inset-0 rounded-full bg-gradient-to-r from-neon-cyan via-neon-purple to-neon-pink animate-spin" style={{ animationDuration: '3s' }} />
-        <div className="absolute inset-0.5 rounded-full bg-dark-400" />
+        <div className="absolute inset-0.5 rounded-full bg-dark-800" />
         <div className="absolute inset-2 rounded-full bg-gradient-to-r from-neon-cyan to-neon-purple animate-pulse" />
       </div>
       <span className="text-sm text-white/60">

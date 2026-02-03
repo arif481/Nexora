@@ -49,7 +49,7 @@ export function Progress({
     <div className={cn('w-full', className)}>
       <div
         className={cn(
-          'w-full bg-dark-300 rounded-full overflow-hidden',
+          'w-full bg-dark-800 rounded-full overflow-hidden',
           sizeStyles[size]
         )}
       >
@@ -269,7 +269,7 @@ export function SegmentProgress({
     <div className={cn('w-full', className)}>
       <div
         className={cn(
-          'w-full bg-dark-300 rounded-full overflow-hidden flex',
+          'w-full bg-dark-800 rounded-full overflow-hidden flex',
           sizeStyles[size]
         )}
       >

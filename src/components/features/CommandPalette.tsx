@@ -172,7 +172,7 @@ export function CommandPalette() {
               transition={{ duration: 0.15 }}
               className={cn(
                 'w-full max-w-xl mx-4',
-                'backdrop-blur-2xl bg-dark-200/95 border border-glass-border rounded-2xl',
+                'backdrop-blur-2xl bg-dark-800/95 border border-glass-border rounded-2xl',
                 'shadow-glass-lg overflow-hidden'
               )}
             >
@@ -190,7 +190,7 @@ export function CommandPalette() {
                   className="flex-1 bg-transparent text-white placeholder-white/40 outline-none text-base"
                   autoFocus
                 />
-                <kbd className="px-2 py-1 rounded bg-dark-400 text-xs text-white/40">ESC</kbd>
+                <kbd className="px-2 py-1 rounded bg-dark-700 text-xs text-white/40">ESC</kbd>
               </div>
 
               {/* Results */}
@@ -253,7 +253,7 @@ export function CommandPalette() {
                                     {cmd.shortcut.split(' ').map((key, i) => (
                                       <kbd
                                         key={i}
-                                        className="px-1.5 py-0.5 rounded bg-dark-400 text-xs text-white/40"
+                                        className="px-1.5 py-0.5 rounded bg-dark-700 text-xs text-white/40"
                                       >
                                         {key}
                                       </kbd>
@@ -276,15 +276,15 @@ export function CommandPalette() {
               {/* Footer */}
               <div className="flex items-center gap-4 px-4 py-3 border-t border-glass-border text-xs text-white/30">
                 <div className="flex items-center gap-1">
-                  <kbd className="px-1.5 py-0.5 rounded bg-dark-400">↑↓</kbd>
+                  <kbd className="px-1.5 py-0.5 rounded bg-dark-700">↑↓</kbd>
                   <span>Navigate</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <kbd className="px-1.5 py-0.5 rounded bg-dark-400">↵</kbd>
+                  <kbd className="px-1.5 py-0.5 rounded bg-dark-700">↵</kbd>
                   <span>Select</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <kbd className="px-1.5 py-0.5 rounded bg-dark-400">ESC</kbd>
+                  <kbd className="px-1.5 py-0.5 rounded bg-dark-700">ESC</kbd>
                   <span>Close</span>
                 </div>
               </div>

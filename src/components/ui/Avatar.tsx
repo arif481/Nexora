@@ -149,7 +149,7 @@ export function AvatarGroup({
         <div
           className={cn(
             'rounded-full flex items-center justify-center',
-            'bg-dark-200 border border-glass-border',
+            'bg-dark-700 border border-glass-border',
             'ring-2 ring-dark-300',
             sizeStyles[size],
             overlapStyles[size]
