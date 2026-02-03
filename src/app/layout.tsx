@@ -43,12 +43,12 @@ export const metadata: Metadata = {
     address: false,
     telephone: false,
   },
-  manifest: '/manifest.json',
+  manifest: '/Nexora/manifest.json',
   icons: {
     icon: [
-      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/Nexora/favicon.svg', type: 'image/svg+xml' },
     ],
-    apple: '/apple-touch-icon.svg',
+    apple: '/Nexora/apple-touch-icon.svg',
   },
   openGraph: {
     type: 'website',
