@@ -287,10 +287,10 @@ export function useRecentWellness(days: number = 7) {
 
 // Hook for wellness statistics
 export function useWellnessStats(entries: WellnessEntry[]) {
+  // Ensure entries is always an array - do this before useMemo to ensure stable reference
+  const safeEntries = Array.isArray(entries) ? entries : [];
+  
   const stats = useMemo(() => {
-    // Ensure entries is always an array
-    const safeEntries = entries || [];
-    
     if (safeEntries.length === 0) {
       return {
         avgSleepDuration: 0,
@@ -342,7 +342,7 @@ export function useWellnessStats(entries: WellnessEntry[]) {
       avgMealsPerDay,
       exerciseCount,
     };
-  }, [entries]);
+  }, [safeEntries]);
 
   return stats;
 }
