@@ -4,6 +4,9 @@ export interface User {
   email: string;
   displayName: string;
   photoURL?: string;
+  phone?: string;
+  location?: string;
+  bio?: string;
   createdAt: Date;
   lastLoginAt: Date;
   preferences: UserPreferences;
@@ -15,6 +18,8 @@ export interface UserPreferences {
   accentColor: string;
   language: string;
   timezone: string;
+  compactMode?: boolean;
+  animations?: boolean;
   notifications: NotificationPreferences;
   privacy: PrivacySettings;
   aiPersonality: AIPersonality;

@@ -31,6 +31,7 @@ import {
   Pause,
   RefreshCw,
   LogIn,
+  Loader2,
 } from 'lucide-react';
 import { MainLayout, PageContainer } from '@/components/layout/MainLayout';
 import { Card, CardHeader, CardContent } from '@/components/ui/Card';
@@ -71,9 +72,22 @@ export default function GoalsPage() {
   
   const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isAddMilestoneOpen, setIsAddMilestoneOpen] = useState(false);
+  const [newMilestoneTitle, setNewMilestoneTitle] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
   const [expandedGoals, setExpandedGoals] = useState<Set<string>>(new Set());
   const { openAIPanel } = useUIStore();
+  
+  // Edit form state
+  const [editForm, setEditForm] = useState({
+    title: '',
+    description: '',
+    category: 'personal' as Goal['category'],
+    priority: 'medium' as Goal['priority'],
+    targetDate: '',
+  });
 
   const loading = authLoading || goalsLoading;
 
@@ -105,6 +119,74 @@ export default function GoalsPage() {
       await toggleMilestoneService(goalId, milestoneId, !currentCompleted);
     } catch (error) {
       console.error('Failed to toggle milestone:', error);
+    }
+  };
+
+  // Open edit modal
+  const handleEditGoal = (goal: Goal) => {
+    setSelectedGoal(goal);
+    setEditForm({
+      title: goal.title,
+      description: goal.description || '',
+      category: goal.category,
+      priority: goal.priority,
+      targetDate: goal.targetDate ? new Date(goal.targetDate).toISOString().split('T')[0] : '',
+    });
+    setIsEditModalOpen(true);
+  };
+
+  // Save edited goal
+  const handleSaveEdit = async () => {
+    if (!selectedGoal || !editForm.title.trim()) return;
+    
+    setIsSaving(true);
+    try {
+      await updateGoal(selectedGoal.id, {
+        title: editForm.title,
+        description: editForm.description,
+        category: editForm.category,
+        priority: editForm.priority,
+        targetDate: editForm.targetDate ? new Date(editForm.targetDate) : undefined,
+      });
+      setIsEditModalOpen(false);
+      setSelectedGoal(null);
+    } catch (error) {
+      console.error('Failed to update goal:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Delete goal
+  const handleDeleteGoal = async () => {
+    if (!selectedGoal) return;
+    if (!confirm('Are you sure you want to delete this goal?')) return;
+    
+    setIsSaving(true);
+    try {
+      await deleteGoal(selectedGoal.id);
+      setIsEditModalOpen(false);
+      setSelectedGoal(null);
+    } catch (error) {
+      console.error('Failed to delete goal:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Add milestone to goal
+  const handleAddMilestone = async () => {
+    if (!selectedGoal || !newMilestoneTitle.trim()) return;
+    
+    setIsSaving(true);
+    try {
+      await addMilestoneService(selectedGoal.id, { title: newMilestoneTitle });
+      setNewMilestoneTitle('');
+      setIsAddMilestoneOpen(false);
+    } catch (error) {
+      console.error('Failed to add milestone:', error);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -234,10 +316,11 @@ export default function GoalsPage() {
                 )}
               </button>
               <button
-                onClick={() => setSelectedGoal(goal)}
+                onClick={() => handleEditGoal(goal)}
                 className="p-2 rounded-lg hover:bg-dark-700/50 opacity-0 group-hover:opacity-100 transition-all"
+                title="Edit goal"
               >
-                <MoreHorizontal className="w-5 h-5 text-dark-400" />
+                <Edit3 className="w-5 h-5 text-dark-400 hover:text-neon-cyan" />
               </button>
             </div>
           </div>
@@ -297,6 +380,18 @@ export default function GoalsPage() {
                       )}
                     </div>
                   ))}
+                  
+                  {/* Add Milestone Button */}
+                  <button
+                    onClick={() => {
+                      setSelectedGoal(goal);
+                      setIsAddMilestoneOpen(true);
+                    }}
+                    className="flex items-center gap-2 py-2 text-sm text-dark-400 hover:text-neon-cyan transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Milestone
+                  </button>
                 </div>
               </div>
             </motion.div>
@@ -536,6 +631,163 @@ export default function GoalsPage() {
               onClose={() => setSelectedGoal(null)}
             />
           )}
+        </Modal>
+
+        {/* Edit Goal Modal */}
+        <Modal
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          title="Edit Goal"
+          size="lg"
+        >
+          {editForm && (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Title
+                </label>
+                <input
+                  type="text"
+                  value={editForm.title}
+                  onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Description
+                </label>
+                <textarea
+                  value={editForm.description}
+                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Category
+                  </label>
+                  <select
+                    value={editForm.category}
+                    onChange={(e) => setEditForm({ ...editForm, category: e.target.value as Goal['category'] })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="career">Career</option>
+                    <option value="health">Health</option>
+                    <option value="finance">Finance</option>
+                    <option value="personal">Personal</option>
+                    <option value="education">Education</option>
+                    <option value="relationships">Relationships</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Priority
+                  </label>
+                  <select
+                    value={editForm.priority}
+                    onChange={(e) => setEditForm({ ...editForm, priority: e.target.value as Goal['priority'] })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Target Date
+                </label>
+                <input
+                  type="date"
+                  value={editForm.targetDate}
+                  onChange={(e) => setEditForm({ ...editForm, targetDate: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+              
+              <div className="flex justify-between pt-4">
+                <button
+                  onClick={handleDeleteGoal}
+                  disabled={isSaving}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
+                >
+                  {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                  Delete Goal
+                </button>
+                
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setIsEditModalOpen(false)}
+                    className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSaveEdit}
+                    disabled={isSaving || !editForm.title.trim()}
+                    className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+                    Save Changes
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </Modal>
+
+        {/* Add Milestone Modal */}
+        <Modal
+          isOpen={isAddMilestoneOpen}
+          onClose={() => {
+            setIsAddMilestoneOpen(false);
+            setNewMilestoneTitle('');
+          }}
+          title="Add Milestone"
+          size="sm"
+        >
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Milestone Title
+              </label>
+              <input
+                type="text"
+                value={newMilestoneTitle}
+                onChange={(e) => setNewMilestoneTitle(e.target.value)}
+                placeholder="Enter milestone title..."
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+            
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() => {
+                  setIsAddMilestoneOpen(false);
+                  setNewMilestoneTitle('');
+                }}
+                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddMilestone}
+                disabled={isSaving || !newMilestoneTitle.trim()}
+                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center gap-2"
+              >
+                {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+                Add Milestone
+              </button>
+            </div>
+          </div>
         </Modal>
       </PageContainer>
     </MainLayout>

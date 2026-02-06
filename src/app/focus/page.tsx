@@ -698,6 +698,28 @@ export default function FocusPage() {
                   </div>
                 </div>
 
+                {/* Weekly stats */}
+                <div className="mt-4 p-3 rounded-lg bg-dark-800/30">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-neon-purple" />
+                      <span className="text-sm text-dark-300">This Week</span>
+                    </div>
+                    <span className="text-sm font-medium text-white">{focusStats.weekPomodoros} sessions</span>
+                  </div>
+                </div>
+
+                {/* Streak */}
+                <div className="mt-2 p-3 rounded-lg bg-gradient-to-r from-orange-500/10 to-red-500/10 border border-orange-500/20">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Flame className="w-4 h-4 text-orange-400" />
+                      <span className="text-sm text-dark-300">Focus Streak</span>
+                    </div>
+                    <span className="text-lg font-bold text-orange-400">{focusStats.streak} {focusStats.streak === 1 ? 'day' : 'days'}</span>
+                  </div>
+                </div>
+
                 {/* Daily goal progress */}
                 <div className="mt-4">
                   <div className="flex items-center justify-between mb-2">

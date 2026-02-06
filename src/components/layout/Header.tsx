@@ -234,12 +234,12 @@ export function Header() {
                             {user?.displayName || 'User'}
                           </p>
                           <p className="text-xs text-white/50 truncate">
-                            {user?.email || 'user@example.com'}
+                            {user?.email || ''}
                           </p>
                         </div>
                       </div>
                       <div className="mt-3 flex items-center gap-2">
-                        <Badge variant="cyan" size="sm">Pro User</Badge>
+                        <Badge variant="cyan" size="sm">Free Plan</Badge>
                       </div>
                     </div>
 

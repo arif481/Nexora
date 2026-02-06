@@ -161,12 +161,13 @@ export function useSimpleAI() {
     {
       id: '1',
       role: 'assistant',
-      content: "Hello! I'm Nexora, your AI assistant. I'm here to help you stay organized, productive, and balanced. How can I assist you today?",
+      content: "Hello! I'm NOVA, your AI assistant. I'm here to help you stay organized, productive, and balanced. How can I assist you today?",
       timestamp: new Date(),
       suggestions: ['Plan my day', 'What are my priorities?', 'How am I doing this week?'],
     },
   ]);
   const [isThinking, setIsThinking] = useState(false);
+  const [lastUserMessage, setLastUserMessage] = useState<string>('');
 
   const sendMessage = useCallback(async (content: string) => {
     if (!content.trim() || isThinking) return;
@@ -179,6 +180,7 @@ export function useSimpleAI() {
       timestamp: new Date(),
     };
     setMessages(prev => [...prev, userMessage]);
+    setLastUserMessage(content.trim());
     setIsThinking(true);
 
     try {
@@ -191,7 +193,13 @@ export function useSimpleAI() {
         transactions,
       };
       
-      const aiResponse = await generateAIResponse(content, context);
+      // Build conversation history for context
+      const history = messages.map(m => ({
+        role: m.role,
+        content: m.content,
+      }));
+      
+      const aiResponse = await generateAIResponse(content, context, history);
 
       // Add AI response
       const assistantMessage: AIMessage = {
@@ -215,18 +223,67 @@ export function useSimpleAI() {
     } finally {
       setIsThinking(false);
     }
-  }, [isThinking, tasks, habits, events, goals, transactions]);
+  }, [isThinking, tasks, habits, events, goals, transactions, messages]);
+
+  const regenerateLastResponse = useCallback(async () => {
+    if (!lastUserMessage || isThinking) return;
+    
+    // Remove the last AI message
+    setMessages(prev => {
+      const newMessages = [...prev];
+      if (newMessages.length > 0 && newMessages[newMessages.length - 1].role === 'assistant') {
+        newMessages.pop();
+      }
+      return newMessages;
+    });
+    
+    setIsThinking(true);
+
+    try {
+      const context = {
+        tasks,
+        habits,
+        events,
+        goals,
+        transactions,
+      };
+      
+      const aiResponse = await generateAIResponse(lastUserMessage, context);
+
+      const assistantMessage: AIMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: aiResponse.content,
+        timestamp: new Date(),
+        suggestions: aiResponse.suggestions,
+      };
+      setMessages(prev => [...prev, assistantMessage]);
+    } catch (error) {
+      console.error('Failed to regenerate response:', error);
+      const errorMessage: AIMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: "I'm sorry, I couldn't regenerate the response. Please try again.",
+        timestamp: new Date(),
+        suggestions: ['Try again', 'Help'],
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsThinking(false);
+    }
+  }, [isThinking, lastUserMessage, tasks, habits, events, goals, transactions]);
 
   const clearMessages = useCallback(() => {
     setMessages([
       {
         id: '1',
         role: 'assistant',
-        content: "Hello! I'm Nexora, your AI assistant. How can I help you today?",
+        content: "Hello! I'm NOVA, your AI assistant. How can I help you today?",
         timestamp: new Date(),
         suggestions: ['Plan my day', 'What are my priorities?', 'Show my tasks'],
       },
     ]);
+    setLastUserMessage('');
   }, []);
 
   return {
@@ -234,5 +291,6 @@ export function useSimpleAI() {
     isThinking,
     sendMessage,
     clearMessages,
+    regenerateLastResponse,
   };
 }

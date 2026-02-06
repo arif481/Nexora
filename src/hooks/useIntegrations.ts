@@ -38,7 +38,13 @@ export function useIntegrations() {
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CALENDAR_CLIENT_ID;
     
     if (!clientId) {
-      alert('Google Calendar integration requires setup. Please add NEXT_PUBLIC_GOOGLE_CALENDAR_CLIENT_ID to your environment variables.');
+      console.warn('Google Calendar integration requires setup. Please add NEXT_PUBLIC_GOOGLE_CALENDAR_CLIENT_ID to your environment variables.');
+      // Show user-friendly message
+      if (typeof window !== 'undefined') {
+        const message = 'Google Calendar integration is not configured. Please contact support.';
+        // Use native confirm as fallback since there's no toast system
+        window.confirm(message);
+      }
       return;
     }
     
@@ -122,7 +128,8 @@ export function useLinkedAccounts() {
 
   const connectAccount = useCallback((provider: 'google' | 'github' | 'twitter' | 'linkedin') => {
     if (provider === 'google') {
-      alert('To connect Google, please sign out and sign in with Google.');
+      // Provide guidance without blocking alert
+      console.info('To connect Google, user should sign out and sign in with Google.');
     }
   }, []);
 

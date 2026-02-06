@@ -6,6 +6,16 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
     
+    // User integrations - document ID is the userId
+    match /userIntegrations/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // User linked accounts - document ID is the userId
+    match /userLinkedAccounts/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
     // Wellness entries use document ID format: {userId}_{dateKey}
     // Allow read if document ID starts with the user's ID
     match /wellnessEntries/{docId} {

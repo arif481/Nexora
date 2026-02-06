@@ -16,6 +16,9 @@ import {
   Loader2,
   Grid3X3,
   List,
+  Trash2,
+  Edit3,
+  X,
 } from 'lucide-react';
 import { MainLayout, PageContainer } from '@/components/layout/MainLayout';
 import { Card } from '@/components/ui/Card';
@@ -55,10 +58,13 @@ export default function CalendarPage() {
   const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
   
   const { events, loading } = useEventsInRange(monthStart, monthEnd);
-  const { createEvent, deleteEvent } = useCalendar();
+  const { createEvent, updateEvent, deleteEvent } = useCalendar();
   
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { openAIPanel } = useUIStore();
 
   // Form state for new event
@@ -165,6 +171,82 @@ export default function CalendarPage() {
       console.error('Failed to create event:', err);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // Edit event - open modal with event data
+  const handleEditEvent = (event: CalendarEvent) => {
+    setSelectedEvent(event);
+    const eventDate = new Date(event.startTime);
+    setNewEvent({
+      title: event.title,
+      description: event.description || '',
+      date: eventDate.toISOString().split('T')[0],
+      startTime: eventDate.toTimeString().slice(0, 5),
+      endTime: new Date(event.endTime).toTimeString().slice(0, 5),
+      location: event.location || '',
+      category: event.category,
+      allDay: event.allDay,
+    });
+    setIsEditModalOpen(true);
+  };
+
+  // Save edited event
+  const handleSaveEdit = async () => {
+    if (!selectedEvent || !newEvent.title.trim() || !newEvent.date) return;
+    
+    setIsSaving(true);
+    try {
+      const startTime = newEvent.allDay
+        ? new Date(newEvent.date)
+        : new Date(`${newEvent.date}T${newEvent.startTime || '09:00'}`);
+      
+      const endTime = newEvent.allDay
+        ? new Date(new Date(newEvent.date).setHours(23, 59, 59))
+        : new Date(`${newEvent.date}T${newEvent.endTime || '10:00'}`);
+      
+      await updateEvent(selectedEvent.id, {
+        title: newEvent.title,
+        description: newEvent.description,
+        startTime,
+        endTime,
+        allDay: newEvent.allDay,
+        location: newEvent.location,
+        category: newEvent.category,
+      });
+      
+      setIsEditModalOpen(false);
+      setSelectedEvent(null);
+      setNewEvent({
+        title: '',
+        description: '',
+        date: '',
+        startTime: '',
+        endTime: '',
+        location: '',
+        category: 'work',
+        allDay: false,
+      });
+    } catch (err) {
+      console.error('Failed to update event:', err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Delete event
+  const handleDeleteEvent = async (eventId: string) => {
+    if (!confirm('Are you sure you want to delete this event?')) return;
+    
+    setIsDeleting(true);
+    try {
+      await deleteEvent(eventId);
+      setIsEditModalOpen(false);
+      setSelectedEvent(null);
+    } catch (err) {
+      console.error('Failed to delete event:', err);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -359,13 +441,27 @@ export default function CalendarPage() {
                     selectedDateEvents.map(event => (
                       <div
                         key={event.id}
-                        className="p-3 rounded-lg bg-dark-800/50 border-l-2"
+                        className="p-3 rounded-lg bg-dark-800/50 border-l-2 group"
                         style={{ borderColor: getCategoryColor(event.category).replace('bg-', '#') }}
                       >
                         <div className="flex items-start justify-between mb-1">
-                          <h4 className="font-medium text-white text-sm">{event.title}</h4>
-                          <Badge variant="default" size="sm">{event.category}</Badge>
+                          <h4 className="font-medium text-white text-sm flex-1">{event.title}</h4>
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => handleEditEvent(event)}
+                              className="p-1 hover:bg-dark-700 rounded text-dark-400 hover:text-neon-cyan"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteEvent(event.id)}
+                              className="p-1 hover:bg-dark-700 rounded text-dark-400 hover:text-status-error"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
+                        <Badge variant="default" size="sm" className="mb-1">{event.category}</Badge>
                         {!event.allDay && (
                           <div className="flex items-center gap-1 text-xs text-dark-400">
                             <Clock className="w-3 h-3" />
@@ -561,6 +657,150 @@ export default function CalendarPage() {
                   </>
                 ) : (
                   'Create Event'
+                )}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* Edit Event Modal */}
+        <Modal
+          isOpen={isEditModalOpen}
+          onClose={() => {
+            setIsEditModalOpen(false);
+            setSelectedEvent(null);
+            setNewEvent({
+              title: '',
+              description: '',
+              date: '',
+              startTime: '',
+              endTime: '',
+              location: '',
+              category: 'work',
+              allDay: false,
+            });
+          }}
+          title="Edit Event"
+        >
+          <div className="space-y-4">
+            <Input
+              label="Title"
+              placeholder="Event title..."
+              value={newEvent.title}
+              onChange={(e) => setNewEvent(prev => ({ ...prev, title: e.target.value }))}
+            />
+
+            <Input
+              label="Description"
+              placeholder="Add details..."
+              value={newEvent.description}
+              onChange={(e) => setNewEvent(prev => ({ ...prev, description: e.target.value }))}
+            />
+
+            <div>
+              <label className="block text-sm font-medium text-dark-300 mb-2">Date</label>
+              <input
+                type="date"
+                value={newEvent.date}
+                onChange={(e) => setNewEvent(prev => ({ ...prev, date: e.target.value }))}
+                className="w-full bg-dark-800 border border-dark-700 rounded-lg px-3 py-2 text-white focus:border-neon-cyan outline-none"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 mb-4">
+              <input
+                type="checkbox"
+                id="allDayEdit"
+                checked={newEvent.allDay}
+                onChange={(e) => setNewEvent(prev => ({ ...prev, allDay: e.target.checked }))}
+                className="rounded"
+              />
+              <label htmlFor="allDayEdit" className="text-sm text-dark-300">All day event</label>
+            </div>
+
+            {!newEvent.allDay && (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-dark-300 mb-2">Start Time</label>
+                  <input
+                    type="time"
+                    value={newEvent.startTime}
+                    onChange={(e) => setNewEvent(prev => ({ ...prev, startTime: e.target.value }))}
+                    className="w-full bg-dark-800 border border-dark-700 rounded-lg px-3 py-2 text-white focus:border-neon-cyan outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-dark-300 mb-2">End Time</label>
+                  <input
+                    type="time"
+                    value={newEvent.endTime}
+                    onChange={(e) => setNewEvent(prev => ({ ...prev, endTime: e.target.value }))}
+                    className="w-full bg-dark-800 border border-dark-700 rounded-lg px-3 py-2 text-white focus:border-neon-cyan outline-none"
+                  />
+                </div>
+              </div>
+            )}
+
+            <Input
+              label="Location"
+              placeholder="Add location..."
+              value={newEvent.location}
+              onChange={(e) => setNewEvent(prev => ({ ...prev, location: e.target.value }))}
+            />
+
+            <div>
+              <label className="block text-sm font-medium text-dark-300 mb-2">Category</label>
+              <div className="flex flex-wrap gap-2">
+                {categoryOptions.map(({ label, value, color }) => (
+                  <button
+                    key={value}
+                    onClick={() => setNewEvent(prev => ({ ...prev, category: value }))}
+                    className={cn(
+                      'px-3 py-1.5 rounded-lg text-sm transition-all flex items-center gap-1',
+                      newEvent.category === value
+                        ? 'bg-neon-cyan/20 border border-neon-cyan text-neon-cyan'
+                        : 'bg-dark-800 border border-dark-700 text-dark-400 hover:border-dark-500'
+                    )}
+                  >
+                    <div className={cn('w-2 h-2 rounded-full', color)} />
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-4">
+              <Button
+                variant="ghost"
+                className="text-status-error"
+                onClick={() => selectedEvent && handleDeleteEvent(selectedEvent.id)}
+                disabled={isDeleting}
+              >
+                {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  setIsEditModalOpen(false);
+                  setSelectedEvent(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="glow"
+                className="flex-1"
+                onClick={handleSaveEdit}
+                disabled={!newEvent.title.trim() || !newEvent.date || isSaving}
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  'Save Changes'
                 )}
               </Button>
             </div>

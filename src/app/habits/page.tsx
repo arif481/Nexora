@@ -90,14 +90,24 @@ const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 export default function HabitsPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const { habits, loading, createHabit, deleteHabit, toggleCompletion } = useHabits();
+  const { habits, loading, createHabit, updateHabit, deleteHabit, toggleCompletion } = useHabits();
   const completionData = useHabitCompletions(habits as any, 7);
   
   const [selectedHabit, setSelectedHabit] = useState<(Habit & { icon?: string; color?: string }) | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isActualEditMode, setIsActualEditMode] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Edit form state
+  const [editForm, setEditForm] = useState({
+    name: '',
+    description: '',
+    icon: 'target',
+    color: '#06b6d4',
+    targetDays: [0, 1, 2, 3, 4, 5, 6] as number[],
+  });
   const { openAIPanel } = useUIStore();
 
   // Form state for new habit
@@ -199,6 +209,43 @@ export default function HabitsPage() {
       setSelectedHabit(null);
     } catch (err) {
       console.error('Failed to delete habit:', err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Open edit form with habit data
+  const openEditForm = (habit: Habit & { icon?: string; color?: string }) => {
+    setSelectedHabit(habit);
+    setEditForm({
+      name: habit.name,
+      description: habit.description || '',
+      icon: habit.icon || 'target',
+      color: habit.color || '#06b6d4',
+      targetDays: habit.targetDays || [0, 1, 2, 3, 4, 5, 6],
+    });
+    setIsActualEditMode(true);
+    setIsEditModalOpen(true);
+  };
+
+  // Save edited habit
+  const handleSaveEdit = async () => {
+    if (!selectedHabit || !editForm.name.trim()) return;
+    
+    setIsSaving(true);
+    try {
+      await updateHabit(selectedHabit.id, {
+        name: editForm.name,
+        description: editForm.description,
+        targetDays: editForm.targetDays,
+        icon: editForm.icon,
+        color: editForm.color,
+      } as any);
+      setIsEditModalOpen(false);
+      setIsActualEditMode(false);
+      setSelectedHabit(null);
+    } catch (err) {
+      console.error('Failed to update habit:', err);
     } finally {
       setIsSaving(false);
     }
@@ -697,11 +744,12 @@ export default function HabitsPage() {
           isOpen={isEditModalOpen}
           onClose={() => {
             setIsEditModalOpen(false);
+            setIsActualEditMode(false);
             setSelectedHabit(null);
           }}
-          title="Habit Options"
+          title={isActualEditMode ? "Edit Habit" : "Habit Options"}
         >
-          {selectedHabit && (
+          {selectedHabit && !isActualEditMode && (
             <div className="space-y-4">
               <div className="flex items-center gap-3 p-3 rounded-lg bg-dark-800/50">
                 {(() => {
@@ -731,12 +779,9 @@ export default function HabitsPage() {
                 <Button
                   variant="outline"
                   className="flex-1"
-                  onClick={() => {
-                    setIsEditModalOpen(false);
-                    setSelectedHabit(null);
-                  }}
+                  onClick={() => openEditForm(selectedHabit)}
                 >
-                  Close
+                  Edit
                 </Button>
                 <Button
                   variant="outline"
@@ -748,6 +793,115 @@ export default function HabitsPage() {
                 >
                   <Trash2 className="w-4 h-4 mr-1" />
                   Delete
+                </Button>
+              </div>
+            </div>
+          )}
+          
+          {selectedHabit && isActualEditMode && (
+            <div className="space-y-4">
+              <Input
+                label="Habit Name"
+                placeholder="e.g., Morning Exercise"
+                value={editForm.name}
+                onChange={(e) => setEditForm(prev => ({ ...prev, name: e.target.value }))}
+              />
+
+              <Input
+                label="Description"
+                placeholder="Optional description..."
+                value={editForm.description}
+                onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
+              />
+
+              <div>
+                <label className="block text-sm font-medium text-dark-300 mb-2">Icon</label>
+                <div className="flex flex-wrap gap-2">
+                  {iconOptions.map(option => (
+                    <button
+                      key={option.value}
+                      onClick={() => setEditForm(prev => ({ ...prev, icon: option.value }))}
+                      className={cn(
+                        'p-2 rounded-lg transition-all',
+                        editForm.icon === option.value
+                          ? 'bg-neon-cyan/20 ring-2 ring-neon-cyan'
+                          : 'bg-dark-800 hover:bg-dark-700'
+                      )}
+                    >
+                      <option.icon className="w-5 h-5" style={{ color: editForm.color }} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-dark-300 mb-2">Color</label>
+                <div className="flex flex-wrap gap-2">
+                  {colorOptions.map(color => (
+                    <button
+                      key={color}
+                      onClick={() => setEditForm(prev => ({ ...prev, color }))}
+                      className={cn(
+                        'w-8 h-8 rounded-lg transition-all',
+                        editForm.color === color && 'ring-2 ring-white ring-offset-2 ring-offset-dark-900'
+                      )}
+                      style={{ backgroundColor: color }}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-dark-300 mb-2">Target Days</label>
+                <div className="flex gap-2">
+                  {DAYS.map((day, index) => (
+                    <button
+                      key={day}
+                      onClick={() => {
+                        setEditForm(prev => ({
+                          ...prev,
+                          targetDays: prev.targetDays.includes(index)
+                            ? prev.targetDays.filter(d => d !== index)
+                            : [...prev.targetDays, index]
+                        }));
+                      }}
+                      className={cn(
+                        'w-10 h-10 rounded-lg text-sm font-medium transition-all',
+                        editForm.targetDays.includes(index)
+                          ? 'bg-neon-cyan/20 text-neon-cyan border border-neon-cyan'
+                          : 'bg-dark-800 text-dark-400 border border-dark-700'
+                      )}
+                    >
+                      {day.charAt(0)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    setIsActualEditMode(false);
+                  }}
+                >
+                  Back
+                </Button>
+                <Button
+                  variant="glow"
+                  className="flex-1"
+                  onClick={handleSaveEdit}
+                  disabled={!editForm.name.trim() || isSaving}
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    'Save Changes'
+                  )}
                 </Button>
               </div>
             </div>

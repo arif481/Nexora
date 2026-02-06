@@ -105,12 +105,33 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // Script to apply theme before page renders to prevent flash
+  const themeScript = `
+    (function() {
+      try {
+        const savedTheme = localStorage.getItem('nexora-theme') || 'dark';
+        document.documentElement.classList.remove('light', 'dark');
+        if (savedTheme === 'system') {
+          const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          document.documentElement.classList.add(prefersDark ? 'dark' : 'light');
+        } else {
+          document.documentElement.classList.add(savedTheme);
+        }
+      } catch (e) {
+        document.documentElement.classList.add('dark');
+      }
+    })();
+  `;
+
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable}`}
+      className={`${inter.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable} dark`}
       suppressHydrationWarning
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body className="font-sans antialiased">
         {children}
       </body>

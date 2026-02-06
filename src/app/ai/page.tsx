@@ -37,7 +37,7 @@ import { useHabits } from '@/hooks/useHabits';
 import { useCalendar } from '@/hooks/useCalendar';
 import { useGoals } from '@/hooks/useGoals';
 import { useTransactions } from '@/hooks/useFinance';
-import { generateAIResponse } from '@/lib/services/ai';
+import { generateAIResponse, saveAIFeedback } from '@/lib/services/ai';
 
 // Suggestion prompts for new conversations
 const suggestionPrompts = [
@@ -89,6 +89,7 @@ export default function AIPage() {
   const [inputValue, setInputValue] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [feedbackGiven, setFeedbackGiven] = useState<Record<string, 'up' | 'down'>>({});
   const [localMessages, setLocalMessages] = useState<any[]>([]);
   const [localSending, setLocalSending] = useState(false);
   
@@ -215,6 +216,14 @@ export default function AIPage() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const handleFeedback = (messageId: string, type: 'up' | 'down') => {
+    setFeedbackGiven(prev => ({ ...prev, [messageId]: type }));
+    // Save feedback to Firebase
+    if (user) {
+      saveAIFeedback(user.uid, messageId, type, currentConversationId || undefined);
+    }
+  };
+
   const handleDeleteConversation = async (convId: string) => {
     await deleteConversation(convId);
     if (currentConversationId === convId) {
@@ -327,10 +336,22 @@ export default function AIPage() {
                   <Copy className="w-4 h-4" />
                 )}
               </button>
-              <button className="p-1.5 rounded-lg hover:bg-dark-700/50 text-dark-400 hover:text-white transition-colors">
+              <button 
+                onClick={() => handleFeedback(message.id, 'up')}
+                className={`p-1.5 rounded-lg hover:bg-dark-700/50 transition-colors ${
+                  feedbackGiven[message.id] === 'up' ? 'text-neon-green' : 'text-dark-400 hover:text-white'
+                }`}
+                title="Good response"
+              >
                 <ThumbsUp className="w-4 h-4" />
               </button>
-              <button className="p-1.5 rounded-lg hover:bg-dark-700/50 text-dark-400 hover:text-white transition-colors">
+              <button 
+                onClick={() => handleFeedback(message.id, 'down')}
+                className={`p-1.5 rounded-lg hover:bg-dark-700/50 transition-colors ${
+                  feedbackGiven[message.id] === 'down' ? 'text-red-400' : 'text-dark-400 hover:text-white'
+                }`}
+                title="Poor response"
+              >
                 <ThumbsDown className="w-4 h-4" />
               </button>
             </div>

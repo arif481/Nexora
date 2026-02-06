@@ -16,7 +16,7 @@ interface UseUserReturn {
   profile: User | null;
   loading: boolean;
   error: string | null;
-  updateProfile: (updates: { displayName?: string; photoURL?: string }) => Promise<void>;
+  updateProfile: (updates: { displayName?: string; photoURL?: string; phone?: string; location?: string; bio?: string }) => Promise<void>;
   updatePreferences: (preferences: Partial<UserPreferences>) => Promise<void>;
   updateStats: (stats: Partial<UserStats>) => Promise<void>;
   incrementStat: (statKey: keyof UserStats, amount?: number) => Promise<void>;
@@ -58,7 +58,7 @@ export function useUser(): UseUserReturn {
   }, [user]);
 
   const handleUpdateProfile = useCallback(
-    async (updates: { displayName?: string; photoURL?: string }): Promise<void> => {
+    async (updates: { displayName?: string; photoURL?: string; phone?: string; location?: string; bio?: string }): Promise<void> => {
       if (!user) throw new Error('User not authenticated');
       
       try {

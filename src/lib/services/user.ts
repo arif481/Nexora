@@ -68,6 +68,9 @@ const convertUserFromFirestore = (doc: any): User => {
     email: data.email,
     displayName: data.displayName,
     photoURL: data.photoURL,
+    phone: data.phone,
+    location: data.location,
+    bio: data.bio,
     createdAt: convertTimestamp(data.createdAt),
     lastLoginAt: convertTimestamp(data.lastLoginAt),
     preferences: data.preferences || defaultPreferences,
@@ -124,10 +127,20 @@ export const getUser = async (userId: string): Promise<User | null> => {
 // Update user profile
 export const updateUserProfile = async (
   userId: string,
-  updates: Partial<Pick<User, 'displayName' | 'photoURL'>>
+  updates: {
+    displayName?: string;
+    photoURL?: string;
+    phone?: string;
+    location?: string;
+    bio?: string;
+  }
 ): Promise<void> => {
   const userRef = doc(db, COLLECTIONS.USERS, userId);
-  await updateDoc(userRef, updates);
+  // Filter out undefined values
+  const cleanUpdates = Object.fromEntries(
+    Object.entries(updates).filter(([_, v]) => v !== undefined)
+  );
+  await updateDoc(userRef, cleanUpdates);
 };
 
 // Update user preferences

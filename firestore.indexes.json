@@ -58,6 +58,15 @@
       ]
     },
     {
+      "collectionGroup": "focusBlocks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "completed", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "habits",
       "queryScope": "COLLECTION",
       "fields": [

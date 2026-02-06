@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useUIStore } from '@/stores/uiStore';
 import { useSimpleAI } from '@/hooks/useAI';
+import { useAuth } from '@/hooks/useAuth';
+import { saveAIFeedback } from '@/lib/services/ai';
 import {
   X,
   Sparkles,
@@ -22,6 +24,7 @@ import {
   Lightbulb,
   Bot,
   User,
+  Check,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { AIThinkingAnimation } from '../ui/Loading';
@@ -34,8 +37,11 @@ const quickActions = [
 
 export function AIAssistantPanel() {
   const { aiPanelOpen, toggleAIPanel, aiMinimized, setAIMinimized } = useUIStore();
-  const { messages, isThinking, sendMessage, clearMessages } = useSimpleAI();
+  const { messages, isThinking, sendMessage, clearMessages, regenerateLastResponse } = useSimpleAI();
+  const { user } = useAuth();
   const [input, setInput] = useState('');
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [feedbackGiven, setFeedbackGiven] = useState<Record<string, 'up' | 'down'>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -67,6 +73,33 @@ export function AIAssistantPanel() {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
+    }
+  };
+
+  // Copy message to clipboard
+  const handleCopy = async (content: string, messageId: string) => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopiedId(messageId);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch (error) {
+      console.error('Failed to copy:', error);
+    }
+  };
+
+  // Handle feedback
+  const handleFeedback = (messageId: string, type: 'up' | 'down') => {
+    setFeedbackGiven(prev => ({ ...prev, [messageId]: type }));
+    // Save feedback to Firebase
+    if (user) {
+      saveAIFeedback(user.uid, messageId, type);
+    }
+  };
+
+  // Handle regenerate
+  const handleRegenerate = async () => {
+    if (regenerateLastResponse) {
+      await regenerateLastResponse();
     }
   };
 
@@ -185,16 +218,47 @@ export function AIAssistantPanel() {
                       {/* Actions for AI messages */}
                       {message.role === 'assistant' && (
                         <div className="flex items-center gap-2 mt-2">
-                          <button className="p-1 rounded text-white/30 hover:text-white/60 transition-colors">
-                            <Copy className="w-3 h-3" />
+                          <button 
+                            onClick={() => handleCopy(message.content, message.id)}
+                            className="p-1 rounded text-white/30 hover:text-white/60 transition-colors"
+                            title="Copy response"
+                          >
+                            {copiedId === message.id ? (
+                              <Check className="w-3 h-3 text-neon-green" />
+                            ) : (
+                              <Copy className="w-3 h-3" />
+                            )}
                           </button>
-                          <button className="p-1 rounded text-white/30 hover:text-neon-green transition-colors">
+                          <button 
+                            onClick={() => handleFeedback(message.id, 'up')}
+                            className={cn(
+                              "p-1 rounded transition-colors",
+                              feedbackGiven[message.id] === 'up' 
+                                ? "text-neon-green" 
+                                : "text-white/30 hover:text-neon-green"
+                            )}
+                            title="Good response"
+                          >
                             <ThumbsUp className="w-3 h-3" />
                           </button>
-                          <button className="p-1 rounded text-white/30 hover:text-neon-red transition-colors">
+                          <button 
+                            onClick={() => handleFeedback(message.id, 'down')}
+                            className={cn(
+                              "p-1 rounded transition-colors",
+                              feedbackGiven[message.id] === 'down' 
+                                ? "text-red-400" 
+                                : "text-white/30 hover:text-red-400"
+                            )}
+                            title="Poor response"
+                          >
                             <ThumbsDown className="w-3 h-3" />
                           </button>
-                          <button className="p-1 rounded text-white/30 hover:text-white/60 transition-colors">
+                          <button 
+                            onClick={handleRegenerate}
+                            disabled={isThinking}
+                            className="p-1 rounded text-white/30 hover:text-white/60 disabled:opacity-50 transition-colors"
+                            title="Regenerate response"
+                          >
                             <RotateCcw className="w-3 h-3" />
                           </button>
                         </div>

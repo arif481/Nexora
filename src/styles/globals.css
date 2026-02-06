@@ -463,6 +463,290 @@
   }
 }
 
+/* ===== Light Mode ===== */
+html.light {
+  --bg-primary: #f8fafc;
+  --bg-secondary: #e2e8f0;
+  --bg-tertiary: #cbd5e1;
+  --glass-light: rgba(0, 0, 0, 0.02);
+  --glass-medium: rgba(0, 0, 0, 0.05);
+  --glass-heavy: rgba(0, 0, 0, 0.08);
+  --glass-border: rgba(0, 0, 0, 0.1);
+  
+  /* Adjusted neon colors for light mode - slightly darker for visibility */
+  --neon-cyan: #0891b2;
+  --neon-purple: #9333ea;
+  --neon-pink: #db2777;
+  --neon-blue: #2563eb;
+  --neon-green: #16a34a;
+  --neon-orange: #ea580c;
+  --neon-yellow: #ca8a04;
+  --neon-red: #dc2626;
+}
+
+html.light body {
+  @apply bg-slate-50 text-slate-900;
+  background-image: 
+    radial-gradient(ellipse at top, rgba(8, 145, 178, 0.05) 0%, transparent 50%),
+    radial-gradient(ellipse at bottom right, rgba(147, 51, 234, 0.05) 0%, transparent 50%);
+}
+
+html.light .glass-panel {
+  @apply bg-white/70 border-slate-200/50;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.9) 0%,
+    rgba(248, 250, 252, 0.8) 100%
+  );
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+}
+
+html.light .glass-panel-dark {
+  @apply bg-white/80 border-slate-200/50;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.95) 0%,
+    rgba(248, 250, 252, 0.9) 100%
+  );
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* Light mode text colors */
+html.light .text-white {
+  @apply text-slate-900;
+}
+
+html.light .text-white\/60,
+html.light .text-white\/70,
+html.light .text-white\/80 {
+  @apply text-slate-600;
+}
+
+html.light .text-white\/40,
+html.light .text-white\/50 {
+  @apply text-slate-500;
+}
+
+html.light .text-dark-400 {
+  @apply text-slate-500;
+}
+
+html.light .text-dark-300 {
+  @apply text-slate-600;
+}
+
+/* Light mode backgrounds */
+html.light .bg-dark-950,
+html.light .bg-dark-900 {
+  @apply bg-slate-50;
+}
+
+html.light .bg-dark-800 {
+  @apply bg-slate-100;
+}
+
+html.light .bg-dark-700 {
+  @apply bg-slate-200;
+}
+
+html.light .bg-glass-light {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+html.light .bg-glass-medium {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+/* Light mode borders */
+html.light .border-glass-border {
+  @apply border-slate-200;
+}
+
+html.light .border-dark-700,
+html.light .border-dark-800 {
+  @apply border-slate-200;
+}
+
+/* Light mode inputs */
+html.light .input-glass {
+  @apply bg-white border-slate-200 text-slate-900 placeholder-slate-400;
+}
+
+html.light .input-glass:focus {
+  @apply border-cyan-500/50 bg-white;
+}
+
+/* Light mode scrollbar */
+html.light ::-webkit-scrollbar-track {
+  @apply bg-slate-200;
+}
+
+html.light ::-webkit-scrollbar-thumb {
+  @apply bg-slate-400;
+}
+
+html.light ::-webkit-scrollbar-thumb:hover {
+  @apply bg-cyan-600/50;
+}
+
+/* Light mode selection */
+html.light ::selection {
+  @apply bg-cyan-500/30 text-slate-900;
+}
+
+/* Light mode sidebar */
+html.light .sidebar {
+  @apply bg-white/90 border-slate-200;
+}
+
+html.light .sidebar-item {
+  @apply text-slate-600 hover:text-slate-900 hover:bg-slate-100;
+}
+
+html.light .sidebar-item-active {
+  @apply text-cyan-700 bg-cyan-50;
+}
+
+/* Light mode cards and panels */
+html.light .card-futuristic {
+  @apply bg-white/80 border-slate-200 hover:border-cyan-500/30;
+}
+
+/* Light mode badges - keep vibrant */
+html.light .badge {
+  @apply bg-slate-100 border-slate-200;
+}
+
+html.light .badge-cyan {
+  @apply bg-cyan-50 border-cyan-200 text-cyan-700;
+}
+
+html.light .badge-purple {
+  @apply bg-purple-50 border-purple-200 text-purple-700;
+}
+
+html.light .badge-pink {
+  @apply bg-pink-50 border-pink-200 text-pink-700;
+}
+
+html.light .badge-green {
+  @apply bg-green-50 border-green-200 text-green-700;
+}
+
+html.light .badge-orange {
+  @apply bg-orange-50 border-orange-200 text-orange-700;
+}
+
+/* Light mode progress bar */
+html.light .progress-bar {
+  @apply bg-slate-200;
+}
+
+/* Light mode dividers */
+html.light .divider {
+  @apply bg-gradient-to-r from-transparent via-slate-300 to-transparent;
+}
+
+html.light .divider-vertical {
+  @apply bg-gradient-to-b from-transparent via-slate-300 to-transparent;
+}
+
+/* Light mode nav tabs */
+html.light .nav-tab {
+  @apply text-slate-500 hover:text-slate-900;
+}
+
+html.light .nav-tab-active {
+  @apply text-cyan-700;
+}
+
+/* Light mode modal */
+html.light .modal-overlay {
+  @apply bg-slate-900/50;
+}
+
+/* Light mode spinner */
+html.light .spinner {
+  @apply border-cyan-200 border-t-cyan-600;
+}
+
+/* Light mode skeleton */
+html.light .skeleton {
+  @apply bg-slate-200;
+}
+
+/* Light mode specific component overrides */
+html.light [class*="text-neon-cyan"] {
+  @apply text-cyan-600;
+}
+
+html.light [class*="text-neon-purple"] {
+  @apply text-purple-600;
+}
+
+html.light [class*="text-neon-pink"] {
+  @apply text-pink-600;
+}
+
+html.light [class*="text-neon-green"] {
+  @apply text-green-600;
+}
+
+html.light [class*="text-neon-orange"] {
+  @apply text-orange-600;
+}
+
+html.light [class*="text-neon-blue"] {
+  @apply text-blue-600;
+}
+
+/* Light mode gradients */
+html.light .text-gradient {
+  background-image: linear-gradient(135deg, #0891b2, #9333ea);
+}
+
+html.light .text-gradient-accent {
+  background-image: linear-gradient(135deg, #9333ea, #db2777);
+}
+
+/* Light mode button glow - softer shadow */
+html.light .btn-glow {
+  @apply shadow-lg;
+}
+
+html.light .btn-glow:hover {
+  @apply shadow-xl;
+}
+
+/* Light mode glass button */
+html.light .btn-glass {
+  @apply bg-white/80 border-slate-200 hover:bg-slate-50 hover:border-cyan-300;
+}
+
+/* Light mode hover states */
+html.light .hover\:bg-glass-medium:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+html.light .hover\:bg-glass-light:hover {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+/* Light mode focus states */
+html.light .focus\:border-neon-cyan\/50:focus {
+  @apply border-cyan-500/50;
+}
+
+/* Light mode ring colors */
+html.light .ring-neon-cyan\/20 {
+  --tw-ring-color: rgba(8, 145, 178, 0.2);
+}
+
+/* Light mode hover borders */
+html.light .hover\:border-neon-cyan\/30:hover {
+  @apply border-cyan-500/30;
+}
+
 /* ===== Reduced Motion ===== */
 @media (prefers-reduced-motion: reduce) {
   *,
