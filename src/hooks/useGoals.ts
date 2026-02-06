@@ -56,6 +56,8 @@ export function useGoals(activeOnly: boolean = false): UseGoalsReturn {
     }
 
     setLoading(true);
+    setError(null);
+    
     const subscribeFn = activeOnly ? subscribeToActiveGoals : subscribeToGoals;
     
     const unsubscribe = subscribeFn(
@@ -66,8 +68,10 @@ export function useGoals(activeOnly: boolean = false): UseGoalsReturn {
         setError(null);
       },
       (err) => {
+        console.error('Goals subscription error:', err);
         setError(err.message);
         setLoading(false);
+        setGoals([]); // Set empty array so UI doesn't hang
       }
     );
 

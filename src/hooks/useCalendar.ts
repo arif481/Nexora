@@ -66,6 +66,7 @@ export function useCalendar(): UseCalendarReturn {
     }
 
     setLoading(true);
+    setError(null);
 
     // Subscribe to events
     const unsubscribeEvents = subscribeToCalendarEvents(
@@ -76,8 +77,10 @@ export function useCalendar(): UseCalendarReturn {
         setError(null);
       },
       (err) => {
+        console.error('Calendar events subscription error:', err);
         setError(err.message);
         setLoading(false);
+        setEvents([]); // Set empty array so UI doesn't hang
       }
     );
 
@@ -88,7 +91,9 @@ export function useCalendar(): UseCalendarReturn {
         setFocusBlocks(fetchedBlocks);
       },
       (err) => {
+        console.error('Focus blocks subscription error:', err);
         setError(err.message);
+        setFocusBlocks([]); // Set empty array so UI doesn't hang
       }
     );
 
@@ -201,6 +206,10 @@ export function useEventsInRange(startDate: Date, endDate: Date) {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Memoize date strings to prevent infinite re-renders
+  const startDateStr = startDate.toISOString();
+  const endDateStr = endDate.toISOString();
 
   useEffect(() => {
     if (!user) {
@@ -212,8 +221,8 @@ export function useEventsInRange(startDate: Date, endDate: Date) {
     setLoading(true);
     const unsubscribe = subscribeToEventsInRange(
       user.uid,
-      startDate,
-      endDate,
+      new Date(startDateStr),
+      new Date(endDateStr),
       (fetchedEvents) => {
         setEvents(fetchedEvents);
         setLoading(false);
@@ -222,24 +231,57 @@ export function useEventsInRange(startDate: Date, endDate: Date) {
       (err) => {
         setError(err.message);
         setLoading(false);
+        setEvents([]);
       }
     );
 
     return () => unsubscribe();
-  }, [user, startDate, endDate]);
+  }, [user, startDateStr, endDateStr]);
 
   return { events, loading, error };
 }
 
 // Hook for today's events
 export function useTodayEvents() {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  const { user } = useAuth();
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  return useEventsInRange(today, tomorrow);
+  useEffect(() => {
+    if (!user) {
+      setEvents([]);
+      setLoading(false);
+      return;
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    setLoading(true);
+    const unsubscribe = subscribeToEventsInRange(
+      user.uid,
+      today,
+      tomorrow,
+      (fetchedEvents) => {
+        setEvents(fetchedEvents);
+        setLoading(false);
+        setError(null);
+      },
+      (err) => {
+        setError(err.message);
+        setLoading(false);
+        setEvents([]);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [user]);
+
+  return { events, loading, error };
 }
 
 // Hook for events by category

@@ -58,6 +58,8 @@ export function useTasks(pendingOnly: boolean = false): UseTasksReturn {
     }
 
     setLoading(true);
+    setError(null);
+    
     const subscribeFn = pendingOnly ? subscribeToPendingTasks : subscribeToTasks;
     
     const unsubscribe = subscribeFn(
@@ -68,8 +70,10 @@ export function useTasks(pendingOnly: boolean = false): UseTasksReturn {
         setError(null);
       },
       (err) => {
+        console.error('Tasks subscription error:', err);
         setError(err.message);
         setLoading(false);
+        setTasks([]); // Set empty array so UI doesn't hang
       }
     );
 

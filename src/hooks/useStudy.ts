@@ -60,6 +60,8 @@ export function useStudy(): UseStudyReturn {
     }
 
     setLoading(true);
+    setError(null);
+    
     const unsubscribe = subscribeToSubjects(
       user.uid,
       (fetchedSubjects) => {
@@ -68,7 +70,9 @@ export function useStudy(): UseStudyReturn {
         setError(null);
       },
       (err) => {
+        console.error('Study subscription error:', err);
         setError(err.message);
+        setSubjects([]);
         setLoading(false);
       }
     );

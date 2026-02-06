@@ -61,6 +61,8 @@ export function useTransactions(): UseTransactionsReturn {
     }
 
     setLoading(true);
+    setError(null);
+    
     const unsubscribe = subscribeToTransactions(
       user.uid,
       (fetchedTransactions) => {
@@ -69,7 +71,9 @@ export function useTransactions(): UseTransactionsReturn {
         setError(null);
       },
       (err) => {
+        console.error('Transactions subscription error:', err);
         setError(err.message);
+        setTransactions([]);
         setLoading(false);
       }
     );

@@ -48,6 +48,8 @@ export function useWellness(date: Date = new Date()): UseWellnessReturn {
     }
 
     setLoading(true);
+    setError(null);
+    
     const unsubscribe = subscribeToWellnessEntry(
       user.uid,
       date,
@@ -57,7 +59,9 @@ export function useWellness(date: Date = new Date()): UseWellnessReturn {
         setError(null);
       },
       (err) => {
+        console.error('Wellness subscription error:', err);
         setError(err.message);
+        setEntry(null);
         setLoading(false);
       }
     );

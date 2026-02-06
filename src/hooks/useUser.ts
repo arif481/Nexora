@@ -37,6 +37,8 @@ export function useUser(): UseUserReturn {
     }
 
     setLoading(true);
+    setError(null);
+    
     const unsubscribe = subscribeToUser(
       user.uid,
       (fetchedProfile) => {
@@ -45,7 +47,9 @@ export function useUser(): UseUserReturn {
         setError(null);
       },
       (err) => {
+        console.error('User profile subscription error:', err);
         setError(err.message);
+        setProfile(null);
         setLoading(false);
       }
     );

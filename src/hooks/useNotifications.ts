@@ -15,6 +15,7 @@ export function useNotifications() {
   const { user } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) {
@@ -24,10 +25,23 @@ export function useNotifications() {
     }
 
     setLoading(true);
-    const unsubscribe = subscribeToNotifications(user.uid, (data) => {
-      setNotifications(data);
-      setLoading(false);
-    });
+    setError(null);
+    
+    const unsubscribe = subscribeToNotifications(
+      user.uid,
+      (data) => {
+        setNotifications(data);
+        setLoading(false);
+        setError(null);
+      },
+      (err) => {
+        console.error('Notifications error:', err);
+        setError(err.message);
+        setLoading(false);
+        // Set empty array on error so UI doesn't hang
+        setNotifications([]);
+      }
+    );
 
     return () => unsubscribe();
   }, [user]);
@@ -71,6 +85,7 @@ export function useNotifications() {
   return {
     notifications,
     loading,
+    error,
     unreadCount,
     markAsRead,
     markAllAsRead,

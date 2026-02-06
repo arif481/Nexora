@@ -97,9 +97,9 @@ export const getOrCreateWellnessEntry = async (
     return convertWellnessFromFirestore(entryDoc);
   }
 
-  // Create new entry
+  // Create new entry - MUST include userId for Firestore rules
   const newEntry = {
-    userId,
+    userId, // Required for Firestore security rules
     date,
     sleep: {
       duration: 0,
@@ -127,7 +127,13 @@ export const getOrCreateWellnessEntry = async (
   
   return {
     id: entryId,
-    ...newEntry,
+    userId,
+    date,
+    sleep: newEntry.sleep as any,
+    activity: newEntry.activity as any,
+    nutrition: newEntry.nutrition as any,
+    stress: newEntry.stress as any,
+    focusSessions: [],
     createdAt: new Date(),
   } as WellnessEntry;
 };

@@ -59,6 +59,8 @@ export function useJournal(): UseJournalReturn {
     }
 
     setLoading(true);
+    setError(null);
+    
     const unsubscribe = subscribeToJournalEntries(
       user.uid,
       (fetchedEntries) => {
@@ -67,7 +69,9 @@ export function useJournal(): UseJournalReturn {
         setError(null);
       },
       (err) => {
+        console.error('Journal subscription error:', err);
         setError(err.message);
+        setEntries([]);
         setLoading(false);
       }
     );

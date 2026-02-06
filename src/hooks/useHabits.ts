@@ -58,6 +58,8 @@ export function useHabits(): UseHabitsReturn {
     }
 
     setLoading(true);
+    setError(null);
+    
     const unsubscribe = subscribeToHabits(
       user.uid,
       (fetchedHabits) => {
@@ -66,8 +68,10 @@ export function useHabits(): UseHabitsReturn {
         setError(null);
       },
       (err) => {
+        console.error('Habits subscription error:', err);
         setError(err.message);
         setLoading(false);
+        setHabits([]); // Set empty array so UI doesn't hang
       }
     );
 

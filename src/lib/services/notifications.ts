@@ -58,8 +58,9 @@ const convertNotificationFromFirestore = (doc: any): Notification => {
 export const subscribeToNotifications = (
   userId: string,
   callback: (notifications: Notification[]) => void,
+  onError?: (error: Error) => void,
   limitCount: number = 50
-) => {
+): (() => void) => {
   const notificationsRef = collection(db, COLLECTIONS.NOTIFICATIONS);
   const q = query(
     notificationsRef,
@@ -68,10 +69,17 @@ export const subscribeToNotifications = (
     limit(limitCount)
   );
 
-  return onSnapshot(q, (snapshot) => {
-    const notifications = snapshot.docs.map(convertNotificationFromFirestore);
-    callback(notifications);
-  });
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const notifications = snapshot.docs.map(convertNotificationFromFirestore);
+      callback(notifications);
+    },
+    (error) => {
+      console.error('Error subscribing to notifications:', error);
+      if (onError) onError(error);
+    }
+  );
 };
 
 // Create a notification

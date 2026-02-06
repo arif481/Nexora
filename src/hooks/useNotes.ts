@@ -64,6 +64,8 @@ export function useNotes(archived: boolean = false): UseNotesReturn {
     }
 
     setLoading(true);
+    setError(null);
+    
     const subscribeFn = archived ? subscribeToArchivedNotes : subscribeToNotes;
     
     const unsubscribe = subscribeFn(
@@ -74,7 +76,9 @@ export function useNotes(archived: boolean = false): UseNotesReturn {
         setError(null);
       },
       (err) => {
+        console.error('Notes subscription error:', err);
         setError(err.message);
+        setNotes([]);
         setLoading(false);
       }
     );
