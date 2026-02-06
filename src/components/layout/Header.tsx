@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useUIStore } from '@/stores/uiStore';
 import { useAuth } from '@/hooks/useAuth';
+import { useNotifications } from '@/hooks/useNotifications';
 import {
   Search,
   Bell,
@@ -14,7 +15,6 @@ import {
   Menu,
   Plus,
   Command,
-  Mic,
   Sparkles,
   Moon,
   Sun,
@@ -33,10 +33,12 @@ export function Header() {
     toggleCommandPalette, 
     toggleNotificationPanel,
     toggleQuickActions,
+    openModal,
     theme,
     setTheme 
   } = useUIStore();
   const { user, logout } = useAuth();
+  const { unreadCount: notificationCount } = useNotifications();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
 
@@ -49,8 +51,6 @@ export function Header() {
       console.error('Error signing out:', error);
     }
   };
-
-  const notificationCount = 3; // This would come from a notification store
 
   return (
     <header className="sticky top-0 z-30 backdrop-blur-xl bg-dark-950/80 border-b border-glass-border">
@@ -127,15 +127,18 @@ export function Header() {
                   >
                     <div className="p-2">
                       {[
-                        { label: 'New Task', icon: '✓', shortcut: 'T' },
-                        { label: 'New Event', icon: '📅', shortcut: 'E' },
-                        { label: 'New Note', icon: '📝', shortcut: 'N' },
-                        { label: 'Journal Entry', icon: '📖', shortcut: 'J' },
-                        { label: 'Quick Capture', icon: '⚡', shortcut: 'Q' },
+                        { label: 'New Task', icon: '✓', shortcut: 'T', modal: 'create-task' as const },
+                        { label: 'New Event', icon: '📅', shortcut: 'E', modal: 'create-event' as const },
+                        { label: 'New Note', icon: '📝', shortcut: 'N', modal: 'create-note' as const },
+                        { label: 'Journal Entry', icon: '📖', shortcut: 'J', modal: 'journal-entry' as const },
+                        { label: 'Quick Capture', icon: '⚡', shortcut: 'Q', modal: 'quick-capture' as const },
                       ].map((item) => (
                         <button
                           key={item.label}
-                          onClick={() => setShowQuickAdd(false)}
+                          onClick={() => {
+                            setShowQuickAdd(false);
+                            openModal(item.modal);
+                          }}
                           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/80 hover:text-white hover:bg-glass-medium transition-colors"
                         >
                           <span className="text-lg">{item.icon}</span>
@@ -152,13 +155,12 @@ export function Header() {
             </AnimatePresence>
           </div>
 
-          {/* Voice Command */}
-          <button className="hidden lg:flex p-2 rounded-xl text-white/50 hover:text-white hover:bg-glass-medium transition-colors">
-            <Mic className="w-5 h-5" />
-          </button>
-
           {/* AI Assistant */}
-          <button className="p-2 rounded-xl text-white/50 hover:text-neon-purple hover:bg-neon-purple/10 transition-colors">
+          <button 
+            onClick={() => router.push('/ai')}
+            className="p-2 rounded-xl text-white/50 hover:text-neon-purple hover:bg-neon-purple/10 transition-colors"
+            title="AI Assistant"
+          >
             <Sparkles className="w-5 h-5" />
           </button>
 
@@ -255,7 +257,11 @@ export function Header() {
                           key={item.label}
                           onClick={() => {
                             setShowUserMenu(false);
-                            item.onClick?.();
+                            if (item.onClick) {
+                              item.onClick();
+                            } else if (item.href) {
+                              router.push(item.href);
+                            }
                           }}
                           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/70 hover:text-white hover:bg-glass-medium transition-colors"
                         >

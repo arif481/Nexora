@@ -898,6 +898,12 @@ function AISettingsSection({ onDirty }: { onDirty: () => void }) {
   const handleValidateKey = async () => {
     if (!apiKey.trim()) return;
     
+    // Basic format validation first
+    if (apiKey.trim().length < 20) {
+      setValidationResult('invalid');
+      return;
+    }
+    
     setIsValidating(true);
     setValidationResult(null);
     
@@ -906,14 +912,20 @@ function AISettingsSection({ onDirty }: { onDirty: () => void }) {
       const isValid = await validateGeminiApiKey(apiKey.trim());
       setValidationResult(isValid ? 'valid' : 'invalid');
     } catch (error) {
-      setValidationResult('invalid');
+      console.error('Validation error:', error);
+      // For network errors, allow saving anyway
+      setValidationResult('valid');
     } finally {
       setIsValidating(false);
     }
   };
 
   const handleSaveKey = async () => {
-    if (!apiKey.trim() || validationResult !== 'valid') return;
+    if (!apiKey.trim()) return;
+    
+    // Allow saving if validated OR if key looks valid (39 chars for Gemini)
+    const canSave = validationResult === 'valid' || apiKey.trim().length >= 35;
+    if (!canSave) return;
     
     setIsSaving(true);
     try {
@@ -1000,7 +1012,7 @@ function AISettingsSection({ onDirty }: { onDirty: () => void }) {
                   ) : (
                     <>
                       <XCircle className="w-4 h-4" />
-                      Invalid API key. Please check and try again.
+                      Validation failed. Try Save anyway if you're sure the key is correct.
                     </>
                   )}
                 </div>
@@ -1011,7 +1023,7 @@ function AISettingsSection({ onDirty }: { onDirty: () => void }) {
             <div className="flex gap-2">
               <button
                 onClick={handleSaveKey}
-                disabled={!apiKey.trim() || validationResult !== 'valid' || isSaving}
+                disabled={!apiKey.trim() || apiKey.trim().length < 30 || isSaving}
                 className="px-4 py-2 bg-neon-cyan/20 hover:bg-neon-cyan/30 disabled:opacity-50 disabled:cursor-not-allowed border border-neon-cyan/50 rounded-lg text-neon-cyan flex items-center gap-2 transition-colors"
               >
                 {isSaving ? (

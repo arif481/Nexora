@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useUIStore } from '@/stores/uiStore';
+import { useTaskStats } from '@/hooks/useTasks';
 import {
   Home,
   CheckSquare,
@@ -37,13 +38,13 @@ interface NavItem {
   name: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
-  badge?: number;
+  badgeKey?: 'tasks'; // Key to look up dynamic badge value
   isNew?: boolean;
 }
 
 const mainNavItems: NavItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: Home },
-  { name: 'Tasks', href: '/tasks', icon: CheckSquare, badge: 5 },
+  { name: 'Tasks', href: '/tasks', icon: CheckSquare, badgeKey: 'tasks' },
   { name: 'Calendar', href: '/calendar', icon: Calendar },
   { name: 'Notes', href: '/notes', icon: FileText },
   { name: 'Journal', href: '/journal', icon: BookOpen },
@@ -69,11 +70,18 @@ const otherItems: NavItem[] = [
 export function Sidebar() {
   const pathname = usePathname();
   const { sidebarCollapsed, toggleSidebarCollapsed, sidebarOpen, setSidebarOpen } = useUIStore();
+  const taskStats = useTaskStats();
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
+
+  // Dynamic badge values
+  const badgeValues = useMemo(() => ({
+    tasks: taskStats.pending + taskStats.inProgress,
+  }), [taskStats.pending, taskStats.inProgress]);
 
   const NavLink = ({ item }: { item: NavItem }) => {
     const isActive = pathname === item.href;
     const Icon = item.icon;
+    const badgeCount = item.badgeKey ? badgeValues[item.badgeKey] : undefined;
 
     const content = (
       <Link
@@ -105,7 +113,7 @@ export function Sidebar() {
         {!sidebarCollapsed && (
           <>
             <span className="flex-1 text-sm font-medium truncate">{item.name}</span>
-            {item.badge && <CountBadge count={item.badge} />}
+            {badgeCount !== undefined && badgeCount > 0 && <CountBadge count={badgeCount} />}
             {item.isNew && <Badge variant="purple" size="sm">New</Badge>}
           </>
         )}
@@ -208,15 +216,18 @@ export function Sidebar() {
 
         {/* Bottom Section */}
         <div className="p-3 border-t border-glass-border">
-          {/* Quick Actions */}
+          {/* AI Quick Access */}
           {!sidebarCollapsed && (
-            <div className="mb-3 p-3 rounded-xl bg-gradient-to-r from-neon-cyan/10 to-neon-purple/10 border border-neon-cyan/20">
-              <div className="flex items-center gap-2 mb-2">
+            <Link
+              href="/ai"
+              className="block mb-3 p-3 rounded-xl bg-gradient-to-r from-neon-cyan/10 to-neon-purple/10 border border-neon-cyan/20 hover:border-neon-cyan/40 transition-colors"
+            >
+              <div className="flex items-center gap-2 mb-1">
                 <Sparkles className="w-4 h-4 text-neon-cyan" />
-                <span className="text-sm font-medium text-white">AI Insights</span>
+                <span className="text-sm font-medium text-white">AI Assistant</span>
               </div>
-              <p className="text-xs text-white/50">3 new suggestions available</p>
-            </div>
+              <p className="text-xs text-white/50">Get personalized suggestions</p>
+            </Link>
           )}
 
           {/* Settings Link */}

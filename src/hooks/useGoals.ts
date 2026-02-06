@@ -15,6 +15,7 @@ import {
   addMilestone,
   removeMilestone,
 } from '@/lib/services/goals';
+import { createAchievementNotification } from '@/lib/services/notifications';
 
 interface UseGoalsReturn {
   goals: Goal[];
@@ -119,29 +120,55 @@ export function useGoals(activeOnly: boolean = false): UseGoalsReturn {
 
   const handleUpdateProgress = useCallback(
     async (goalId: string, progress: number): Promise<void> => {
+      if (!user) return;
+      
       try {
+        const goal = goals.find(g => g.id === goalId);
         await updateGoalProgress(goalId, progress);
+        
+        // Notify when goal reaches 100%
+        if (progress >= 100 && goal && goal.progress < 100) {
+          await createAchievementNotification(
+            user.uid,
+            'Goal Achieved! 🎯',
+            `Congratulations! You've completed your goal: "${goal.title}"`
+          );
+        }
       } catch (err: any) {
         setError(err.message);
         throw err;
       }
     },
-    []
+    [user, goals]
   );
 
   const handleToggleMilestone = useCallback(
     async (goalId: string, milestoneId: string, completed: boolean): Promise<void> => {
+      if (!user) return;
+      
       const goal = goals.find((g) => g.id === goalId);
       if (!goal) throw new Error('Goal not found');
 
       try {
         await toggleMilestone(goalId, milestoneId, completed, goal.milestones);
+        
+        // Notify when completing a milestone
+        if (completed) {
+          const milestone = goal.milestones?.find(m => m.id === milestoneId);
+          if (milestone) {
+            await createAchievementNotification(
+              user.uid,
+              'Milestone Reached! 🏁',
+              `You completed a milestone for "${goal.title}": ${milestone.title}`
+            );
+          }
+        }
       } catch (err: any) {
         setError(err.message);
         throw err;
       }
     },
-    [goals]
+    [user, goals]
   );
 
   const handleAddMilestone = useCallback(

@@ -1,6 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
+import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useUIStore } from '@/stores/uiStore';
 import { useNotifications } from '@/hooks/useNotifications';
@@ -37,8 +38,14 @@ const getRelativeTime = (date: Date): string => {
 };
 
 export function NotificationPanel() {
+  const router = useRouter();
   const { notificationPanelOpen, toggleNotificationPanel } = useUIStore();
   const { notifications, loading, unreadCount, markAsRead, markAllAsRead, removeNotification, clearAll } = useNotifications();
+
+  const handleSettingsClick = () => {
+    toggleNotificationPanel();
+    router.push('/settings');
+  };
 
   const getNotificationIcon = (type: Notification['type']) => {
     switch (type) {
@@ -113,7 +120,11 @@ export function NotificationPanel() {
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <button className="p-2 rounded-lg text-white/50 hover:text-white hover:bg-glass-medium transition-colors">
+                <button 
+                  onClick={handleSettingsClick}
+                  className="p-2 rounded-lg text-white/50 hover:text-white hover:bg-glass-medium transition-colors"
+                  title="Notification settings"
+                >
                   <Settings className="w-4 h-4" />
                 </button>
                 <button

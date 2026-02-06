@@ -60,11 +60,11 @@ export function CommandPalette() {
     { id: 'action-new-event', title: 'Create New Event', subtitle: 'Schedule a calendar event', icon: Calendar, category: 'actions', action: () => openModal('create-event'), shortcut: 'N E' },
     { id: 'action-new-note', title: 'Create New Note', subtitle: 'Capture your thoughts', icon: FileText, category: 'actions', action: () => openModal('create-note'), shortcut: 'N N' },
     { id: 'action-journal', title: 'Write Journal Entry', subtitle: 'Reflect on your day', icon: BookOpen, category: 'actions', action: () => openModal('journal-entry'), shortcut: 'N J' },
-    { id: 'action-focus', title: 'Start Focus Session', subtitle: 'Enter deep work mode', icon: Brain, category: 'actions', action: () => openModal('focus-session'), shortcut: 'F' },
+    { id: 'action-focus', title: 'Start Focus Session', subtitle: 'Enter deep work mode', icon: Brain, category: 'actions', action: () => router.push('/focus'), shortcut: 'F' },
     
     // AI
-    { id: 'ai-chat', title: 'Ask AI Assistant', subtitle: 'Get help with anything', icon: Sparkles, category: 'ai', action: () => openModal('ai-chat'), shortcut: 'A' },
-    { id: 'ai-insights', title: 'View AI Insights', subtitle: 'See personalized recommendations', icon: Zap, category: 'ai', action: () => router.push('/ai/insights') },
+    { id: 'ai-chat', title: 'Ask AI Assistant', subtitle: 'Get help with anything', icon: Sparkles, category: 'ai', action: () => router.push('/ai'), shortcut: 'A' },
+    { id: 'ai-insights', title: 'View AI Insights', subtitle: 'See personalized recommendations', icon: Zap, category: 'ai', action: () => router.push('/ai') },
   ], [router, openModal]);
 
   const filteredCommands = useMemo(() => {

@@ -9,6 +9,7 @@ import { Header } from './Header';
 import { CommandPalette } from '../features/CommandPalette';
 import { NotificationPanel } from '../features/NotificationPanel';
 import { AIAssistantPanel } from '../features/AIAssistantPanel';
+import { GlobalModals } from '../GlobalModals';
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -71,6 +72,9 @@ export function MainLayout({ children }: MainLayoutProps) {
 
       {/* AI Assistant Panel */}
       <AIAssistantPanel />
+
+      {/* Global Modals */}
+      <GlobalModals />
     </div>
   );
 }

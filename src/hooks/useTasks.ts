@@ -15,6 +15,7 @@ import {
   addSubtask,
   batchDeleteTasks,
 } from '@/lib/services/tasks';
+import { createAchievementNotification } from '@/lib/services/notifications';
 
 interface UseTasksReturn {
   tasks: Task[];
@@ -121,14 +122,38 @@ export function useTasks(pendingOnly: boolean = false): UseTasksReturn {
 
   const handleCompleteTask = useCallback(
     async (taskId: string): Promise<void> => {
+      if (!user) throw new Error('User not authenticated');
       try {
         await completeTask(taskId);
+        
+        // Count completed tasks for today
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const completedToday = tasks.filter(t => {
+          const completedAt = t.completedAt ? new Date(t.completedAt) : null;
+          return completedAt && completedAt >= today;
+        }).length + 1; // +1 for the one we just completed
+        
+        // Create achievement notification at milestones
+        if (completedToday === 5) {
+          await createAchievementNotification(
+            user.uid,
+            'Productive Day!',
+            'You completed 5 tasks today. Keep it up!'
+          );
+        } else if (completedToday === 10) {
+          await createAchievementNotification(
+            user.uid,
+            'Task Master!',
+            'You completed 10 tasks today. Amazing productivity!'
+          );
+        }
       } catch (err: any) {
         setError(err.message);
         throw err;
       }
     },
-    []
+    [user, tasks]
   );
 
   const handleReopenTask = useCallback(

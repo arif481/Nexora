@@ -255,13 +255,44 @@ export const removeGeminiApiKey = (): void => {
 
 // Validate API key by making a test request
 export const validateGeminiApiKey = async (apiKey: string): Promise<boolean> => {
+  // Basic format check first
+  if (!apiKey || apiKey.length < 20) {
+    console.error('API key too short');
+    return false;
+  }
+  
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-    await model.generateContent('Hello, test');
-    return true;
-  } catch (error) {
-    console.error('API key validation failed:', error);
+    
+    // Use a minimal request to validate
+    const result = await model.generateContent('Hi');
+    const response = await result.response;
+    
+    // If we got a response, the key is valid
+    return !!response.text();
+  } catch (error: any) {
+    console.error('API key validation failed:', error?.message || error);
+    
+    // Check for specific error types
+    if (error?.message?.includes('API_KEY_INVALID') || 
+        error?.message?.includes('invalid') ||
+        error?.status === 400 ||
+        error?.status === 401) {
+      return false;
+    }
+    
+    // For network errors or rate limits, assume key might be valid
+    // but there's a temporary issue
+    if (error?.message?.includes('network') ||
+        error?.message?.includes('fetch') ||
+        error?.message?.includes('quota') ||
+        error?.message?.includes('rate')) {
+      // Return true for network issues - key format is correct
+      console.warn('Network issue during validation, assuming key is valid');
+      return true;
+    }
+    
     return false;
   }
 };

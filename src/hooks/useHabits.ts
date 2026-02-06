@@ -11,6 +11,7 @@ import {
   toggleHabitCompletion,
   getHabitCompletionsForRange,
 } from '@/lib/services/habits';
+import { createHabitStreakNotification } from '@/lib/services/notifications';
 
 interface UseHabitsReturn {
   habits: Habit[];
@@ -119,14 +120,30 @@ export function useHabits(): UseHabitsReturn {
 
   const handleToggleCompletion = useCallback(
     async (habitId: string, date: Date, completed: boolean, notes?: string): Promise<void> => {
+      if (!user) return;
+      
       try {
         await toggleHabitCompletion(habitId, date, completed, notes);
+        
+        // If completing the habit, check for streak milestones
+        if (completed) {
+          const habit = habits.find(h => h.id === habitId);
+          if (habit) {
+            // The streak will increment after completion, so check for next milestone
+            const newStreak = habit.streak + 1;
+            const streakMilestones = [7, 14, 21, 30, 50, 100, 365];
+            
+            if (streakMilestones.includes(newStreak)) {
+              await createHabitStreakNotification(user.uid, habit.name, newStreak);
+            }
+          }
+        }
       } catch (err: any) {
         setError(err.message);
         throw err;
       }
     },
-    []
+    [user, habits]
   );
 
   const handleGetCompletionsForRange = useCallback(

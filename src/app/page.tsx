@@ -215,11 +215,11 @@ export default function HomePage() {
         {/* Footer */}
         <footer className="absolute bottom-0 left-0 right-0 px-6 py-4 lg:px-12">
           <div className="flex items-center justify-between text-sm text-dark-500">
-            <span>© 2024 Nexora. All rights reserved.</span>
+            <span>© {new Date().getFullYear()} Nexora. All rights reserved.</span>
             <div className="flex items-center gap-6">
-              <a href="#" className="hover:text-neon-cyan transition-colors">Privacy</a>
-              <a href="#" className="hover:text-neon-cyan transition-colors">Terms</a>
-              <a href="#" className="hover:text-neon-cyan transition-colors">Contact</a>
+              <a href="/privacy" className="hover:text-neon-cyan transition-colors">Privacy</a>
+              <a href="/terms" className="hover:text-neon-cyan transition-colors">Terms</a>
+              <a href="/help" className="hover:text-neon-cyan transition-colors">Help</a>
             </div>
           </div>
         </footer>

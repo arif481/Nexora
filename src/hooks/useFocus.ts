@@ -20,6 +20,7 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { db, COLLECTIONS } from '@/lib/firebase';
+import { createAchievementNotification } from '@/lib/services/notifications';
 
 interface FocusTask {
   id: string;
@@ -135,12 +136,33 @@ export function useFocus(): UseFocusReturn {
       
       try {
         await addFocusSession(user.uid, today, session);
+        
+        // Notify on focus session completion
+        const sessionDuration = Math.round(session.duration / 60);
+        if (sessionDuration >= 25) {
+          // Check how many sessions completed today
+          const todaySessionCount = sessions.length + 1;
+          
+          if (todaySessionCount === 1) {
+            await createAchievementNotification(
+              user.uid,
+              'First Focus Session! 🎯',
+              `Great start! You focused for ${sessionDuration} minutes.`
+            );
+          } else if (todaySessionCount === 4) {
+            await createAchievementNotification(
+              user.uid,
+              'Deep Work Mode! 🚀',
+              `Amazing! You've completed 4 focus sessions today.`
+            );
+          }
+        }
       } catch (err: any) {
         setError(err.message);
         throw err;
       }
     },
-    [user]
+    [user, sessions]
   );
 
   const addTask = useCallback(async (task: Omit<FocusTask, 'id'>) => {
