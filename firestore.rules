@@ -6,9 +6,22 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
     
-    // Generic rule for all collections with userId field
+    // Wellness entries use document ID format: {userId}_{dateKey}
+    // Allow read if document ID starts with the user's ID
+    match /wellnessEntries/{docId} {
+      allow create: if request.auth != null && 
+        request.resource.data.userId == request.auth.uid;
+      
+      allow read: if request.auth != null && 
+        docId.split('_')[0] == request.auth.uid;
+      
+      allow update, delete: if request.auth != null && 
+        resource.data.userId == request.auth.uid;
+    }
+    
+    // Generic rule for all other collections with userId field
     // Covers: tasks, calendarEvents, notifications, habits, notes, journalEntries,
-    // subjects, wellnessEntries, transactions, budgets, subscriptions,
+    // subjects, transactions, budgets, subscriptions,
     // aiMemories, focusBlocks, focusSessions, goals, aiConversations, linkedAccounts
     match /{collection}/{docId} {
       allow create: if request.auth != null && 
