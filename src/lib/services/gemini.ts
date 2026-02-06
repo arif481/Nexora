@@ -158,7 +158,7 @@ Would you like to set this up now?`,
   }
   
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
     
     // Build conversation context
     const contextString = formatContextForAI(context);
@@ -263,7 +263,7 @@ export const validateGeminiApiKey = async (apiKey: string): Promise<boolean> => 
   
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
     
     // Use a minimal request to validate
     const result = await model.generateContent('Hi');
