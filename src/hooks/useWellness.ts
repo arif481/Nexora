@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from './useAuth';
 import type { WellnessEntry, SleepData, ActivityData, NutritionData, StressData, FocusSession, Exercise, Meal } from '@/types';
 import {
@@ -274,6 +274,7 @@ export function useRecentWellness(days: number = 7) {
       },
       (err) => {
         console.error('Error fetching recent wellness:', err);
+        setEntries([]);
         setLoading(false);
       }
     );
@@ -286,20 +287,12 @@ export function useRecentWellness(days: number = 7) {
 
 // Hook for wellness statistics
 export function useWellnessStats(entries: WellnessEntry[]) {
-  const [stats, setStats] = useState({
-    avgSleepDuration: 0,
-    avgSleepQuality: 0,
-    totalActiveMinutes: 0,
-    avgStressLevel: 0,
-    totalWaterIntake: 0,
-    totalFocusMinutes: 0,
-    avgMealsPerDay: 0,
-    exerciseCount: 0,
-  });
-
-  useEffect(() => {
-    if (entries.length === 0) {
-      setStats({
+  const stats = useMemo(() => {
+    // Ensure entries is always an array
+    const safeEntries = entries || [];
+    
+    if (safeEntries.length === 0) {
+      return {
         avgSleepDuration: 0,
         avgSleepQuality: 0,
         totalActiveMinutes: 0,
@@ -308,11 +301,10 @@ export function useWellnessStats(entries: WellnessEntry[]) {
         totalFocusMinutes: 0,
         avgMealsPerDay: 0,
         exerciseCount: 0,
-      });
-      return;
+      };
     }
 
-    const sleepEntries = entries.filter((e) => e.sleep?.duration > 0);
+    const sleepEntries = safeEntries.filter((e) => e.sleep?.duration > 0);
     const avgSleepDuration = sleepEntries.length > 0
       ? sleepEntries.reduce((sum, e) => sum + e.sleep.duration, 0) / sleepEntries.length
       : 0;
@@ -321,26 +313,26 @@ export function useWellnessStats(entries: WellnessEntry[]) {
       ? sleepEntries.reduce((sum, e) => sum + e.sleep.quality, 0) / sleepEntries.length
       : 0;
 
-    const totalActiveMinutes = entries.reduce((sum, e) => sum + (e.activity?.activeMinutes || 0), 0);
+    const totalActiveMinutes = safeEntries.reduce((sum, e) => sum + (e.activity?.activeMinutes || 0), 0);
     
-    const stressEntries = entries.filter((e) => e.stress?.level);
+    const stressEntries = safeEntries.filter((e) => e.stress?.level);
     const avgStressLevel = stressEntries.length > 0
       ? stressEntries.reduce((sum, e) => sum + e.stress.level, 0) / stressEntries.length
       : 0;
 
-    const totalWaterIntake = entries.reduce((sum, e) => sum + (e.nutrition?.waterIntake || 0), 0);
+    const totalWaterIntake = safeEntries.reduce((sum, e) => sum + (e.nutrition?.waterIntake || 0), 0);
     
-    const totalFocusMinutes = entries.reduce(
-      (sum, e) => sum + e.focusSessions.reduce((s, f) => s + f.duration, 0),
+    const totalFocusMinutes = safeEntries.reduce(
+      (sum, e) => sum + (e.focusSessions || []).reduce((s, f) => s + f.duration, 0),
       0
     );
 
-    const totalMeals = entries.reduce((sum, e) => sum + (e.nutrition?.meals?.length || 0), 0);
-    const avgMealsPerDay = entries.length > 0 ? totalMeals / entries.length : 0;
+    const totalMeals = safeEntries.reduce((sum, e) => sum + (e.nutrition?.meals?.length || 0), 0);
+    const avgMealsPerDay = safeEntries.length > 0 ? totalMeals / safeEntries.length : 0;
 
-    const exerciseCount = entries.reduce((sum, e) => sum + (e.activity?.exercises?.length || 0), 0);
+    const exerciseCount = safeEntries.reduce((sum, e) => sum + (e.activity?.exercises?.length || 0), 0);
 
-    setStats({
+    return {
       avgSleepDuration,
       avgSleepQuality,
       totalActiveMinutes,
@@ -349,7 +341,7 @@ export function useWellnessStats(entries: WellnessEntry[]) {
       totalFocusMinutes,
       avgMealsPerDay,
       exerciseCount,
-    });
+    };
   }, [entries]);
 
   return stats;
