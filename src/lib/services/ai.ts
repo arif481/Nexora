@@ -208,14 +208,21 @@ export const addMessageToConversation = async (
 ): Promise<void> => {
   const conversationRef = doc(db, AI_CONVERSATIONS, conversationId);
   
-  const newMessage = {
+  // Build message object without undefined values (Firestore doesn't accept undefined in arrayUnion)
+  const newMessage: Record<string, any> = {
     id: `msg-${Date.now()}`,
     role: message.role,
     content: message.content,
     timestamp: new Date(),
-    suggestions: message.suggestions,
-    metadata: message.metadata,
   };
+  
+  // Only add optional fields if they have values
+  if (message.suggestions && message.suggestions.length > 0) {
+    newMessage.suggestions = message.suggestions;
+  }
+  if (message.metadata) {
+    newMessage.metadata = message.metadata;
+  }
   
   await updateDoc(conversationRef, {
     messages: arrayUnion(newMessage),
