@@ -86,6 +86,33 @@ export default function FinancePage() {
 
   const loading = authLoading || transactionsLoading || budgetsLoading;
 
+  // Calculate monthly stats - MUST be called before any early returns
+  const safeTransactions = Array.isArray(transactions) ? transactions : [];
+  const monthlyStats = useMemo(() => {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    
+    const monthlyTransactions = safeTransactions.filter(t => new Date(t.date) >= startOfMonth);
+    const income = monthlyTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+    const expenses = monthlyTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+    const balance = income - expenses;
+    const savingsRate = income > 0 ? Math.round((balance / income) * 100) : 0;
+
+    return { income, expenses, balance, savingsRate };
+  }, [safeTransactions]);
+
+  // Filter transactions - MUST be called before any early returns
+  const filteredTransactions = useMemo(() => {
+    return safeTransactions
+      .filter(t => filter === 'all' || t.type === filter)
+      .filter(t => 
+        searchQuery === '' ||
+        (t.description && t.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        categoryConfig[t.category]?.label.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [safeTransactions, filter, searchQuery]);
+
   // Show loading state
   if (loading) {
     return (
@@ -119,32 +146,6 @@ export default function FinancePage() {
       </MainLayout>
     );
   }
-
-  // Calculate monthly stats
-  const monthlyStats = useMemo(() => {
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    
-    const monthlyTransactions = transactions.filter(t => new Date(t.date) >= startOfMonth);
-    const income = monthlyTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
-    const expenses = monthlyTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
-    const balance = income - expenses;
-    const savingsRate = income > 0 ? Math.round((balance / income) * 100) : 0;
-
-    return { income, expenses, balance, savingsRate };
-  }, [transactions]);
-
-  // Filter transactions
-  const filteredTransactions = useMemo(() => {
-    return transactions
-      .filter(t => filter === 'all' || t.type === filter)
-      .filter(t => 
-        searchQuery === '' ||
-        (t.description && t.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        categoryConfig[t.category]?.label.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [transactions, filter, searchQuery]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
