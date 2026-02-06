@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from './useAuth';
 import type { Transaction, Budget, Subscription } from '@/types';
 import {
@@ -181,7 +181,9 @@ export function useBudgets(): UseBudgetsReturn {
         setError(null);
       },
       (err) => {
+        console.error('Budgets subscription error:', err);
         setError(err.message);
+        setBudgets([]);
         setLoading(false);
       }
     );
@@ -307,7 +309,9 @@ export function useSubscriptions(activeOnly: boolean = false): UseSubscriptionsR
         setError(null);
       },
       (err) => {
+        console.error('Subscriptions error:', err);
         setError(err.message);
+        setSubscriptions([]);
         setLoading(false);
       }
     );
@@ -385,29 +389,35 @@ export function useSubscriptions(activeOnly: boolean = false): UseSubscriptionsR
 // ====== FINANCE STATISTICS HOOK ======
 
 export function useFinanceStats(transactions: Transaction[], budgets: Budget[]) {
-  const [stats, setStats] = useState({
-    totalIncome: 0,
-    totalExpenses: 0,
-    balance: 0,
-    monthlyIncome: 0,
-    monthlyExpenses: 0,
-    budgetUtilization: 0,
-    topCategories: [] as { category: string; amount: number }[],
-  });
+  // Ensure arrays are always valid - do this before useMemo
+  const safeTransactions = Array.isArray(transactions) ? transactions : [];
+  const safeBudgets = Array.isArray(budgets) ? budgets : [];
 
-  useEffect(() => {
+  const stats = useMemo(() => {
+    if (safeTransactions.length === 0 && safeBudgets.length === 0) {
+      return {
+        totalIncome: 0,
+        totalExpenses: 0,
+        balance: 0,
+        monthlyIncome: 0,
+        monthlyExpenses: 0,
+        budgetUtilization: 0,
+        topCategories: [] as { category: string; amount: number }[],
+      };
+    }
+
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    const totalIncome = transactions
+    const totalIncome = safeTransactions
       .filter((t) => t.type === 'income')
       .reduce((sum, t) => sum + t.amount, 0);
 
-    const totalExpenses = transactions
+    const totalExpenses = safeTransactions
       .filter((t) => t.type === 'expense')
       .reduce((sum, t) => sum + t.amount, 0);
 
-    const monthlyTransactions = transactions.filter(
+    const monthlyTransactions = safeTransactions.filter(
       (t) => new Date(t.date) >= startOfMonth
     );
 
@@ -420,13 +430,13 @@ export function useFinanceStats(transactions: Transaction[], budgets: Budget[]) 
       .reduce((sum, t) => sum + t.amount, 0);
 
     // Calculate budget utilization
-    const totalBudget = budgets.reduce((sum, b) => sum + b.amount, 0);
-    const totalSpent = budgets.reduce((sum, b) => sum + b.spent, 0);
+    const totalBudget = safeBudgets.reduce((sum, b) => sum + b.amount, 0);
+    const totalSpent = safeBudgets.reduce((sum, b) => sum + b.spent, 0);
     const budgetUtilization = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
 
     // Calculate top expense categories
     const categoryTotals: Record<string, number> = {};
-    transactions
+    safeTransactions
       .filter((t) => t.type === 'expense')
       .forEach((t) => {
         const category = t.category || 'other';
@@ -438,7 +448,7 @@ export function useFinanceStats(transactions: Transaction[], budgets: Budget[]) 
       .sort((a, b) => b.amount - a.amount)
       .slice(0, 5);
 
-    setStats({
+    return {
       totalIncome,
       totalExpenses,
       balance: totalIncome - totalExpenses,
@@ -446,8 +456,8 @@ export function useFinanceStats(transactions: Transaction[], budgets: Budget[]) 
       monthlyExpenses,
       budgetUtilization,
       topCategories,
-    });
-  }, [transactions, budgets]);
+    };
+  }, [safeTransactions, safeBudgets]);
 
   return stats;
 }
