@@ -34,6 +34,8 @@ import {
   LogIn,
   ChevronDown,
   ChevronUp,
+  UploadCloud,
+  Footprints,
 } from 'lucide-react';
 import { MainLayout, PageContainer } from '@/components/layout/MainLayout';
 import { Card, CardHeader, CardContent } from '@/components/ui/Card';
@@ -46,6 +48,7 @@ import { EmptyState, LoadingSpinner } from '@/components/ui/Loading';
 import { useUIStore } from '@/stores/uiStore';
 import { useAuth } from '@/hooks/useAuth';
 import { useStudy, useUpcomingExams, useStudyStats } from '@/hooks/useStudy';
+import { extractSyllabusDraft } from '@/lib/services/gemini';
 import { cn } from '@/lib/utils';
 import type { Subject, Topic, Resource, ExamDate, Grade } from '@/types';
 
@@ -86,6 +89,7 @@ export default function StudyPage() {
   
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [isCreateSubjectOpen, setIsCreateSubjectOpen] = useState(false);
+  const [isSyllabusImportOpen, setIsSyllabusImportOpen] = useState(false);
   const [isAddTopicOpen, setIsAddTopicOpen] = useState(false);
   const [isAddResourceOpen, setIsAddResourceOpen] = useState(false);
   const [isAddExamOpen, setIsAddExamOpen] = useState(false);
@@ -391,6 +395,14 @@ export default function StudyPage() {
                     AI Study Help
                   </Button>
                   <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsSyllabusImportOpen(true)}
+                    leftIcon={<UploadCloud className="w-4 h-4" />}
+                  >
+                    Upload Syllabus
+                  </Button>
+                  <Button
                     variant="glow"
                     size="sm"
                     onClick={() => setIsCreateSubjectOpen(true)}
@@ -524,8 +536,16 @@ export default function StudyPage() {
                 >
                   Add New Subject
                 </Button>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
+                  leftIcon={<UploadCloud className="w-4 h-4" />}
+                  onClick={() => setIsSyllabusImportOpen(true)}
+                >
+                  AI Syllabus Import
+                </Button>
+                <Button
+                  variant="outline"
                   className="w-full justify-start"
                   leftIcon={<BookOpen className="w-4 h-4" />}
                   onClick={() => selectedSubject && setIsAddTopicOpen(true)}
@@ -567,6 +587,21 @@ export default function StudyPage() {
             onSubmit={async (data) => {
               await createSubject(data);
               setIsCreateSubjectOpen(false);
+            }}
+          />
+        </Modal>
+
+        {/* AI Syllabus Import Modal */}
+        <Modal
+          isOpen={isSyllabusImportOpen}
+          onClose={() => setIsSyllabusImportOpen(false)}
+          title="Import Syllabus with AI"
+        >
+          <SyllabusImportForm
+            onClose={() => setIsSyllabusImportOpen(false)}
+            onSubmit={async (data) => {
+              await createSubject(data);
+              setIsSyllabusImportOpen(false);
             }}
           />
         </Modal>
@@ -739,6 +774,132 @@ function CreateSubjectForm({
   );
 }
 
+function SyllabusImportForm({
+  onClose,
+  onSubmit,
+}: {
+  onClose: () => void;
+  onSubmit: (data: { name: string; description?: string; color: string; topics: Topic[] }) => Promise<void>;
+}) {
+  const [syllabusText, setSyllabusText] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fileToBase64 = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = typeof reader.result === 'string' ? reader.result : '';
+        const base64 = result.includes(',') ? result.split(',')[1] : result;
+        resolve(base64);
+      };
+      reader.onerror = () => reject(new Error('Failed to read file.'));
+      reader.readAsDataURL(file);
+    });
+
+  const handleImport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!syllabusText.trim() && !selectedFile) {
+      setError('Add syllabus text or upload a file first.');
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      const filePayload = selectedFile
+        ? {
+            name: selectedFile.name,
+            mimeType: selectedFile.type || 'application/octet-stream',
+            base64: await fileToBase64(selectedFile),
+          }
+        : undefined;
+
+      const draft = await extractSyllabusDraft({
+        text: syllabusText.trim() || undefined,
+        file: filePayload,
+      });
+
+      const now = Date.now();
+      const topics: Topic[] = draft.milestones.map((milestone, index) => ({
+        id: `topic_${now}_${index}`,
+        name: milestone.title,
+        description: milestone.description || `Milestone ${index + 1} from syllabus`,
+        masteryLevel: 0,
+        studyTime: 0,
+        resources: [],
+        notes: [],
+        weakAreas: [],
+      }));
+
+      const color = colorOptions[Math.floor(Math.random() * colorOptions.length)];
+      await onSubmit({
+        name: draft.subjectName || 'Imported Subject',
+        description: draft.summary || 'Created from syllabus import',
+        color,
+        topics,
+      });
+    } catch (err: any) {
+      setError(err.message || 'Failed to import syllabus');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleImport} className="space-y-4">
+      <div className="p-3 rounded-lg bg-dark-800/40 border border-dark-700/50">
+        <p className="text-sm text-dark-300">
+          Upload a syllabus (PDF/image/text) or paste text. AI will create one subject and topic milestones automatically.
+        </p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-dark-200 mb-1.5">Upload File</label>
+        <Input
+          type="file"
+          accept=".pdf,.txt,.md,image/*"
+          onChange={e => setSelectedFile(e.target.files?.[0] || null)}
+        />
+        {selectedFile && (
+          <p className="text-xs text-dark-400 mt-1">
+            Selected: {selectedFile.name}
+          </p>
+        )}
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-dark-200 mb-1.5">Or Paste Syllabus Text</label>
+        <textarea
+          placeholder="Paste your syllabus here for AI parsing..."
+          value={syllabusText}
+          onChange={e => setSyllabusText(e.target.value)}
+          rows={6}
+          className={cn(
+            'w-full px-4 py-3 rounded-xl text-sm',
+            'bg-dark-800/50 border border-dark-700/50',
+            'text-white placeholder:text-dark-500',
+            'focus:outline-none focus:ring-2 focus:ring-neon-cyan/50'
+          )}
+        />
+      </div>
+
+      {error && (
+        <p className="text-sm text-status-error">{error}</p>
+      )}
+
+      <div className="flex justify-end gap-3 pt-2">
+        <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
+        <Button type="submit" variant="glow" disabled={submitting}>
+          {submitting ? 'Analyzing...' : 'Import with AI'}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
 // Subject Detail View
 function SubjectDetailView({
   subject,
@@ -760,6 +921,14 @@ function SubjectDetailView({
   onAddStudyTime: (minutes: number) => Promise<void>;
 }) {
   const [studyMinutes, setStudyMinutes] = useState('');
+  const [isLoggingProgress, setIsLoggingProgress] = useState(false);
+  const [stepAnimationKey, setStepAnimationKey] = useState(0);
+  const [milestoneBloom, setMilestoneBloom] = useState<string | null>(null);
+
+  const completedMilestones = subject.topics.filter(topic => topic.masteryLevel >= 80).length;
+  const milestoneProgress = subject.topics.length > 0
+    ? Math.round((completedMilestones / subject.topics.length) * 100)
+    : 0;
 
   const formatTime = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
@@ -767,6 +936,35 @@ function SubjectDetailView({
     if (hours === 0) return `${mins} minutes`;
     if (mins === 0) return `${hours} hours`;
     return `${hours}h ${mins}m`;
+  };
+
+  const handleLogProgress = async () => {
+    if (!studyMinutes || isLoggingProgress) return;
+
+    const minutes = Math.max(1, parseInt(studyMinutes, 10));
+    if (Number.isNaN(minutes)) return;
+
+    setIsLoggingProgress(true);
+    try {
+      await onAddStudyTime(minutes);
+      setStudyMinutes('');
+      setStepAnimationKey(Date.now());
+
+      const nextMilestone = subject.topics.find(topic => topic.masteryLevel < 80);
+      if (nextMilestone) {
+        const masteryIncrease = Math.max(5, Math.min(20, Math.round(minutes / 6)));
+        const nextMastery = Math.min(100, nextMilestone.masteryLevel + masteryIncrease);
+
+        await onUpdateTopicMastery(nextMilestone.id, nextMastery);
+
+        if (nextMilestone.masteryLevel < 80 && nextMastery >= 80) {
+          setMilestoneBloom(nextMilestone.name);
+          setTimeout(() => setMilestoneBloom(null), 2200);
+        }
+      }
+    } finally {
+      setIsLoggingProgress(false);
+    }
   };
 
   return (
@@ -788,7 +986,7 @@ function SubjectDetailView({
       </div>
 
       {/* Add Study Time */}
-      <div className="p-3 rounded-lg bg-dark-800/30 border border-dark-700/50">
+      <div className="relative overflow-hidden p-3 rounded-lg bg-dark-800/30 border border-dark-700/50">
         <label className="block text-sm font-medium text-dark-200 mb-2">Log Study Time</label>
         <div className="flex gap-2">
           <Input
@@ -800,17 +998,76 @@ function SubjectDetailView({
           />
           <Button
             variant="outline"
-            onClick={async () => {
-              if (studyMinutes) {
-                await onAddStudyTime(parseInt(studyMinutes));
-                setStudyMinutes('');
-              }
-            }}
-            disabled={!studyMinutes}
+            onClick={handleLogProgress}
+            disabled={!studyMinutes || isLoggingProgress}
           >
-            Add
+            {isLoggingProgress ? 'Adding...' : 'Add'}
           </Button>
         </div>
+
+        <AnimatePresence>
+          {stepAnimationKey > 0 && (
+            <motion.div
+              key={stepAnimationKey}
+              initial={{ opacity: 1 }}
+              animate={{ opacity: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 1.1 }}
+              className="pointer-events-none absolute inset-0"
+            >
+              {Array.from({ length: 5 }).map((_, index) => (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 18, x: -18 + index * 16, scale: 0.7 }}
+                  animate={{ opacity: [0, 1, 0], y: -22, scale: 1 }}
+                  transition={{ duration: 0.9, delay: index * 0.08 }}
+                  className="absolute bottom-2 left-1/2 -translate-x-1/2 text-neon-cyan"
+                >
+                  <Footprints className="w-4 h-4" />
+                </motion.div>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {milestoneBloom && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              className="mt-3 p-2 rounded-lg bg-neon-pink/10 border border-neon-pink/30 text-xs text-neon-pink"
+            >
+              🌸 Milestone complete: {milestoneBloom}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Milestone Path */}
+      <div className="p-3 rounded-lg bg-dark-800/30 border border-dark-700/50">
+        <div className="flex items-center justify-between mb-2">
+          <h4 className="text-sm font-medium text-white">Milestone Path</h4>
+          <Badge variant="pink" size="sm">
+            {completedMilestones}/{subject.topics.length}
+          </Badge>
+        </div>
+        <Progress value={milestoneProgress} variant="pink" size="sm" />
+        {subject.topics.length > 0 && (
+          <div className="grid grid-cols-2 gap-2 mt-3">
+            {subject.topics.map(topic => (
+              <div key={topic.id} className="flex items-center gap-2 p-2 rounded-lg bg-dark-900/40">
+                <span className="text-sm">{topic.masteryLevel >= 80 ? '🌸' : '👣'}</span>
+                <span className={cn(
+                  'text-xs truncate',
+                  topic.masteryLevel >= 80 ? 'text-neon-pink' : 'text-dark-300'
+                )}>
+                  {topic.name}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Topics */}

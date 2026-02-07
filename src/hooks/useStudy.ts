@@ -44,6 +44,7 @@ interface CreateSubjectData {
   description?: string;
   color?: string;
   icon?: string;
+  topics?: Topic[];
 }
 
 export function useStudy(): UseStudyReturn {

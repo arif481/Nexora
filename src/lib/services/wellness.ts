@@ -16,7 +16,17 @@ import {
   setDoc,
 } from 'firebase/firestore';
 import { db, COLLECTIONS } from '../firebase';
-import type { WellnessEntry, SleepData, ActivityData, NutritionData, StressData, FocusSession, Exercise, Meal } from '@/types';
+import type {
+  WellnessEntry,
+  SleepData,
+  ActivityData,
+  NutritionData,
+  StressData,
+  PeriodData,
+  FocusSession,
+  Exercise,
+  Meal,
+} from '@/types';
 
 // Convert Firestore timestamp to Date
 const convertTimestamp = (timestamp: Timestamp | Date | null | undefined): Date => {
@@ -68,6 +78,16 @@ const convertWellnessFromFirestore = (doc: any): WellnessEntry => {
       copingMethods: data.stress?.copingMethods || [],
       notes: data.stress?.notes,
     },
+    period: {
+      isPeriodDay: data.period?.isPeriodDay || false,
+      flowLevel: data.period?.flowLevel || 0,
+      painLevel: data.period?.painLevel || 0,
+      moodScore: data.period?.moodScore || 5,
+      symptoms: data.period?.symptoms || [],
+      comfortPreferences: data.period?.comfortPreferences || [],
+      cycleLength: data.period?.cycleLength || 28,
+      notes: data.period?.notes,
+    },
     focusSessions: (data.focusSessions || []).map((f: any) => ({
       id: f.id,
       startTime: convertTimestamp(f.startTime),
@@ -118,6 +138,15 @@ export const getOrCreateWellnessEntry = async (
       level: 5,
       triggers: [],
       copingMethods: [],
+    },
+    period: {
+      isPeriodDay: false,
+      flowLevel: 0,
+      painLevel: 0,
+      moodScore: 5,
+      symptoms: [],
+      comfortPreferences: [],
+      cycleLength: 28,
     },
     focusSessions: [],
     createdAt: serverTimestamp(),
@@ -298,6 +327,29 @@ export const updateStressData = async (
   
   await updateDoc(entryRef, {
     stress: { ...currentStress, ...stressData },
+  });
+};
+
+// Update period tracking data
+export const updatePeriodData = async (
+  userId: string,
+  date: Date,
+  periodData: Partial<PeriodData>
+): Promise<void> => {
+  const dateKey = date.toISOString().split('T')[0];
+  const entryId = `${userId}_${dateKey}`;
+
+  const entryRef = doc(db, COLLECTIONS.WELLNESS_ENTRIES, entryId);
+  const entryDoc = await getDoc(entryRef);
+
+  if (!entryDoc.exists()) {
+    await getOrCreateWellnessEntry(userId, date);
+  }
+
+  const currentPeriod = entryDoc.exists() ? entryDoc.data().period || {} : {};
+
+  await updateDoc(entryRef, {
+    period: { ...currentPeriod, ...periodData },
   });
 };
 

@@ -4,6 +4,7 @@ export interface User {
   email: string;
   displayName: string;
   photoURL?: string;
+  gender?: GenderIdentity;
   phone?: string;
   location?: string;
   bio?: string;
@@ -12,6 +13,8 @@ export interface User {
   preferences: UserPreferences;
   stats: UserStats;
 }
+
+export type GenderIdentity = 'female' | 'male' | 'non-binary' | 'prefer-not-to-say';
 
 export interface UserPreferences {
   theme: 'dark' | 'light' | 'system';
@@ -382,6 +385,7 @@ export interface WellnessEntry {
   activity: ActivityData;
   nutrition: NutritionData;
   stress: StressData;
+  period?: PeriodData;
   focusSessions: FocusSession[];
   createdAt: Date;
 }
@@ -425,6 +429,17 @@ export interface StressData {
   level: number; // 1-10
   triggers: string[];
   copingMethods: string[];
+  notes?: string;
+}
+
+export interface PeriodData {
+  isPeriodDay: boolean;
+  flowLevel: 0 | 1 | 2 | 3 | 4; // 0 = none, 4 = very heavy
+  painLevel: number; // 0-10
+  moodScore: number; // 1-10
+  symptoms: string[];
+  comfortPreferences: string[];
+  cycleLength: number; // days
   notes?: string;
 }
 

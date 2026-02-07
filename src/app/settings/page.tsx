@@ -65,6 +65,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useUser } from '@/hooks/useUser';
 import { useIntegrations, useLinkedAccounts } from '@/hooks/useIntegrations';
+import type { GenderIdentity } from '@/types';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 
@@ -230,6 +231,7 @@ function ProfileSection({ onDirty }: { onDirty: () => void }) {
   
   const [formData, setFormData] = useState({
     name: '',
+    gender: 'prefer-not-to-say' as GenderIdentity,
     phone: '',
     location: '',
     bio: '',
@@ -245,6 +247,7 @@ function ProfileSection({ onDirty }: { onDirty: () => void }) {
     if (userProfile) {
       setFormData({
         name: userProfile.displayName || '',
+        gender: userProfile.gender || 'prefer-not-to-say',
         phone: userProfile.phone || '',
         location: userProfile.location || '',
         bio: userProfile.bio || '',
@@ -252,7 +255,7 @@ function ProfileSection({ onDirty }: { onDirty: () => void }) {
     }
   }, [userProfile]);
 
-  const handleChange = (field: string, value: string) => {
+  const handleChange = <K extends keyof typeof formData>(field: K, value: (typeof formData)[K]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     onDirty();
   };
@@ -264,6 +267,7 @@ function ProfileSection({ onDirty }: { onDirty: () => void }) {
     try {
       await updateProfile({ 
         displayName: formData.name || displayName,
+        gender: formData.gender,
         phone: formData.phone,
         location: formData.location,
         bio: formData.bio,
@@ -321,6 +325,22 @@ function ProfileSection({ onDirty }: { onDirty: () => void }) {
               disabled
               leftIcon={<Mail className="w-4 h-4" />}
             />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-dark-300 mb-2">Gender</label>
+            <select
+              value={formData.gender}
+              onChange={e => handleChange('gender', e.target.value as GenderIdentity)}
+              className="w-full bg-dark-800 border border-dark-700 rounded-lg px-3 py-2 text-white focus:border-neon-cyan outline-none"
+            >
+              <option value="female">Female</option>
+              <option value="male">Male</option>
+              <option value="non-binary">Non-binary</option>
+              <option value="prefer-not-to-say">Prefer not to say</option>
+            </select>
+            <p className="text-xs text-dark-500 mt-1">
+              Period tracker is available in Wellness when Female is selected.
+            </p>
           </div>
           <div className="flex items-center justify-between pt-2">
             {saveMessage && (

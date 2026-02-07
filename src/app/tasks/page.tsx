@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, memo } from 'react';
+import { useState, useMemo, memo, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -69,6 +69,8 @@ export default function TasksPage() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
+  const [bloomBursts, setBloomBursts] = useState<Array<{ id: number; left: number }>>([]);
+  const previousCompletedRef = useRef<number | null>(null);
   const { openAIPanel } = useUIStore();
 
   // Form state for new task
@@ -79,6 +81,29 @@ export default function TasksPage() {
     dueDate: '',
     tags: '',
   });
+
+  useEffect(() => {
+    if (previousCompletedRef.current === null) {
+      previousCompletedRef.current = stats.completed;
+      return;
+    }
+
+    if (stats.completed > previousCompletedRef.current) {
+      const newBlooms = Array.from({ length: Math.min(stats.completed - previousCompletedRef.current, 3) }).map(
+        (_, index) => ({
+          id: Date.now() + index,
+          left: 10 + Math.random() * 80,
+        })
+      );
+
+      setBloomBursts(prev => [...prev, ...newBlooms]);
+      setTimeout(() => {
+        setBloomBursts(prev => prev.filter(item => !newBlooms.some(newItem => newItem.id === item.id)));
+      }, 1400);
+    }
+
+    previousCompletedRef.current = stats.completed;
+  }, [stats.completed]);
 
   // Filter and sort tasks
   const filteredTasks = useMemo(() => {
@@ -598,6 +623,50 @@ export default function TasksPage() {
             transition={{ delay: 0.3 }}
             className="space-y-4"
           >
+            {/* Garden Progress */}
+            <Card variant="glass" className="p-4 overflow-hidden">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-medium text-white">Focus Garden</h3>
+                <Badge variant="pink" size="sm">{stats.completed} flowers</Badge>
+              </div>
+              <p className="text-xs text-dark-400 mb-3">Every completed task grows your flower garden.</p>
+              <div className="relative h-28 rounded-xl bg-gradient-to-b from-neon-cyan/5 to-neon-green/10 border border-dark-700/50 overflow-hidden">
+                <div className="absolute left-0 right-0 bottom-0 h-8 bg-dark-900/60 border-t border-dark-700/40" />
+                {Array.from({ length: Math.min(stats.completed, 24) }).map((_, index) => {
+                  const left = (index * 31) % 96;
+                  const bottom = 10 + ((index * 13) % 10);
+                  return (
+                    <motion.span
+                      key={`flower-${index}`}
+                      initial={{ opacity: 0, scale: 0.7, y: 8 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      transition={{ delay: index * 0.02 }}
+                      className="absolute text-sm"
+                      style={{ left: `${left}%`, bottom: `${bottom}px` }}
+                    >
+                      🌸
+                    </motion.span>
+                  );
+                })}
+
+                <AnimatePresence>
+                  {bloomBursts.map(bloom => (
+                    <motion.span
+                      key={bloom.id}
+                      initial={{ opacity: 0, y: 20, scale: 0.8 }}
+                      animate={{ opacity: [0, 1, 0], y: -4, scale: [0.8, 1.1, 1] }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 1.2 }}
+                      className="absolute text-base"
+                      style={{ left: `${bloom.left}%`, bottom: '14px' }}
+                    >
+                      🌼
+                    </motion.span>
+                  ))}
+                </AnimatePresence>
+              </div>
+            </Card>
+
             {/* AI Suggestions */}
             <Card variant="glass" className="p-4">
               <div className="flex items-center gap-2 mb-4">

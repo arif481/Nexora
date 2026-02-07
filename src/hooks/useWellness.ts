@@ -2,7 +2,17 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from './useAuth';
-import type { WellnessEntry, SleepData, ActivityData, NutritionData, StressData, FocusSession, Exercise, Meal } from '@/types';
+import type {
+  WellnessEntry,
+  SleepData,
+  ActivityData,
+  NutritionData,
+  StressData,
+  PeriodData,
+  FocusSession,
+  Exercise,
+  Meal,
+} from '@/types';
 import {
   subscribeToWellnessEntry,
   subscribeToWellnessRange,
@@ -15,6 +25,7 @@ import {
   addMeal,
   updateWaterIntake,
   updateStressData,
+  updatePeriodData,
   addFocusSession,
 } from '@/lib/services/wellness';
 
@@ -30,6 +41,7 @@ interface UseWellnessReturn {
   addMeal: (date: Date, meal: Meal) => Promise<void>;
   addWater: (date: Date, amount: number) => Promise<void>;
   updateStress: (date: Date, data: Partial<StressData>) => Promise<void>;
+  updatePeriod: (date: Date, data: Partial<PeriodData>) => Promise<void>;
   addFocusSession: (date: Date, session: Omit<FocusSession, 'id'>) => Promise<void>;
   refresh: () => void;
 }
@@ -196,6 +208,20 @@ export function useWellness(date: Date = new Date()): UseWellnessReturn {
     [user]
   );
 
+  const handleUpdatePeriod = useCallback(
+    async (entryDate: Date, data: Partial<PeriodData>): Promise<void> => {
+      if (!user) throw new Error('User not authenticated');
+
+      try {
+        await updatePeriodData(user.uid, entryDate, data);
+      } catch (err: any) {
+        setError(err.message);
+        throw err;
+      }
+    },
+    [user]
+  );
+
   const refresh = useCallback(() => {
     setLoading(true);
   }, []);
@@ -212,6 +238,7 @@ export function useWellness(date: Date = new Date()): UseWellnessReturn {
     addMeal: handleAddMeal,
     addWater: handleAddWater,
     updateStress: handleUpdateStress,
+    updatePeriod: handleUpdatePeriod,
     addFocusSession: handleAddFocusSession,
     refresh,
   };

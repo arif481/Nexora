@@ -9,7 +9,7 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { db, COLLECTIONS } from '../firebase';
-import type { User, UserPreferences, UserStats } from '@/types';
+import type { User, UserPreferences, UserStats, GenderIdentity } from '@/types';
 
 // Convert Firestore timestamp to Date
 const convertTimestamp = (timestamp: Timestamp | Date | null | undefined): Date => {
@@ -68,6 +68,7 @@ const convertUserFromFirestore = (doc: any): User => {
     email: data.email,
     displayName: data.displayName,
     photoURL: data.photoURL,
+    gender: data.gender,
     phone: data.phone,
     location: data.location,
     bio: data.bio,
@@ -130,6 +131,7 @@ export const updateUserProfile = async (
   updates: {
     displayName?: string;
     photoURL?: string;
+    gender?: GenderIdentity;
     phone?: string;
     location?: string;
     bio?: string;

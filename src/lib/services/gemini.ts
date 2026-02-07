@@ -277,6 +277,150 @@ Error: ${error.message || 'Unknown error'}`,
   }
 };
 
+export interface SyllabusMilestoneDraft {
+  title: string;
+  description?: string;
+}
+
+export interface SyllabusDraft {
+  subjectName: string;
+  summary?: string;
+  milestones: SyllabusMilestoneDraft[];
+}
+
+const extractJsonObject = (text: string): any | null => {
+  const cleaned = text
+    .replace(/```json/gi, '')
+    .replace(/```/g, '')
+    .trim();
+
+  const start = cleaned.indexOf('{');
+  const end = cleaned.lastIndexOf('}');
+  if (start === -1 || end === -1 || end <= start) {
+    return null;
+  }
+
+  const rawJson = cleaned.slice(start, end + 1);
+  try {
+    return JSON.parse(rawJson);
+  } catch {
+    return null;
+  }
+};
+
+const fallbackSyllabusDraft = (text: string, fileName?: string): SyllabusDraft => {
+  const lines = text
+    .split('\n')
+    .map(item => item.trim())
+    .filter(item => item.length >= 4 && item.length <= 100);
+
+  const topicLines = lines
+    .filter(item => /^\d+[\).]/.test(item) || /^[-*]/.test(item) || /week|module|chapter|unit/i.test(item))
+    .map(item => item.replace(/^\d+[\).]\s*/, '').replace(/^[-*]\s*/, '').trim())
+    .slice(0, 12);
+
+  const milestones = (topicLines.length > 0 ? topicLines : lines.slice(0, 8)).map(title => ({ title }));
+
+  return {
+    subjectName: fileName?.replace(/\.[^/.]+$/, '') || 'Imported Subject',
+    summary: '',
+    milestones,
+  };
+};
+
+export const extractSyllabusDraft = async (params: {
+  text?: string;
+  file?: {
+    name: string;
+    mimeType: string;
+    base64: string;
+  };
+}): Promise<SyllabusDraft> => {
+  const text = params.text?.trim() || '';
+  const file = params.file;
+
+  if (!text && !file) {
+    throw new Error('Provide syllabus text or a file first.');
+  }
+
+  const genAI = getGeminiClient();
+  if (!genAI) {
+    throw new Error('AI is not configured. Add a Gemini API key in Settings > AI Settings.');
+  }
+
+  try {
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const instruction = `Extract a study plan from this syllabus.
+Return JSON only with this exact schema:
+{
+  "subjectName": "string",
+  "summary": "string",
+  "milestones": [
+    { "title": "string", "description": "string" }
+  ]
+}
+Rules:
+- Keep milestones concise and practical.
+- Include 5 to 12 milestones.
+- No markdown, no explanation, JSON only.`;
+
+    const parts: any[] = [{ text: instruction }];
+    if (text) {
+      parts.push({ text: `SYLLABUS TEXT:\n${text.slice(0, 24000)}` });
+    }
+    if (file) {
+      parts.push({
+        inlineData: {
+          mimeType: file.mimeType,
+          data: file.base64,
+        },
+      });
+    }
+
+    const result = await model.generateContent(parts);
+    const response = await result.response;
+    const parsed = extractJsonObject(response.text());
+
+    if (!parsed) {
+      return fallbackSyllabusDraft(text, file?.name);
+    }
+
+    const subjectName =
+      typeof parsed.subjectName === 'string' && parsed.subjectName.trim()
+        ? parsed.subjectName.trim()
+        : file?.name?.replace(/\.[^/.]+$/, '') || 'Imported Subject';
+
+    const summary = typeof parsed.summary === 'string' ? parsed.summary.trim() : '';
+    const milestones = Array.isArray(parsed.milestones)
+      ? parsed.milestones
+          .map((item: any) => ({
+            title: typeof item?.title === 'string' ? item.title.trim() : '',
+            description: typeof item?.description === 'string' ? item.description.trim() : undefined,
+          }))
+          .filter((item: SyllabusMilestoneDraft) => item.title.length > 0)
+          .slice(0, 12)
+      : [];
+
+    if (milestones.length === 0) {
+      return fallbackSyllabusDraft(text, file?.name);
+    }
+
+    return {
+      subjectName,
+      summary,
+      milestones,
+    };
+  } catch (error: any) {
+    console.error('Failed to extract syllabus:', error);
+
+    if (error?.message?.includes('quota') || error?.message?.includes('rate')) {
+      throw new Error('Gemini quota reached. Try again in a minute.');
+    }
+
+    return fallbackSyllabusDraft(text, file?.name);
+  }
+};
+
 // Check if AI is configured
 export const isAIConfigured = (): boolean => {
   const apiKey = typeof window !== 'undefined' 

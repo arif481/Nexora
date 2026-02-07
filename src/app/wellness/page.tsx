@@ -4,6 +4,15 @@ import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip as RechartsTooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+import {
   Heart,
   Activity,
   Moon,
@@ -44,13 +53,73 @@ import { Modal } from '@/components/ui/Modal';
 import { EmptyState, LoadingSpinner } from '@/components/ui/Loading';
 import { useUIStore } from '@/stores/uiStore';
 import { useAuth } from '@/hooks/useAuth';
+import { useUser } from '@/hooks/useUser';
 import { useWellness, useRecentWellness, useWellnessStats } from '@/hooks/useWellness';
 import { cn } from '@/lib/utils';
-import type { Exercise, Meal } from '@/types';
+import type { Exercise, Meal, PeriodData, WellnessEntry } from '@/types';
+
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
+const getPeriodCycleInsights = (entries: WellnessEntry[]) => {
+  const periodEntries = entries
+    .filter(item => item.period?.isPeriodDay)
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  if (periodEntries.length === 0) {
+    return {
+      lastStart: null as Date | null,
+      nextStart: null as Date | null,
+      avgCycleLength: 28,
+      daysUntilNext: null as number | null,
+    };
+  }
+
+  // Collapse consecutive period days into cycle start days.
+  const cycleStarts: Date[] = [];
+  for (const entry of periodEntries) {
+    const current = new Date(entry.date);
+    const previous = cycleStarts[cycleStarts.length - 1];
+    if (!previous) {
+      cycleStarts.push(current);
+      continue;
+    }
+    const diffDays = Math.round((current.getTime() - previous.getTime()) / MS_PER_DAY);
+    if (diffDays > 2) {
+      cycleStarts.push(current);
+    }
+  }
+
+  const cycleLengths: number[] = [];
+  for (let index = 1; index < cycleStarts.length; index += 1) {
+    const diff = Math.round((cycleStarts[index].getTime() - cycleStarts[index - 1].getTime()) / MS_PER_DAY);
+    if (diff >= 18 && diff <= 45) {
+      cycleLengths.push(diff);
+    }
+  }
+
+  const avgCycleLength =
+    cycleLengths.length > 0
+      ? Math.round(cycleLengths.reduce((sum, value) => sum + value, 0) / cycleLengths.length)
+      : 28;
+
+  const lastStart = cycleStarts[cycleStarts.length - 1];
+  const nextStart = new Date(lastStart);
+  nextStart.setDate(nextStart.getDate() + avgCycleLength);
+
+  const daysUntilNext = Math.round((nextStart.getTime() - Date.now()) / MS_PER_DAY);
+
+  return {
+    lastStart,
+    nextStart,
+    avgCycleLength,
+    daysUntilNext,
+  };
+};
 
 export default function WellnessPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
+  const { profile } = useUser();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const {
     entry,
@@ -63,18 +132,27 @@ export default function WellnessPage() {
     addMeal,
     addWater,
     updateStress,
+    updatePeriod,
   } = useWellness(selectedDate);
-  const { entries: recentEntries, loading: recentLoading } = useRecentWellness(7);
-  const wellnessStats = useWellnessStats(recentEntries);
+  const { entries: recentEntries } = useRecentWellness(45);
+  const weeklyEntries = useMemo(() => {
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    weekAgo.setHours(0, 0, 0, 0);
+    return recentEntries.filter(item => new Date(item.date) >= weekAgo);
+  }, [recentEntries]);
+  const wellnessStats = useWellnessStats(weeklyEntries);
 
   const [isAddSleepOpen, setIsAddSleepOpen] = useState(false);
   const [isAddExerciseOpen, setIsAddExerciseOpen] = useState(false);
   const [isAddMealOpen, setIsAddMealOpen] = useState(false);
   const [isAddWaterOpen, setIsAddWaterOpen] = useState(false);
   const [isUpdateMoodOpen, setIsUpdateMoodOpen] = useState(false);
+  const [isUpdatePeriodOpen, setIsUpdatePeriodOpen] = useState(false);
   const { openAIPanel } = useUIStore();
 
   const loading = authLoading || wellnessLoading;
+  const showPeriodTracker = profile?.gender === 'female';
 
   const formatTime = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
@@ -107,6 +185,66 @@ export default function WellnessPage() {
     if (mood >= 3) return <Meh className="w-5 h-5 text-neon-cyan" />;
     return <Frown className="w-5 h-5 text-neon-orange" />;
   };
+
+  const moodTrendData = useMemo(() => {
+    return weeklyEntries
+      .slice()
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      .map(item => {
+        const fallbackMood = Math.max(1, 11 - (item.stress?.level || 5));
+        const moodScore = item.period?.moodScore || fallbackMood;
+        return {
+          day: new Date(item.date).toLocaleDateString('en-US', { weekday: 'short' }),
+          mood: moodScore,
+          stress: item.stress?.level || 0,
+          comfort: Math.max(1, 11 - (item.period?.painLevel || item.stress?.level || 5)),
+        };
+      });
+  }, [weeklyEntries]);
+
+  const periodInsights = useMemo(() => {
+    if (!showPeriodTracker) return null;
+    return getPeriodCycleInsights(recentEntries);
+  }, [recentEntries, showPeriodTracker]);
+
+  const periodSuggestions = useMemo(() => {
+    if (!showPeriodTracker) return [];
+    const periodData = entry?.period;
+    if (!periodData) {
+      return [
+        'Track flow and mood today so your cycle prediction becomes more accurate.',
+        'Save comfort preferences (tea, heat pad, light walk) for personalized suggestions.',
+      ];
+    }
+
+    const suggestions: string[] = [];
+
+    if (periodData.painLevel >= 7) {
+      suggestions.push('High discomfort detected. Use your favorite comfort ritual and take a short rest block.');
+    } else if (periodData.painLevel >= 4) {
+      suggestions.push('Try a gentle stretch session and warm hydration to ease cramps.');
+    } else {
+      suggestions.push('Body seems comfortable today. A short walk can keep energy steady.');
+    }
+
+    if (periodData.flowLevel >= 3) {
+      suggestions.push('Heavy flow day: keep hydration nearby and schedule lighter tasks if possible.');
+    }
+
+    if (periodData.comfortPreferences.includes('heat therapy')) {
+      suggestions.push('Heat therapy is in your comfort list. Consider a 15-minute heating pad session.');
+    } else if (periodData.comfortPreferences.includes('herbal tea')) {
+      suggestions.push('Herbal tea is one of your comforts. Plan 1 warm cup during your next break.');
+    } else if (periodData.comfortPreferences.includes('light movement')) {
+      suggestions.push('Light movement is your preference. A slow 10-minute walk may help.');
+    }
+
+    if (suggestions.length < 3) {
+      suggestions.push('Log symptoms consistently this week to improve personalized period insights.');
+    }
+
+    return suggestions.slice(0, 3);
+  }, [showPeriodTracker, entry?.period]);
 
   // Loading state
   if (loading) {
@@ -469,6 +607,121 @@ export default function WellnessPage() {
               </Card>
             )}
 
+            {/* Period Tracker (female profile only) */}
+            {entry && showPeriodTracker && (
+              <Card variant="glass" className="border border-neon-pink/20 bg-gradient-to-br from-neon-pink/10 to-neon-purple/5">
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                    <Heart className="w-5 h-5 text-neon-pink" />
+                    Period Tracker
+                  </h3>
+                  <Button variant="ghost" size="sm" onClick={() => setIsUpdatePeriodOpen(true)}>
+                    Update
+                  </Button>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="p-3 rounded-lg bg-dark-800/40 border border-neon-pink/20">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-dark-300">Today</span>
+                      <Badge variant={entry.period?.isPeriodDay ? 'pink' : 'default'} size="sm">
+                        {entry.period?.isPeriodDay ? 'Period Day' : 'Not Period Day'}
+                      </Badge>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3 mt-3">
+                      <div>
+                        <p className="text-xs text-dark-400">Flow</p>
+                        <p className="text-sm text-white">{entry.period?.flowLevel || 0}/4</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-dark-400">Pain</p>
+                        <p className="text-sm text-white">{entry.period?.painLevel || 0}/10</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-dark-400">Mood</p>
+                        <p className="text-sm text-white">{entry.period?.moodScore || 5}/10</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {periodInsights && (
+                    <div className="p-3 rounded-lg bg-dark-800/30">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm text-dark-300">Cycle estimate</span>
+                        <Badge variant="outline" size="sm">{periodInsights.avgCycleLength} days</Badge>
+                      </div>
+                      <p className="text-xs text-dark-400">
+                        {periodInsights.nextStart
+                          ? `Next expected start: ${periodInsights.nextStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}${periodInsights.daysUntilNext !== null ? ` (${periodInsights.daysUntilNext >= 0 ? `${periodInsights.daysUntilNext}d` : `${Math.abs(periodInsights.daysUntilNext)}d late`})` : ''}`
+                          : 'Log your first period day to unlock cycle prediction.'}
+                      </p>
+                    </div>
+                  )}
+
+                  <div>
+                    <p className="text-sm text-dark-300 mb-2">Comfort Suggestions</p>
+                    <div className="space-y-2">
+                      {periodSuggestions.map((tip, index) => (
+                        <div key={index} className="text-xs text-dark-300 p-2 rounded-lg bg-dark-800/30 border border-dark-700/40">
+                          {tip}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Mood Trend Graph */}
+            <Card variant="glass">
+              <CardHeader>
+                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <Heart className="w-5 h-5 text-neon-pink" />
+                  Mood Trend
+                </h3>
+              </CardHeader>
+              <CardContent>
+                {moodTrendData.length === 0 ? (
+                  <p className="text-sm text-dark-400 text-center py-4">Log daily wellness to unlock your mood pattern.</p>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="h-40">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={moodTrendData} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
+                          <defs>
+                            <linearGradient id="moodTrendFill" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="#ff79c6" stopOpacity={0.45} />
+                              <stop offset="100%" stopColor="#ff79c6" stopOpacity={0.02} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                          <XAxis dataKey="day" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                          <YAxis domain={[0, 10]} tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                          <RechartsTooltip
+                            contentStyle={{
+                              backgroundColor: '#0f172a',
+                              border: '1px solid rgba(255,255,255,0.15)',
+                              borderRadius: '0.75rem',
+                              color: '#fff',
+                            }}
+                          />
+                          <Area
+                            type="monotone"
+                            dataKey="mood"
+                            stroke="#ff79c6"
+                            strokeWidth={2}
+                            fill="url(#moodTrendFill)"
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <p className="text-xs text-dark-400">
+                      You&rsquo;re doing great. Keep logging small check-ins to get gentler, personalized support trends.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             {/* Weekly Trend */}
             <Card variant="glass">
               <CardHeader>
@@ -478,13 +731,13 @@ export default function WellnessPage() {
                 </h3>
               </CardHeader>
               <CardContent>
-                {recentEntries.length === 0 ? (
+                {weeklyEntries.length === 0 ? (
                   <p className="text-sm text-dark-400 text-center py-4">No data this week</p>
                 ) : (
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-dark-400">Days tracked</span>
-                      <span className="text-sm font-medium text-white">{recentEntries.length}/7</span>
+                      <span className="text-sm font-medium text-white">{weeklyEntries.length}/7</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-dark-400">Exercises logged</span>
@@ -617,6 +870,22 @@ export default function WellnessPage() {
             onSubmit={async (data) => {
               await updateStress(selectedDate, data);
               setIsUpdateMoodOpen(false);
+            }}
+          />
+        </Modal>
+
+        {/* Update Period Modal */}
+        <Modal
+          isOpen={isUpdatePeriodOpen}
+          onClose={() => setIsUpdatePeriodOpen(false)}
+          title="Period & Comfort Log"
+        >
+          <UpdatePeriodForm
+            currentData={entry?.period}
+            onClose={() => setIsUpdatePeriodOpen(false)}
+            onSubmit={async (data) => {
+              await updatePeriod(selectedDate, data);
+              setIsUpdatePeriodOpen(false);
             }}
           />
         </Modal>
@@ -1064,6 +1333,184 @@ function UpdateMoodForm({
         <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
         <Button type="submit" variant="glow" disabled={submitting}>
           {submitting ? 'Saving...' : 'Update'}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+function UpdatePeriodForm({
+  currentData,
+  onClose,
+  onSubmit,
+}: {
+  currentData?: PeriodData;
+  onClose: () => void;
+  onSubmit: (data: Partial<PeriodData>) => Promise<void>;
+}) {
+  const [isPeriodDay, setIsPeriodDay] = useState(currentData?.isPeriodDay ?? false);
+  const [flowLevel, setFlowLevel] = useState((currentData?.flowLevel ?? 0).toString());
+  const [painLevel, setPainLevel] = useState((currentData?.painLevel ?? 0).toString());
+  const [moodScore, setMoodScore] = useState((currentData?.moodScore ?? 5).toString());
+  const [cycleLength, setCycleLength] = useState((currentData?.cycleLength ?? 28).toString());
+  const [notes, setNotes] = useState(currentData?.notes || '');
+  const [symptoms, setSymptoms] = useState<string[]>(currentData?.symptoms || []);
+  const [comfortPreferences, setComfortPreferences] = useState<string[]>(currentData?.comfortPreferences || []);
+  const [submitting, setSubmitting] = useState(false);
+
+  const symptomOptions = ['cramps', 'bloating', 'fatigue', 'headache', 'acne', 'back pain', 'sensitive mood'];
+  const comfortOptions = ['heat therapy', 'herbal tea', 'light movement', 'breathing exercise', 'extra rest'];
+
+  const toggleSelection = (items: string[], setter: (value: string[]) => void, value: string) => {
+    if (items.includes(value)) {
+      setter(items.filter(item => item !== value));
+    } else {
+      setter([...items, value]);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      await onSubmit({
+        isPeriodDay,
+        flowLevel: Number(flowLevel) as PeriodData['flowLevel'],
+        painLevel: Number(painLevel),
+        moodScore: Number(moodScore),
+        cycleLength: Number(cycleLength),
+        symptoms,
+        comfortPreferences,
+        notes: notes || undefined,
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="flex items-center justify-between p-3 rounded-lg bg-dark-800/40">
+        <div>
+          <p className="text-sm font-medium text-white">Is today a period day?</p>
+          <p className="text-xs text-dark-400">This helps predict your cycle better.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsPeriodDay(!isPeriodDay)}
+          className={cn(
+            'w-12 h-6 rounded-full transition-colors relative',
+            isPeriodDay ? 'bg-neon-pink' : 'bg-dark-700'
+          )}
+        >
+          <div
+            className={cn(
+              'w-5 h-5 rounded-full bg-white absolute top-0.5 transition-transform',
+              isPeriodDay ? 'translate-x-6' : 'translate-x-0.5'
+            )}
+          />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-3 gap-3">
+        <div>
+          <label className="block text-xs text-dark-400 mb-1">Flow (0-4)</label>
+          <Input
+            type="number"
+            min="0"
+            max="4"
+            value={flowLevel}
+            onChange={e => setFlowLevel(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-dark-400 mb-1">Pain (0-10)</label>
+          <Input
+            type="number"
+            min="0"
+            max="10"
+            value={painLevel}
+            onChange={e => setPainLevel(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-dark-400 mb-1">Mood (1-10)</label>
+          <Input
+            type="number"
+            min="1"
+            max="10"
+            value={moodScore}
+            onChange={e => setMoodScore(e.target.value)}
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-xs text-dark-400 mb-1">Cycle Length (days)</label>
+        <Input
+          type="number"
+          min="18"
+          max="45"
+          value={cycleLength}
+          onChange={e => setCycleLength(e.target.value)}
+        />
+      </div>
+
+      <div>
+        <label className="block text-xs text-dark-400 mb-1">Symptoms</label>
+        <div className="flex flex-wrap gap-2">
+          {symptomOptions.map(option => (
+            <button
+              key={option}
+              type="button"
+              onClick={() => toggleSelection(symptoms, setSymptoms, option)}
+              className={cn(
+                'px-2.5 py-1 rounded-full text-xs border transition-colors',
+                symptoms.includes(option)
+                  ? 'bg-neon-pink/20 border-neon-pink/40 text-neon-pink'
+                  : 'bg-dark-800/40 border-dark-700 text-dark-300'
+              )}
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-xs text-dark-400 mb-1">Comfort Preferences</label>
+        <div className="flex flex-wrap gap-2">
+          {comfortOptions.map(option => (
+            <button
+              key={option}
+              type="button"
+              onClick={() => toggleSelection(comfortPreferences, setComfortPreferences, option)}
+              className={cn(
+                'px-2.5 py-1 rounded-full text-xs border transition-colors',
+                comfortPreferences.includes(option)
+                  ? 'bg-neon-cyan/20 border-neon-cyan/40 text-neon-cyan'
+                  : 'bg-dark-800/40 border-dark-700 text-dark-300'
+              )}
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-xs text-dark-400 mb-1">Notes</label>
+        <Input
+          placeholder="Anything that helped today?"
+          value={notes}
+          onChange={e => setNotes(e.target.value)}
+        />
+      </div>
+
+      <div className="flex justify-end gap-3 pt-4">
+        <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
+        <Button type="submit" variant="glow" disabled={submitting}>
+          {submitting ? 'Saving...' : 'Save Period Log'}
         </Button>
       </div>
     </form>
