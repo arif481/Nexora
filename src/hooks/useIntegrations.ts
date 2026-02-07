@@ -5,7 +5,9 @@ import { useAuth } from './useAuth';
 import {
   subscribeToIntegrations,
   subscribeToLinkedAccounts,
+  connectAppleCalendar as connectAppleCalendarService,
   disconnectGoogleCalendar,
+  disconnectAppleCalendar,
   unlinkAccount,
   type UserIntegrations,
   type UserLinkedAccounts,
@@ -55,6 +57,15 @@ export function useIntegrations() {
     window.open(authUrl, '_blank', 'width=600,height=700');
   }, []);
 
+  const connectAppleCalendar = useCallback(async () => {
+    if (!user) return;
+    try {
+      await connectAppleCalendarService(user.uid, user.email || undefined);
+    } catch (error) {
+      console.error('Failed to connect Apple Calendar:', error);
+    }
+  }, [user]);
+
   // Disconnect Google Calendar
   const disconnect = useCallback(async (service: keyof UserIntegrations) => {
     if (!user) return;
@@ -62,6 +73,8 @@ export function useIntegrations() {
     try {
       if (service === 'googleCalendar') {
         await disconnectGoogleCalendar(user.uid);
+      } else if (service === 'appleCalendar') {
+        await disconnectAppleCalendar(user.uid);
       }
     } catch (error) {
       console.error(`Failed to disconnect ${service}:`, error);
@@ -73,7 +86,9 @@ export function useIntegrations() {
     integrations,
     loading,
     isGoogleCalendarConnected: integrations.googleCalendar?.connected ?? false,
+    isAppleCalendarConnected: integrations.appleCalendar?.connected ?? false,
     connectGoogleCalendar,
+    connectAppleCalendar,
     disconnect,
   };
 }

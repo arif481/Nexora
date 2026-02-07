@@ -41,6 +41,7 @@ import {
   Clock,
   Target,
   Heart,
+  Apple,
   CreditCard,
   HelpCircle,
   MessageSquare,
@@ -68,6 +69,12 @@ import { useIntegrations, useLinkedAccounts } from '@/hooks/useIntegrations';
 import type { GenderIdentity } from '@/types';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, query, where } from 'firebase/firestore';
+import {
+  COMMON_CURRENCIES,
+  COMMON_TIMEZONES,
+  COUNTRY_OPTIONS,
+  getCountryPreference,
+} from '@/lib/constants/regional';
 
 type SettingsSection =
   | 'profile'
@@ -225,7 +232,7 @@ export default function SettingsPage() {
 // Profile Section
 function ProfileSection({ onDirty }: { onDirty: () => void }) {
   const { user } = useAuth();
-  const { profile: userProfile, loading, updateProfile } = useUser();
+  const { profile: userProfile, updateProfile, updatePreferences } = useUser();
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   
@@ -235,6 +242,9 @@ function ProfileSection({ onDirty }: { onDirty: () => void }) {
     phone: '',
     location: '',
     bio: '',
+    country: 'US',
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    currency: 'USD',
   });
 
   // Initialize form from user data
@@ -245,12 +255,16 @@ function ProfileSection({ onDirty }: { onDirty: () => void }) {
   // Initialize form with user data
   useEffect(() => {
     if (userProfile) {
+      const preferredCountry = getCountryPreference(userProfile.preferences?.country);
       setFormData({
         name: userProfile.displayName || '',
         gender: userProfile.gender || 'prefer-not-to-say',
         phone: userProfile.phone || '',
         location: userProfile.location || '',
         bio: userProfile.bio || '',
+        country: preferredCountry.code,
+        timezone: userProfile.preferences?.timezone || preferredCountry.timezone,
+        currency: userProfile.preferences?.currency || preferredCountry.currency,
       });
     }
   }, [userProfile]);
@@ -260,18 +274,36 @@ function ProfileSection({ onDirty }: { onDirty: () => void }) {
     onDirty();
   };
 
+  const handleCountryChange = (countryCode: string) => {
+    const country = getCountryPreference(countryCode);
+    setFormData(prev => ({
+      ...prev,
+      country: country.code,
+      timezone: country.timezone,
+      currency: country.currency,
+    }));
+    onDirty();
+  };
+
   const handleSave = async () => {
     if (!user) return;
     setSaving(true);
     setSaveMessage(null);
     try {
-      await updateProfile({ 
-        displayName: formData.name || displayName,
-        gender: formData.gender,
-        phone: formData.phone,
-        location: formData.location,
-        bio: formData.bio,
-      });
+      await Promise.all([
+        updateProfile({
+          displayName: formData.name || displayName,
+          gender: formData.gender,
+          phone: formData.phone,
+          location: formData.location,
+          bio: formData.bio,
+        }),
+        updatePreferences({
+          country: formData.country,
+          timezone: formData.timezone,
+          currency: formData.currency,
+        }),
+      ]);
       setSaveMessage('Profile saved successfully!');
       setTimeout(() => setSaveMessage(null), 3000);
     } catch (error) {
@@ -341,6 +373,51 @@ function ProfileSection({ onDirty }: { onDirty: () => void }) {
             <p className="text-xs text-dark-500 mt-1">
               Period tracker is available in Wellness when Female is selected.
             </p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-dark-300 mb-2">Country</label>
+            <select
+              value={formData.country}
+              onChange={e => handleCountryChange(e.target.value)}
+              className="w-full bg-dark-800 border border-dark-700 rounded-lg px-3 py-2 text-white focus:border-neon-cyan outline-none"
+            >
+              {COUNTRY_OPTIONS.map(option => (
+                <option key={option.code} value={option.code}>
+                  {option.name}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-dark-500 mt-1">
+              Used for timezone defaults, local holidays, and regional insights.
+            </p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-dark-300 mb-2">Timezone</label>
+            <select
+              value={formData.timezone}
+              onChange={e => handleChange('timezone', e.target.value)}
+              className="w-full bg-dark-800 border border-dark-700 rounded-lg px-3 py-2 text-white focus:border-neon-cyan outline-none"
+            >
+              {COMMON_TIMEZONES.map(timezone => (
+                <option key={timezone} value={timezone}>
+                  {timezone}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-dark-300 mb-2">Currency</label>
+            <select
+              value={formData.currency}
+              onChange={e => handleChange('currency', e.target.value)}
+              className="w-full bg-dark-800 border border-dark-700 rounded-lg px-3 py-2 text-white focus:border-neon-cyan outline-none"
+            >
+              {COMMON_CURRENCIES.map(currencyCode => (
+                <option key={currencyCode} value={currencyCode}>
+                  {currencyCode}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="flex items-center justify-between pt-2">
             {saveMessage && (
@@ -1119,7 +1196,9 @@ function IntegrationsSection() {
     integrations,
     loading,
     isGoogleCalendarConnected,
+    isAppleCalendarConnected,
     connectGoogleCalendar,
+    connectAppleCalendar,
     disconnect,
   } = useIntegrations();
   
@@ -1131,9 +1210,18 @@ function IntegrationsSection() {
       key: 'googleCalendar' as const,
       icon: Calendar, 
       connected: isGoogleCalendarConnected, 
-      description: 'Sync your events with Nexora',
+      description: 'Add-only sync for sending Nexora events to Google Calendar',
       details: integrations.googleCalendar?.email,
       onConnect: connectGoogleCalendar,
+    },
+    {
+      name: 'Apple Calendar',
+      key: 'appleCalendar' as const,
+      icon: Apple,
+      connected: isAppleCalendarConnected,
+      description: 'Add-only sync for exporting Nexora events to Apple Calendar',
+      details: integrations.appleCalendar?.accountLabel,
+      onConnect: connectAppleCalendar,
     },
   ];
 

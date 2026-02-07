@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
   Plus,
   ChevronLeft,
@@ -10,7 +10,6 @@ import {
   CalendarDays,
   Clock,
   MapPin,
-  Users,
   Brain,
   Sparkles,
   Loader2,
@@ -18,7 +17,8 @@ import {
   List,
   Trash2,
   Edit3,
-  X,
+  ArrowUpRight,
+  BellRing,
 } from 'lucide-react';
 import { MainLayout, PageContainer } from '@/components/layout/MainLayout';
 import { Card } from '@/components/ui/Card';
@@ -31,31 +31,112 @@ import { useUIStore } from '@/stores/uiStore';
 import { cn, formatTime } from '@/lib/utils';
 import { useCalendar, useEventsInRange } from '@/hooks/useCalendar';
 import { useAuth } from '@/hooks/useAuth';
+import { useTasks } from '@/hooks/useTasks';
+import { useGoals } from '@/hooks/useGoals';
+import { useUpcomingExams } from '@/hooks/useStudy';
+import { useRecentWellness } from '@/hooks/useWellness';
+import { useUser } from '@/hooks/useUser';
+import { getCountryHolidaysInRange, supportsLocalHolidays, type HolidayItem } from '@/lib/holidays';
+import { createNotification } from '@/lib/services/notifications';
+import { downloadAppleCalendarEvent, getGoogleCalendarAddLink } from '@/lib/externalCalendar';
 import type { CalendarEvent, EventCategory } from '@/types';
 
-const categoryOptions: { label: string; value: EventCategory; color: string }[] = [
-  { label: 'Work', value: 'work', color: 'bg-neon-cyan' },
-  { label: 'Personal', value: 'personal', color: 'bg-neon-purple' },
-  { label: 'Health', value: 'health', color: 'bg-neon-green' },
-  { label: 'Social', value: 'social', color: 'bg-neon-orange' },
-  { label: 'Learning', value: 'learning', color: 'bg-neon-pink' },
-  { label: 'Rest', value: 'rest', color: 'bg-blue-500' },
-  { label: 'Other', value: 'other', color: 'bg-gray-500' },
+const categoryOptions: { label: string; value: EventCategory; color: string; hex: string }[] = [
+  { label: 'Work', value: 'work', color: 'bg-neon-cyan', hex: '#06b6d4' },
+  { label: 'Personal', value: 'personal', color: 'bg-neon-purple', hex: '#a855f7' },
+  { label: 'Health', value: 'health', color: 'bg-neon-green', hex: '#22c55e' },
+  { label: 'Social', value: 'social', color: 'bg-neon-orange', hex: '#f97316' },
+  { label: 'Learning', value: 'learning', color: 'bg-neon-pink', hex: '#ec4899' },
+  { label: 'Rest', value: 'rest', color: 'bg-blue-500', hex: '#3b82f6' },
+  { label: 'Other', value: 'other', color: 'bg-gray-500', hex: '#6b7280' },
 ];
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
+type LinkedItemType = 'task' | 'goal' | 'exam' | 'period' | 'holiday';
+
+interface LinkedDateItem {
+  id: string;
+  title: string;
+  date: Date;
+  type: LinkedItemType;
+  actionUrl: string;
+  subtitle?: string;
+}
+
+const getDateKey = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const getPredictedPeriodStarts = (entries: Array<{ date: Date; period?: { isPeriodDay?: boolean; cycleLength?: number } }>): Date[] => {
+  const periodEntries = entries
+    .filter(entry => entry.period?.isPeriodDay)
+    .map(entry => new Date(entry.date))
+    .sort((a, b) => a.getTime() - b.getTime());
+
+  if (periodEntries.length === 0) return [];
+
+  const cycleStarts: Date[] = [];
+  for (const currentDate of periodEntries) {
+    const previousDate = cycleStarts[cycleStarts.length - 1];
+    if (!previousDate) {
+      cycleStarts.push(currentDate);
+      continue;
+    }
+    const diffDays = Math.round((currentDate.getTime() - previousDate.getTime()) / MS_PER_DAY);
+    if (diffDays > 2) {
+      cycleStarts.push(currentDate);
+    }
+  }
+
+  if (cycleStarts.length === 0) return [];
+
+  const cycleLengths: number[] = [];
+  for (let index = 1; index < cycleStarts.length; index += 1) {
+    const diffDays = Math.round((cycleStarts[index].getTime() - cycleStarts[index - 1].getTime()) / MS_PER_DAY);
+    if (diffDays >= 18 && diffDays <= 45) {
+      cycleLengths.push(diffDays);
+    }
+  }
+
+  const avgCycleLength =
+    cycleLengths.length > 0
+      ? Math.round(cycleLengths.reduce((sum, value) => sum + value, 0) / cycleLengths.length)
+      : 28;
+
+  const predictions: Date[] = [];
+  const lastStart = new Date(cycleStarts[cycleStarts.length - 1]);
+  const cursor = new Date(lastStart);
+
+  for (let count = 0; count < 4; count += 1) {
+    cursor.setDate(cursor.getDate() + avgCycleLength);
+    predictions.push(new Date(cursor));
+  }
+
+  return predictions;
+};
 
 export default function CalendarPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
+  const { profile } = useUser();
+  const { tasks, loading: tasksLoading } = useTasks();
+  const { goals, loading: goalsLoading } = useGoals();
+  const { exams: upcomingExams, loading: examsLoading } = useUpcomingExams();
+  const { entries: recentWellnessEntries, loading: wellnessLoading } = useRecentWellness(90);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [viewMode, setViewMode] = useState<'month' | 'week'>('month');
+  const reminderCacheRef = useRef<Set<string>>(new Set());
   
   // Get the start and end of the current month for fetching events
   const monthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-  const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+  const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59, 999);
   
   const { events, loading } = useEventsInRange(monthStart, monthEnd);
   const { createEvent, updateEvent, deleteEvent } = useCalendar();
@@ -78,6 +159,90 @@ export default function CalendarPage() {
     category: 'work' as EventCategory,
     allDay: false,
   });
+
+  const countryCode = profile?.preferences?.country || 'US';
+  const holidays = useMemo<HolidayItem[]>(() => {
+    return getCountryHolidaysInRange(countryCode, monthStart, monthEnd);
+  }, [countryCode, monthStart.getTime(), monthEnd.getTime()]);
+
+  const periodPredictions = useMemo(() => {
+    const starts = getPredictedPeriodStarts(recentWellnessEntries);
+    return starts.filter(date => date >= monthStart && date <= monthEnd);
+  }, [recentWellnessEntries, monthStart.getTime(), monthEnd.getTime()]);
+
+  const linkedDateItems = useMemo<LinkedDateItem[]>(() => {
+    const taskItems: LinkedDateItem[] = tasks
+      .filter(task => task.dueDate && task.status !== 'completed')
+      .map(task => ({
+        id: `task_${task.id}`,
+        title: task.title,
+        date: new Date(task.dueDate as Date),
+        type: 'task',
+        actionUrl: `/tasks?id=${task.id}`,
+        subtitle: 'Task deadline',
+      }))
+      .filter(item => item.date >= monthStart && item.date <= monthEnd);
+
+    const goalItems: LinkedDateItem[] = goals
+      .filter(goal => goal.targetDate && goal.status !== 'completed')
+      .map(goal => ({
+        id: `goal_${goal.id}`,
+        title: goal.title,
+        date: new Date(goal.targetDate as Date),
+        type: 'goal',
+        actionUrl: '/goals',
+        subtitle: 'Goal target date',
+      }))
+      .filter(item => item.date >= monthStart && item.date <= monthEnd);
+
+    const examItems: LinkedDateItem[] = upcomingExams
+      .map(exam => ({
+        id: `exam_${exam.id}`,
+        title: exam.name,
+        date: new Date(exam.date),
+        type: 'exam',
+        actionUrl: '/study',
+        subtitle: exam.subjectName ? `Exam • ${exam.subjectName}` : 'Exam',
+      }))
+      .filter(item => item.date >= monthStart && item.date <= monthEnd);
+
+    const periodItems: LinkedDateItem[] = periodPredictions.map((date, index) => ({
+      id: `period_${getDateKey(date)}_${index}`,
+      title: 'Predicted period start',
+      date,
+      type: 'period',
+      actionUrl: '/wellness',
+      subtitle: 'Cycle insight',
+    }));
+
+    const holidayItems: LinkedDateItem[] = holidays.map(holiday => ({
+      id: holiday.id,
+      title: holiday.name,
+      date: holiday.date,
+      type: 'holiday',
+      actionUrl: '/calendar',
+      subtitle: 'Local holiday',
+    }));
+
+    return [...taskItems, ...goalItems, ...examItems, ...periodItems, ...holidayItems].sort(
+      (a, b) => a.date.getTime() - b.date.getTime()
+    );
+  }, [tasks, goals, upcomingExams, periodPredictions, holidays, monthStart.getTime(), monthEnd.getTime()]);
+
+  const upcomingLinkedCount = useMemo(() => {
+    const now = Date.now();
+    const next24Hours = now + 24 * 60 * 60 * 1000;
+    const eventCount = events.filter(event => {
+      const timestamp = new Date(event.startTime).getTime();
+      return timestamp > now && timestamp <= next24Hours;
+    }).length;
+    const linkedCount = linkedDateItems.filter(item => {
+      if (item.type === 'holiday') return false;
+      const timestamp = item.date.getTime();
+      return timestamp > now && timestamp <= next24Hours;
+    }).length;
+    return eventCount + linkedCount;
+  }, [events, linkedDateItems]);
 
   // Generate calendar days
   const calendarDays = useMemo(() => {
@@ -113,8 +278,39 @@ export default function CalendarPage() {
     });
   };
 
+  const getLinkedItemsForDay = (date: Date) => {
+    const dayKey = getDateKey(date);
+    return linkedDateItems.filter(item => getDateKey(item.date) === dayKey);
+  };
+
   // Get events for selected date
   const selectedDateEvents = selectedDate ? getEventsForDay(selectedDate) : [];
+  const selectedDateLinkedItems = selectedDate ? getLinkedItemsForDay(selectedDate) : [];
+
+  const handleAddToGoogle = (event: CalendarEvent) => {
+    const url = getGoogleCalendarAddLink({
+      id: event.id,
+      title: event.title,
+      description: event.description,
+      location: event.location,
+      startTime: new Date(event.startTime),
+      endTime: new Date(event.endTime),
+      allDay: event.allDay,
+    });
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleAddToApple = (event: CalendarEvent) => {
+    downloadAppleCalendarEvent({
+      id: event.id,
+      title: event.title,
+      description: event.description,
+      location: event.location,
+      startTime: new Date(event.startTime),
+      endTime: new Date(event.endTime),
+      allDay: event.allDay,
+    });
+  };
 
   // Navigate months
   const goToPreviousMonth = () => {
@@ -129,6 +325,81 @@ export default function CalendarPage() {
     setCurrentDate(new Date());
     setSelectedDate(new Date());
   };
+
+  useEffect(() => {
+    if (!user) return;
+    if (profile?.preferences?.notifications?.calendarAlerts === false) return;
+
+    const now = Date.now();
+    const next24Hours = now + 24 * 60 * 60 * 1000;
+
+    const reminderCandidates: Array<{
+      key: string;
+      title: string;
+      body: string;
+      actionUrl: string;
+      timestamp: number;
+    }> = [
+      ...events.map(event => ({
+        key: `event_${event.id}_${getDateKey(new Date(event.startTime))}`,
+        title: 'Upcoming event reminder',
+        body: `"${event.title}" starts within 24 hours.`,
+        actionUrl: `/calendar?id=${event.id}`,
+        timestamp: new Date(event.startTime).getTime(),
+      })),
+      ...linkedDateItems
+        .filter(item => item.type !== 'holiday')
+        .map(item => ({
+          key: `${item.type}_${item.id}_${getDateKey(item.date)}`,
+          title: 'Date-linked reminder',
+          body: `"${item.title}" is coming up within 24 hours.`,
+          actionUrl: item.actionUrl,
+          timestamp: item.date.getTime(),
+        })),
+    ]
+      .filter(item => item.timestamp > now && item.timestamp <= next24Hours)
+      .sort((a, b) => a.timestamp - b.timestamp)
+      .slice(0, 8);
+
+    if (reminderCandidates.length === 0) return;
+
+    const savedRemindersRaw = localStorage.getItem('nexora-reminder-cache');
+    let savedReminders: Record<string, number> = {};
+    if (savedRemindersRaw) {
+      try {
+        savedReminders = JSON.parse(savedRemindersRaw) as Record<string, number>;
+      } catch {
+        savedReminders = {};
+      }
+    }
+    const nextReminderCache = { ...savedReminders };
+    const operations: Promise<unknown>[] = [];
+
+    reminderCandidates.forEach(candidate => {
+      if (reminderCacheRef.current.has(candidate.key) || nextReminderCache[candidate.key]) {
+        return;
+      }
+
+      reminderCacheRef.current.add(candidate.key);
+      nextReminderCache[candidate.key] = Date.now();
+      operations.push(
+        createNotification(user.uid, {
+          type: 'calendar',
+          title: candidate.title,
+          body: candidate.body,
+          actionUrl: candidate.actionUrl,
+          data: { reminderKey: candidate.key },
+        })
+      );
+    });
+
+    if (operations.length === 0) return;
+
+    localStorage.setItem('nexora-reminder-cache', JSON.stringify(nextReminderCache));
+    void Promise.all(operations).catch(error => {
+      console.error('Failed to create date reminders:', error);
+    });
+  }, [user, profile?.preferences?.notifications?.calendarAlerts, events, linkedDateItems]);
 
   // Create event
   const handleCreateEvent = async () => {
@@ -254,6 +525,10 @@ export default function CalendarPage() {
     return categoryOptions.find(c => c.value === category)?.color || 'bg-gray-500';
   };
 
+  const getCategoryHex = (category: EventCategory) => {
+    return categoryOptions.find(c => c.value === category)?.hex || '#6b7280';
+  };
+
   // Show loading state
   if (authLoading || loading) {
     return (
@@ -318,6 +593,11 @@ export default function CalendarPage() {
             <Button variant="outline" size="sm" onClick={goToToday}>
               Today
             </Button>
+            <Badge variant={supportsLocalHolidays(countryCode) ? 'green' : 'default'} size="sm">
+              {supportsLocalHolidays(countryCode)
+                ? `${countryCode} holidays on`
+                : `${countryCode} holidays unavailable`}
+            </Badge>
           </div>
 
           <div className="flex items-center gap-3">
@@ -349,7 +629,12 @@ export default function CalendarPage() {
         </motion.div>
 
         {/* Main Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div
+          className={cn(
+            'grid grid-cols-1 lg:grid-cols-4 gap-6 transition-opacity duration-300',
+            (tasksLoading || goalsLoading || examsLoading || wellnessLoading) && 'opacity-90'
+          )}
+        >
           {/* Calendar Grid */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -377,6 +662,9 @@ export default function CalendarPage() {
                   const isToday = date.toDateString() === new Date().toDateString();
                   const isSelected = selectedDate?.toDateString() === date.toDateString();
                   const dayEvents = getEventsForDay(date);
+                  const dayLinkedItems = getLinkedItemsForDay(date);
+                  const holidayForDay = dayLinkedItems.find(item => item.type === 'holiday');
+                  const linkedCount = dayLinkedItems.filter(item => item.type !== 'holiday').length;
                   
                   return (
                     <button
@@ -395,8 +683,13 @@ export default function CalendarPage() {
                       )}>
                         {date.getDate()}
                       </div>
+                      {holidayForDay && (
+                        <div className="text-[10px] px-1 py-0.5 rounded bg-neon-orange/20 text-neon-orange truncate mb-0.5">
+                          {holidayForDay.title}
+                        </div>
+                      )}
                       <div className="space-y-0.5">
-                        {dayEvents.slice(0, 3).map(event => (
+                        {dayEvents.slice(0, 2).map(event => (
                           <div
                             key={event.id}
                             className={cn(
@@ -407,9 +700,9 @@ export default function CalendarPage() {
                             {event.title}
                           </div>
                         ))}
-                        {dayEvents.length > 3 && (
+                        {(dayEvents.length > 2 || linkedCount > 0) && (
                           <div className="text-[10px] text-dark-400 px-1">
-                            +{dayEvents.length - 3} more
+                            +{Math.max(0, dayEvents.length - 2) + linkedCount} linked
                           </div>
                         )}
                       </div>
@@ -436,67 +729,127 @@ export default function CalendarPage() {
               </h3>
               
               {selectedDate && (
-                <div className="space-y-3">
-                  {selectedDateEvents.length > 0 ? (
-                    selectedDateEvents.map(event => (
-                      <div
-                        key={event.id}
-                        className="p-3 rounded-lg bg-dark-800/50 border-l-2 group"
-                        style={{ borderColor: getCategoryColor(event.category).replace('bg-', '#') }}
-                      >
-                        <div className="flex items-start justify-between mb-1">
-                          <h4 className="font-medium text-white text-sm flex-1">{event.title}</h4>
-                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                              onClick={() => handleEditEvent(event)}
-                              className="p-1 hover:bg-dark-700 rounded text-dark-400 hover:text-neon-cyan"
-                            >
-                              <Edit3 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteEvent(event.id)}
-                              className="p-1 hover:bg-dark-700 rounded text-dark-400 hover:text-status-error"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-dark-500 mb-2">Events</p>
+                    {selectedDateEvents.length > 0 ? (
+                      <div className="space-y-3">
+                        {selectedDateEvents.map(event => (
+                          <div
+                            key={event.id}
+                            className="p-3 rounded-lg bg-dark-800/50 border-l-2 group"
+                            style={{ borderColor: getCategoryHex(event.category) }}
+                          >
+                            <div className="flex items-start justify-between mb-1">
+                              <h4 className="font-medium text-white text-sm flex-1">{event.title}</h4>
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  onClick={() => handleEditEvent(event)}
+                                  className="p-1 hover:bg-dark-700 rounded text-dark-400 hover:text-neon-cyan"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteEvent(event.id)}
+                                  className="p-1 hover:bg-dark-700 rounded text-dark-400 hover:text-status-error"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                            <Badge variant="default" size="sm" className="mb-1">{event.category}</Badge>
+                            {!event.allDay && (
+                              <div className="flex items-center gap-1 text-xs text-dark-400">
+                                <Clock className="w-3 h-3" />
+                                {formatTime(new Date(event.startTime))} - {formatTime(new Date(event.endTime))}
+                              </div>
+                            )}
+                            {event.location && (
+                              <div className="flex items-center gap-1 text-xs text-dark-400 mt-1">
+                                <MapPin className="w-3 h-3" />
+                                {event.location}
+                              </div>
+                            )}
+                            <div className="flex gap-2 mt-2">
+                              <button
+                                onClick={() => handleAddToGoogle(event)}
+                                className="text-[10px] px-2 py-1 rounded-md bg-dark-700/60 text-dark-300 hover:text-white transition-colors"
+                              >
+                                Add to Google
+                              </button>
+                              <button
+                                onClick={() => handleAddToApple(event)}
+                                className="text-[10px] px-2 py-1 rounded-md bg-dark-700/60 text-dark-300 hover:text-white transition-colors"
+                              >
+                                Add to Apple
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                        <Badge variant="default" size="sm" className="mb-1">{event.category}</Badge>
-                        {!event.allDay && (
-                          <div className="flex items-center gap-1 text-xs text-dark-400">
-                            <Clock className="w-3 h-3" />
-                            {formatTime(new Date(event.startTime))} - {formatTime(new Date(event.endTime))}
-                          </div>
-                        )}
-                        {event.location && (
-                          <div className="flex items-center gap-1 text-xs text-dark-400 mt-1">
-                            <MapPin className="w-3 h-3" />
-                            {event.location}
-                          </div>
-                        )}
+                        ))}
                       </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-6 text-dark-500">
-                      <CalendarDays className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                      <p className="text-sm">No events</p>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="mt-2"
-                        onClick={() => {
-                          setNewEvent(prev => ({
-                            ...prev,
-                            date: selectedDate.toISOString().split('T')[0]
-                          }));
-                          setIsCreateModalOpen(true);
-                        }}
-                      >
-                        <Plus className="w-3 h-3 mr-1" />
-                        Add Event
-                      </Button>
-                    </div>
-                  )}
+                    ) : (
+                      <div className="text-center py-4 text-dark-500 rounded-lg bg-dark-800/20">
+                        <CalendarDays className="w-7 h-7 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">No events</p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-2"
+                          onClick={() => {
+                            setNewEvent(prev => ({
+                              ...prev,
+                              date: selectedDate.toISOString().split('T')[0]
+                            }));
+                            setIsCreateModalOpen(true);
+                          }}
+                        >
+                          <Plus className="w-3 h-3 mr-1" />
+                          Add Event
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-dark-500 mb-2">Linked Timeline</p>
+                    {selectedDateLinkedItems.length > 0 ? (
+                      <div className="space-y-2">
+                        {selectedDateLinkedItems.map(item => (
+                          <a
+                            key={item.id}
+                            href={item.actionUrl}
+                            className="flex items-start justify-between gap-2 p-2.5 rounded-lg bg-dark-800/30 hover:bg-dark-700/30 transition-colors"
+                          >
+                            <div>
+                              <p className="text-sm text-white">{item.title}</p>
+                              <p className="text-xs text-dark-400">{item.subtitle || item.type}</p>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <Badge
+                                variant={
+                                  item.type === 'task'
+                                    ? 'orange'
+                                    : item.type === 'goal'
+                                    ? 'cyan'
+                                    : item.type === 'exam'
+                                    ? 'purple'
+                                    : item.type === 'period'
+                                    ? 'pink'
+                                    : 'green'
+                                }
+                                size="sm"
+                              >
+                                {item.type}
+                              </Badge>
+                              <ArrowUpRight className="w-3 h-3 text-dark-500" />
+                            </div>
+                          </a>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-dark-500">No linked deadlines, exams, cycle insights, or holidays.</p>
+                    )}
+                  </div>
                 </div>
               )}
             </Card>
@@ -529,6 +882,19 @@ export default function CalendarPage() {
                   <span className="text-dark-400">Total Events</span>
                   <span className="text-white font-medium">{events.length}</span>
                 </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-dark-400">Date-linked items</span>
+                  <span className="text-white font-medium">
+                    {linkedDateItems.filter(item => item.type !== 'holiday').length}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-dark-400 inline-flex items-center gap-1">
+                    <BellRing className="w-3.5 h-3.5 text-neon-orange" />
+                    Upcoming reminders (24h)
+                  </span>
+                  <span className="text-white font-medium">{upcomingLinkedCount}</span>
+                </div>
                 {categoryOptions.slice(0, 4).map(cat => {
                   const count = events.filter(e => e.category === cat.value).length;
                   return (
@@ -538,6 +904,9 @@ export default function CalendarPage() {
                     </div>
                   );
                 })}
+                {(tasksLoading || goalsLoading || examsLoading || wellnessLoading) && (
+                  <p className="text-[11px] text-dark-500 pt-1">Syncing linked dates...</p>
+                )}
               </div>
             </Card>
           </motion.div>

@@ -7,6 +7,9 @@ import { useHabits } from './useHabits';
 import { useCalendar } from './useCalendar';
 import { useGoals } from './useGoals';
 import { useTransactions } from './useFinance';
+import { useUser } from './useUser';
+import { useStudy } from './useStudy';
+import { useRecentWellness } from './useWellness';
 import {
   subscribeToConversations,
   subscribeToConversation,
@@ -78,12 +81,14 @@ export function useAIConversations() {
 }
 
 export function useAIChat(conversationId: string | null) {
-  const { user } = useAuth();
   const { tasks } = useTasks();
   const { habits } = useHabits();
   const { events } = useCalendar();
   const { goals } = useGoals();
   const { transactions } = useTransactions();
+  const { profile } = useUser();
+  const { subjects } = useStudy();
+  const { entries: wellnessEntries } = useRecentWellness(21);
   
   const [conversation, setConversation] = useState<AIConversationWithMessages | null>(null);
   const [loading, setLoading] = useState(true);
@@ -123,6 +128,9 @@ export function useAIChat(conversationId: string | null) {
         events,
         goals,
         transactions,
+        profile,
+        subjects,
+        wellness: wellnessEntries,
       };
       
       const aiResponse = await generateAIResponse(content, context);
@@ -138,7 +146,7 @@ export function useAIChat(conversationId: string | null) {
     } finally {
       setSending(false);
     }
-  }, [conversationId, sending, tasks, habits, events, goals, transactions]);
+  }, [conversationId, sending, tasks, habits, events, goals, transactions, profile, subjects, wellnessEntries]);
 
   return {
     conversation,
@@ -156,6 +164,9 @@ export function useSimpleAI() {
   const { events } = useCalendar();
   const { goals } = useGoals();
   const { transactions } = useTransactions();
+  const { profile } = useUser();
+  const { subjects } = useStudy();
+  const { entries: wellnessEntries } = useRecentWellness(21);
   
   const [messages, setMessages] = useState<AIMessage[]>([
     {
@@ -191,6 +202,9 @@ export function useSimpleAI() {
         events,
         goals,
         transactions,
+        profile,
+        subjects,
+        wellness: wellnessEntries,
       };
       
       // Build conversation history for context
@@ -223,7 +237,7 @@ export function useSimpleAI() {
     } finally {
       setIsThinking(false);
     }
-  }, [isThinking, tasks, habits, events, goals, transactions, messages]);
+  }, [isThinking, tasks, habits, events, goals, transactions, profile, subjects, wellnessEntries, messages]);
 
   const regenerateLastResponse = useCallback(async () => {
     if (!lastUserMessage || isThinking) return;
@@ -246,6 +260,9 @@ export function useSimpleAI() {
         events,
         goals,
         transactions,
+        profile,
+        subjects,
+        wellness: wellnessEntries,
       };
       
       const aiResponse = await generateAIResponse(lastUserMessage, context);
@@ -271,7 +288,7 @@ export function useSimpleAI() {
     } finally {
       setIsThinking(false);
     }
-  }, [isThinking, lastUserMessage, tasks, habits, events, goals, transactions]);
+  }, [isThinking, lastUserMessage, tasks, habits, events, goals, transactions, profile, subjects, wellnessEntries]);
 
   const clearMessages = useCallback(() => {
     setMessages([

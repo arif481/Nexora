@@ -10,6 +10,7 @@ import {
 } from 'firebase/firestore';
 import { db, COLLECTIONS } from '../firebase';
 import type { User, UserPreferences, UserStats, GenderIdentity } from '@/types';
+import { DEFAULT_COUNTRY_CODE, getCountryPreference } from '@/lib/constants/regional';
 
 // Convert Firestore timestamp to Date
 const convertTimestamp = (timestamp: Timestamp | Date | null | undefined): Date => {
@@ -21,11 +22,17 @@ const convertTimestamp = (timestamp: Timestamp | Date | null | undefined): Date 
 };
 
 // Default user preferences
+const detectedRegion = Intl.DateTimeFormat().resolvedOptions().locale.split('-')[1]?.toUpperCase();
+const detectedCountry = getCountryPreference(detectedRegion || DEFAULT_COUNTRY_CODE);
+const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || detectedCountry.timezone;
+
 const defaultPreferences: UserPreferences = {
   theme: 'dark',
   accentColor: '#06b6d4',
   language: 'en',
-  timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  timezone: detectedTimezone,
+  country: detectedCountry.code,
+  currency: detectedCountry.currency,
   notifications: {
     enabled: true,
     sound: true,
@@ -47,6 +54,25 @@ const defaultPreferences: UserPreferences = {
     verbosity: 'balanced',
     proactivity: 'medium',
   },
+};
+
+const mergePreferences = (preferences?: Partial<UserPreferences>): UserPreferences => {
+  return {
+    ...defaultPreferences,
+    ...(preferences || {}),
+    notifications: {
+      ...defaultPreferences.notifications,
+      ...(preferences?.notifications || {}),
+    },
+    privacy: {
+      ...defaultPreferences.privacy,
+      ...(preferences?.privacy || {}),
+    },
+    aiPersonality: {
+      ...defaultPreferences.aiPersonality,
+      ...(preferences?.aiPersonality || {}),
+    },
+  };
 };
 
 // Default user stats
@@ -74,7 +100,7 @@ const convertUserFromFirestore = (doc: any): User => {
     bio: data.bio,
     createdAt: convertTimestamp(data.createdAt),
     lastLoginAt: convertTimestamp(data.lastLoginAt),
-    preferences: data.preferences || defaultPreferences,
+    preferences: mergePreferences(data.preferences),
     stats: data.stats || defaultStats,
   };
 };
@@ -157,10 +183,10 @@ export const updateUserPreferences = async (
     throw new Error('User not found');
   }
 
-  const currentPreferences = userDoc.data().preferences || defaultPreferences;
+  const currentPreferences = mergePreferences(userDoc.data().preferences);
   
   await updateDoc(userRef, {
-    preferences: { ...currentPreferences, ...preferences },
+    preferences: mergePreferences({ ...currentPreferences, ...preferences }),
   });
 };
 

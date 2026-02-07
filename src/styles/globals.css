@@ -438,6 +438,15 @@
   .backdrop-saturate-200 {
     backdrop-filter: saturate(2);
   }
+
+  .data-fade {
+    transition: opacity 220ms ease, transform 220ms ease;
+  }
+
+  .data-fade-loading {
+    opacity: 0.68;
+    transform: translateY(2px);
+  }
 }
 
 /* ===== Animations ===== */
@@ -756,6 +765,14 @@ html.light .hover\:border-neon-cyan\/30:hover {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+html.reduce-motion *,
+html.reduce-motion *::before,
+html.reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
 }
 
 /* ===== Print Styles ===== */

@@ -207,6 +207,23 @@ export default function WellnessPage() {
     return getPeriodCycleInsights(recentEntries);
   }, [recentEntries, showPeriodTracker]);
 
+  const cyclePhase = useMemo(() => {
+    if (!showPeriodTracker || !periodInsights?.lastStart) return null;
+    if (entry?.period?.isPeriodDay) return 'period';
+
+    const cycleLength = Math.max(18, periodInsights.avgCycleLength || 28);
+    const daysSinceLastStart = Math.max(
+      0,
+      Math.round((selectedDate.getTime() - periodInsights.lastStart.getTime()) / MS_PER_DAY)
+    );
+    const cycleDay = ((daysSinceLastStart % cycleLength) + cycleLength) % cycleLength;
+
+    if (cycleDay <= 4) return 'period';
+    if (cycleDay <= 13) return 'follicular';
+    if (cycleDay <= 16) return 'ovulation';
+    return 'luteal';
+  }, [showPeriodTracker, periodInsights, entry?.period?.isPeriodDay, selectedDate]);
+
   const periodSuggestions = useMemo(() => {
     if (!showPeriodTracker) return [];
     const periodData = entry?.period;
@@ -245,6 +262,13 @@ export default function WellnessPage() {
 
     return suggestions.slice(0, 3);
   }, [showPeriodTracker, entry?.period]);
+
+  const cyclePhases = [
+    { id: 'period', label: 'Period', emoji: '🌸', range: 'Day 1-5' },
+    { id: 'follicular', label: 'Follicular', emoji: '✨', range: 'Day 6-13' },
+    { id: 'ovulation', label: 'Ovulation', emoji: '🌼', range: 'Day 14-16' },
+    { id: 'luteal', label: 'Luteal', emoji: '🫶', range: 'Day 17+' },
+  ] as const;
 
   // Loading state
   if (loading) {
@@ -292,6 +316,10 @@ export default function WellnessPage() {
   return (
     <MainLayout>
       <PageContainer title="Wellness" subtitle="Track your health and well-being">
+        <div className="relative">
+          {showPeriodTracker && (
+            <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_right,rgba(236,72,153,0.12),transparent_45%),radial-gradient(circle_at_bottom_left,rgba(168,85,247,0.10),transparent_40%)]" />
+          )}
         {/* Date Navigation */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
@@ -657,6 +685,33 @@ export default function WellnessPage() {
                     </div>
                   )}
 
+                  <div className="p-3 rounded-lg bg-neon-pink/10 border border-neon-pink/30">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm text-neon-pink font-medium">Cute P Cycle</p>
+                      <Badge variant="pink" size="sm">
+                        {cyclePhase || 'tracking'}
+                      </Badge>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {cyclePhases.map(phase => (
+                        <div
+                          key={phase.id}
+                          className={cn(
+                            'rounded-lg px-2 py-1.5 text-xs border transition-colors',
+                            cyclePhase === phase.id
+                              ? 'border-neon-pink/60 bg-neon-pink/20 text-neon-pink'
+                              : 'border-dark-700/60 bg-dark-800/30 text-dark-300'
+                          )}
+                        >
+                          <p>
+                            {phase.emoji} {phase.label}
+                          </p>
+                          <p className="text-[10px] text-dark-400">{phase.range}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
                   <div>
                     <p className="text-sm text-dark-300 mb-2">Comfort Suggestions</p>
                     <div className="space-y-2">
@@ -889,6 +944,7 @@ export default function WellnessPage() {
             }}
           />
         </Modal>
+        </div>
       </PageContainer>
     </MainLayout>
   );

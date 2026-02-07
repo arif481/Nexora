@@ -37,6 +37,7 @@ interface UseTransactionsReturn {
 
 interface CreateTransactionData {
   amount: number;
+  currency?: string;
   type: 'income' | 'expense';
   category: string;
   description?: string;
@@ -274,6 +275,7 @@ interface UseSubscriptionsReturn {
 interface CreateSubscriptionData {
   name: string;
   amount: number;
+  currency?: string;
   billingCycle: 'weekly' | 'monthly' | 'quarterly' | 'yearly';
   nextBillingDate?: Date;
   category?: string;

@@ -62,6 +62,32 @@ export function MainLayout({ children }: MainLayoutProps) {
             </ErrorBoundary>
           </motion.div>
         </div>
+
+        {!focusModeActive && (
+          <footer className="px-4 lg:px-6 pb-20 lg:pb-4">
+            <div className="border-t border-dark-800/60 pt-3 text-[11px] text-dark-500 flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span>created by arif</span>
+              <span>•</span>
+              <a
+                href="https://github.com/arif481"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-neon-cyan transition-colors"
+              >
+                github/arif481
+              </a>
+              <span>•</span>
+              <a
+                href="https://iamarif.me/portfolio"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-neon-cyan transition-colors"
+              >
+                portfolio
+              </a>
+            </div>
+          </footer>
+        )}
       </motion.main>
 
       {/* Mobile Bottom Navigation */}

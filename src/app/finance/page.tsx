@@ -51,6 +51,7 @@ import { LoadingSpinner, EmptyState } from '@/components/ui/Loading';
 import { useUIStore } from '@/stores/uiStore';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
+import { useUser } from '@/hooks/useUser';
 import { useTransactions, useBudgets, useSubscriptions, useFinanceStats } from '@/hooks/useFinance';
 import type { Transaction, Budget } from '@/types';
 
@@ -74,6 +75,7 @@ const categoryConfig: Record<string, { label: string; icon: any; color: string }
 export default function FinancePage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
+  const { profile } = useUser();
   const { transactions, loading: transactionsLoading, createTransaction, updateTransaction, deleteTransaction: deleteTransactionFn } = useTransactions();
   const { budgets, loading: budgetsLoading, createBudget, updateBudget, deleteBudget } = useBudgets();
   const { subscriptions, loading: subscriptionsLoading, createSubscription, updateSubscription, deleteSubscription } = useSubscriptions();
@@ -91,6 +93,7 @@ export default function FinancePage() {
   const { openAIPanel } = useUIStore();
 
   const loading = authLoading || transactionsLoading || budgetsLoading || subscriptionsLoading;
+  const preferredCurrency = profile?.preferences?.currency || 'USD';
 
   // Calculate monthly stats - MUST be called before any early returns
   const safeTransactions = Array.isArray(transactions) ? transactions : [];
@@ -153,11 +156,15 @@ export default function FinancePage() {
     );
   }
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
+  const formatCurrency = (amount: number, currency: string = preferredCurrency) => {
+    try {
+      return new Intl.NumberFormat(undefined, {
+        style: 'currency',
+        currency,
+      }).format(amount);
+    } catch {
+      return `${currency} ${amount.toFixed(2)}`;
+    }
   };
 
   const formatDate = (date: Date) => {
@@ -205,7 +212,7 @@ export default function FinancePage() {
             transaction.type === 'income' ? 'text-neon-green' : 'text-white'
           )}>
             {transaction.type === 'income' ? '+' : '-'}
-            {formatCurrency(transaction.amount)}
+            {formatCurrency(transaction.amount, transaction.currency || preferredCurrency)}
           </p>
           <p className="text-xs text-dark-500">{formatDate(transaction.date)}</p>
         </div>
@@ -442,7 +449,7 @@ export default function FinancePage() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-medium text-white">{formatCurrency(sub.amount)}</p>
+                        <p className="text-sm font-medium text-white">{formatCurrency(sub.amount, sub.currency || preferredCurrency)}</p>
                         <p className="text-xs text-dark-400">/{sub.billingCycle}</p>
                       </div>
                     </div>
@@ -527,6 +534,7 @@ export default function FinancePage() {
           size="md"
         >
           <AddTransactionForm
+            currency={preferredCurrency}
             onAdd={async (data) => {
               await createTransaction(data);
               setIsAddTransactionOpen(false);
@@ -545,6 +553,7 @@ export default function FinancePage() {
           {selectedTransaction && (
             <TransactionDetails
               transaction={selectedTransaction}
+              fallbackCurrency={preferredCurrency}
               onClose={() => setSelectedTransaction(null)}
               onDelete={async () => {
                 await deleteTransactionFn(selectedTransaction.id);
@@ -601,6 +610,7 @@ export default function FinancePage() {
           {selectedBudget && (
             <BudgetDetailsForm
               budget={selectedBudget}
+              currency={preferredCurrency}
               onSave={async (data) => {
                 await updateBudget(selectedBudget.id, data);
                 setSelectedBudget(null);
@@ -622,6 +632,7 @@ export default function FinancePage() {
           size="md"
         >
           <AddSubscriptionForm
+            currency={preferredCurrency}
             onAdd={async (data) => {
               await createSubscription(data);
               setIsAddSubscriptionOpen(false);
@@ -640,6 +651,7 @@ export default function FinancePage() {
           {selectedSubscription && (
             <SubscriptionDetailsForm
               subscription={selectedSubscription}
+              fallbackCurrency={preferredCurrency}
               onSave={async (data) => {
                 await updateSubscription(selectedSubscription.id, data);
                 setSelectedSubscription(null);
@@ -660,6 +672,7 @@ export default function FinancePage() {
 // Add Transaction Form
 interface CreateTransactionData {
   amount: number;
+  currency?: string;
   type: 'income' | 'expense';
   category: string;
   description?: string;
@@ -668,9 +681,11 @@ interface CreateTransactionData {
 }
 
 function AddTransactionForm({
+  currency,
   onAdd,
   onClose,
 }: {
+  currency: string;
   onAdd: (data: CreateTransactionData) => Promise<void>;
   onClose: () => void;
 }) {
@@ -693,6 +708,7 @@ function AddTransactionForm({
       await onAdd({
         type,
         amount: parseFloat(amount),
+        currency,
         category,
         description,
         date: new Date(date),
@@ -825,11 +841,13 @@ function AddTransactionForm({
 // Transaction Details Component
 function TransactionDetails({
   transaction,
+  fallbackCurrency,
   onClose,
   onDelete,
   onEdit,
 }: {
   transaction: Transaction;
+  fallbackCurrency: string;
   onClose: () => void;
   onDelete: () => void;
   onEdit: () => void;
@@ -837,11 +855,15 @@ function TransactionDetails({
   const config = categoryConfig[transaction.category] || categoryConfig.other;
   const Icon = config.icon;
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
+  const formatCurrency = (amount: number, currency: string) => {
+    try {
+      return new Intl.NumberFormat(undefined, {
+        style: 'currency',
+        currency,
+      }).format(amount);
+    } catch {
+      return `${currency} ${amount.toFixed(2)}`;
+    }
   };
 
   return (
@@ -860,7 +882,7 @@ function TransactionDetails({
             transaction.type === 'income' ? 'text-neon-green' : 'text-white'
           )}>
             {transaction.type === 'income' ? '+' : '-'}
-            {formatCurrency(transaction.amount)}
+            {formatCurrency(transaction.amount, transaction.currency || fallbackCurrency)}
           </p>
           <p className="text-dark-400">{config.label}</p>
         </div>
@@ -1197,11 +1219,13 @@ function AddBudgetForm({
 // Budget Details/Edit Form
 function BudgetDetailsForm({
   budget,
+  currency,
   onSave,
   onDelete,
   onClose,
 }: {
   budget: Budget;
+  currency: string;
   onSave: (data: Partial<Budget>) => Promise<void>;
   onDelete: () => Promise<void>;
   onClose: () => void;
@@ -1248,10 +1272,14 @@ function BudgetDetailsForm({
   };
 
   const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(val);
+    try {
+      return new Intl.NumberFormat(undefined, {
+        style: 'currency',
+        currency,
+      }).format(val);
+    } catch {
+      return `${currency} ${val.toFixed(2)}`;
+    }
   };
 
   return (
@@ -1344,12 +1372,15 @@ function BudgetDetailsForm({
 
 // Add Subscription Form
 function AddSubscriptionForm({
+  currency,
   onAdd,
   onClose,
 }: {
+  currency: string;
   onAdd: (data: {
     name: string;
     amount: number;
+    currency?: string;
     billingCycle: 'weekly' | 'monthly' | 'quarterly' | 'yearly';
     nextBillingDate?: Date;
     category?: string;
@@ -1374,6 +1405,7 @@ function AddSubscriptionForm({
       await onAdd({
         name,
         amount: parseFloat(amount),
+        currency,
         billingCycle,
         nextBillingDate: new Date(nextBillingDate),
         category,
@@ -1478,11 +1510,13 @@ function AddSubscriptionForm({
 // Subscription Details/Edit Form
 function SubscriptionDetailsForm({
   subscription,
+  fallbackCurrency,
   onSave,
   onDelete,
   onClose,
 }: {
   subscription: any;
+  fallbackCurrency: string;
   onSave: (data: any) => Promise<void>;
   onDelete: () => Promise<void>;
   onClose: () => void;
@@ -1537,11 +1571,15 @@ function SubscriptionDetailsForm({
     }
   };
 
-  const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(val);
+  const formatCurrency = (val: number, currency: string) => {
+    try {
+      return new Intl.NumberFormat(undefined, {
+        style: 'currency',
+        currency,
+      }).format(val);
+    } catch {
+      return `${currency} ${val.toFixed(2)}`;
+    }
   };
 
   return (
@@ -1550,7 +1588,9 @@ function SubscriptionDetailsForm({
       <div className="p-4 rounded-lg bg-dark-800/50 flex items-center justify-between">
         <div>
           <p className="text-sm text-dark-400">Current Amount</p>
-          <p className="text-lg font-semibold text-white">{formatCurrency(subscription.amount)}/{subscription.billingCycle}</p>
+          <p className="text-lg font-semibold text-white">
+            {formatCurrency(subscription.amount, subscription.currency || fallbackCurrency)}/{subscription.billingCycle}
+          </p>
         </div>
         <Badge variant={subscription.isActive !== false ? 'green' : 'orange'}>
           {subscription.isActive !== false ? 'Active' : 'Paused'}

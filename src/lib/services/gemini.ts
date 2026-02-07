@@ -38,12 +38,14 @@ IMPORTANT GUIDELINES:
 Always end with 1-3 relevant follow-up suggestions as a bullet list.`;
 
 export interface AIContext {
+  profile?: any;
   tasks?: any[];
   habits?: any[];
   events?: any[];
   goals?: any[];
   transactions?: any[];
   budgets?: any[];
+  subjects?: any[];
   wellness?: any[];
   focusSessions?: any[];
   journal?: any[];
@@ -55,6 +57,16 @@ const formatContextForAI = (context?: AIContext): string => {
   if (!context) return '';
   
   const parts: string[] = [];
+
+  if (context.profile) {
+    const profile = context.profile;
+    parts.push(`\n**User Profile Preferences:**
+- Name: ${profile.displayName || 'User'}
+- Gender: ${profile.gender || 'Not specified'}
+- Country: ${profile.preferences?.country || 'Not set'}
+- Timezone: ${profile.preferences?.timezone || 'Not set'}
+- Currency: ${profile.preferences?.currency || 'USD'}`);
+  }
   
   if (context.tasks && context.tasks.length > 0) {
     const pending = context.tasks.filter(t => t.status !== 'completed');
@@ -110,15 +122,37 @@ ${active.slice(0, 3).map(g => `- ${g.title}: ${g.progress || 0}% complete`).join
     const recent = context.wellness
       .sort((a, b) => new Date(b.date || b.createdAt).getTime() - new Date(a.date || a.createdAt).getTime())
       .slice(0, 7);
-    
-    const avgMood = recent.reduce((sum, w) => sum + (w.mood || 0), 0) / recent.length;
-    const avgEnergy = recent.reduce((sum, w) => sum + (w.energy || 0), 0) / recent.length;
-    const avgSleep = recent.reduce((sum, w) => sum + (w.sleepHours || 0), 0) / recent.length;
-    
-    parts.push(`\n**Wellness (Last 7 entries):**
-- Average Mood: ${avgMood.toFixed(1)}/10
-- Average Energy: ${avgEnergy.toFixed(1)}/10
-- Average Sleep: ${avgSleep.toFixed(1)} hours`);
+
+    const avgStress = recent.reduce((sum, w) => sum + (w.stress?.level || 0), 0) / recent.length;
+    const avgSleepMinutes = recent.reduce((sum, w) => sum + (w.sleep?.duration || 0), 0) / recent.length;
+    const periodDays = recent.filter(w => w.period?.isPeriodDay).length;
+
+    parts.push(`\n**Wellness (Last ${recent.length} entries):**
+- Avg Stress: ${avgStress.toFixed(1)}/10
+- Avg Sleep: ${(avgSleepMinutes / 60).toFixed(1)} hours
+- Period Days Logged: ${periodDays}`);
+  }
+
+  if (context.subjects && context.subjects.length > 0) {
+    const subjects = context.subjects.slice(0, 5);
+    const upcomingExams: Array<{ subjectName: string; examName: string; date: Date }> = [];
+    subjects.forEach(subject => {
+      (subject.examDates || []).forEach((exam: any) => {
+        const examDate = new Date(exam.date);
+        if (!Number.isNaN(examDate.getTime()) && examDate >= new Date()) {
+          upcomingExams.push({
+            subjectName: subject.name,
+            examName: exam.name,
+            date: examDate,
+          });
+        }
+      });
+    });
+    upcomingExams.sort((a, b) => a.date.getTime() - b.date.getTime());
+
+    parts.push(`\n**Study Snapshot:**
+${subjects.map(subject => `- ${subject.name}: ${subject.topics?.length || 0} topics, mastery ${subject.masteryLevel || 0}%`).join('\n')}
+${upcomingExams.length > 0 ? `\nUpcoming Exams:\n${upcomingExams.slice(0, 4).map(exam => `- ${exam.date.toLocaleDateString()}: ${exam.examName} (${exam.subjectName})`).join('\n')}` : ''}`);
   }
   
   if (context.focusSessions && context.focusSessions.length > 0) {

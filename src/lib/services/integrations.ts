@@ -25,11 +25,21 @@ export interface GoogleCalendarIntegration {
   email?: string;
   credentials?: IntegrationCredentials;
   syncEnabled?: boolean;
+  syncMode?: 'add-only' | 'two-way';
+  lastSynced?: Date;
+}
+
+export interface AppleCalendarIntegration {
+  connected: boolean;
+  accountLabel?: string;
+  syncEnabled?: boolean;
+  syncMode?: 'add-only';
   lastSynced?: Date;
 }
 
 export interface UserIntegrations {
   googleCalendar?: GoogleCalendarIntegration;
+  appleCalendar?: AppleCalendarIntegration;
   updatedAt?: any;
 }
 
@@ -93,6 +103,7 @@ export async function connectGoogleCalendar(
       email,
       credentials,
       syncEnabled: true,
+      syncMode: 'add-only',
       lastSynced: null,
     },
     updatedAt: serverTimestamp(),
@@ -106,6 +117,37 @@ export async function disconnectGoogleCalendar(userId: string): Promise<void> {
   await updateDoc(docRef, {
     googleCalendar: {
       connected: false,
+      syncEnabled: false,
+    },
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function connectAppleCalendar(
+  userId: string,
+  accountLabel?: string
+): Promise<void> {
+  const docRef = doc(db, INTEGRATIONS_COLLECTION, userId);
+
+  await setDoc(docRef, {
+    appleCalendar: {
+      connected: true,
+      accountLabel: accountLabel || 'Apple Calendar',
+      syncEnabled: true,
+      syncMode: 'add-only',
+      lastSynced: null,
+    },
+    updatedAt: serverTimestamp(),
+  }, { merge: true });
+}
+
+export async function disconnectAppleCalendar(userId: string): Promise<void> {
+  const docRef = doc(db, INTEGRATIONS_COLLECTION, userId);
+
+  await updateDoc(docRef, {
+    appleCalendar: {
+      connected: false,
+      syncEnabled: false,
     },
     updatedAt: serverTimestamp(),
   });

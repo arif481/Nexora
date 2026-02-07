@@ -21,6 +21,8 @@ export interface UserPreferences {
   accentColor: string;
   language: string;
   timezone: string;
+  country: string;
+  currency: string;
   compactMode?: boolean;
   animations?: boolean;
   notifications: NotificationPreferences;
