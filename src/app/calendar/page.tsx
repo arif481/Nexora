@@ -134,9 +134,17 @@ export default function CalendarPage() {
   const [viewMode, setViewMode] = useState<'month' | 'week'>('month');
   const reminderCacheRef = useRef<Set<string>>(new Set());
   
-  // Get the start and end of the current month for fetching events
-  const monthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-  const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59, 999);
+  // Get a stable month range for fetching events and derived data.
+  const { monthStart, monthEnd, monthStartTime, monthEndTime } = useMemo(() => {
+    const start = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+    const end = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59, 999);
+    return {
+      monthStart: start,
+      monthEnd: end,
+      monthStartTime: start.getTime(),
+      monthEndTime: end.getTime(),
+    };
+  }, [currentDate]);
   
   const { events, loading } = useEventsInRange(monthStart, monthEnd);
   const { createEvent, updateEvent, deleteEvent } = useCalendar();
@@ -162,18 +170,21 @@ export default function CalendarPage() {
 
   const countryCode = profile?.preferences?.country || 'US';
   const holidays = useMemo<HolidayItem[]>(() => {
-    return getCountryHolidaysInRange(countryCode, monthStart, monthEnd);
-  }, [countryCode, monthStart.getTime(), monthEnd.getTime()]);
+    return getCountryHolidaysInRange(countryCode, new Date(monthStartTime), new Date(monthEndTime));
+  }, [countryCode, monthStartTime, monthEndTime]);
 
   const periodPredictions = useMemo(() => {
     const starts = getPredictedPeriodStarts(recentWellnessEntries);
-    return starts.filter(date => date >= monthStart && date <= monthEnd);
-  }, [recentWellnessEntries, monthStart.getTime(), monthEnd.getTime()]);
+    return starts.filter(date => {
+      const timestamp = date.getTime();
+      return timestamp >= monthStartTime && timestamp <= monthEndTime;
+    });
+  }, [recentWellnessEntries, monthStartTime, monthEndTime]);
 
   const linkedDateItems = useMemo<LinkedDateItem[]>(() => {
     const taskItems: LinkedDateItem[] = tasks
       .filter(task => task.dueDate && task.status !== 'completed')
-      .map(task => ({
+      .map<LinkedDateItem>(task => ({
         id: `task_${task.id}`,
         title: task.title,
         date: new Date(task.dueDate as Date),
@@ -181,11 +192,14 @@ export default function CalendarPage() {
         actionUrl: `/tasks?id=${task.id}`,
         subtitle: 'Task deadline',
       }))
-      .filter(item => item.date >= monthStart && item.date <= monthEnd);
+      .filter(item => {
+        const timestamp = item.date.getTime();
+        return timestamp >= monthStartTime && timestamp <= monthEndTime;
+      });
 
     const goalItems: LinkedDateItem[] = goals
       .filter(goal => goal.targetDate && goal.status !== 'completed')
-      .map(goal => ({
+      .map<LinkedDateItem>(goal => ({
         id: `goal_${goal.id}`,
         title: goal.title,
         date: new Date(goal.targetDate as Date),
@@ -193,10 +207,13 @@ export default function CalendarPage() {
         actionUrl: '/goals',
         subtitle: 'Goal target date',
       }))
-      .filter(item => item.date >= monthStart && item.date <= monthEnd);
+      .filter(item => {
+        const timestamp = item.date.getTime();
+        return timestamp >= monthStartTime && timestamp <= monthEndTime;
+      });
 
     const examItems: LinkedDateItem[] = upcomingExams
-      .map(exam => ({
+      .map<LinkedDateItem>(exam => ({
         id: `exam_${exam.id}`,
         title: exam.name,
         date: new Date(exam.date),
@@ -204,7 +221,10 @@ export default function CalendarPage() {
         actionUrl: '/study',
         subtitle: exam.subjectName ? `Exam • ${exam.subjectName}` : 'Exam',
       }))
-      .filter(item => item.date >= monthStart && item.date <= monthEnd);
+      .filter(item => {
+        const timestamp = item.date.getTime();
+        return timestamp >= monthStartTime && timestamp <= monthEndTime;
+      });
 
     const periodItems: LinkedDateItem[] = periodPredictions.map((date, index) => ({
       id: `period_${getDateKey(date)}_${index}`,
@@ -227,7 +247,7 @@ export default function CalendarPage() {
     return [...taskItems, ...goalItems, ...examItems, ...periodItems, ...holidayItems].sort(
       (a, b) => a.date.getTime() - b.date.getTime()
     );
-  }, [tasks, goals, upcomingExams, periodPredictions, holidays, monthStart.getTime(), monthEnd.getTime()]);
+  }, [tasks, goals, upcomingExams, periodPredictions, holidays, monthStartTime, monthEndTime]);
 
   const upcomingLinkedCount = useMemo(() => {
     const now = Date.now();
