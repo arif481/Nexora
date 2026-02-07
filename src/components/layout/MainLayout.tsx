@@ -10,6 +10,7 @@ import { CommandPalette } from '../features/CommandPalette';
 import { NotificationPanel } from '../features/NotificationPanel';
 import { AIAssistantPanel } from '../features/AIAssistantPanel';
 import { GlobalModals } from '../GlobalModals';
+import { ErrorBoundary } from '../ErrorBoundary';
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -56,7 +57,9 @@ export function MainLayout({ children }: MainLayoutProps) {
             transition={{ duration: 0.3 }}
             className="p-4 lg:p-6 pb-24 lg:pb-6"
           >
-            {children}
+            <ErrorBoundary>
+              {children}
+            </ErrorBoundary>
           </motion.div>
         </div>
       </motion.main>

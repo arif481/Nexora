@@ -295,7 +295,7 @@ export function useFocusStats(sessions: FocusSession[]) {
 
         // Calculate streak - count consecutive days with focus sessions
         let streak = 0;
-        let checkDate = new Date(startOfDay);
+        const checkDate = new Date(startOfDay);
         checkDate.setDate(checkDate.getDate() - 1); // Start from yesterday
         
         // First, check if user has focused today

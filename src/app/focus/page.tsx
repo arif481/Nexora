@@ -71,6 +71,41 @@ const TIMER_PRESETS = {
   longBreak: 15 * 60,
 };
 
+// Persisted timer state
+interface PersistedTimerState {
+  mode: TimerMode;
+  status: TimerStatus;
+  timeLeft: number;
+  startedAt: number | null;
+  pausedAt: number | null;
+  activeTaskId: string | null;
+}
+
+const TIMER_STORAGE_KEY = 'nexora_focus_timer_state';
+
+const saveTimerState = (state: PersistedTimerState) => {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(TIMER_STORAGE_KEY, JSON.stringify(state));
+  }
+};
+
+const loadTimerState = (): PersistedTimerState | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const saved = localStorage.getItem(TIMER_STORAGE_KEY);
+    if (!saved) return null;
+    return JSON.parse(saved);
+  } catch {
+    return null;
+  }
+};
+
+const clearTimerState = () => {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem(TIMER_STORAGE_KEY);
+  }
+};
+
 // Ambient sounds with free audio URLs from Pixabay/FreeSound (royalty-free)
 const ambientSounds = [
   { 
@@ -135,6 +170,7 @@ export default function FocusPage() {
   const [isAddTaskOpen, setIsAddTaskOpen] = useState(false);
   const [focusModeActive, setFocusModeActive] = useState(false);
   const [distractionBlocker, setDistractionBlocker] = useState(false);
+  const [isRestoringState, setIsRestoringState] = useState(true);
   
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -143,6 +179,55 @@ export default function FocusPage() {
   const { openAIPanel } = useUIStore();
 
   const loading = authLoading || focusLoading;
+  
+  // Restore timer state from localStorage on mount
+  useEffect(() => {
+    const savedState = loadTimerState();
+    if (savedState && savedState.status !== 'idle') {
+      // Restore mode
+      setMode(savedState.mode);
+      
+      // Calculate elapsed time if timer was running
+      if (savedState.status === 'running' && savedState.startedAt) {
+        const elapsedSeconds = Math.floor((Date.now() - savedState.startedAt) / 1000);
+        const remaining = Math.max(0, savedState.timeLeft - elapsedSeconds);
+        
+        if (remaining > 0) {
+          setTimeLeft(remaining);
+          setStatus('running');
+          if (savedState.mode === 'focus') {
+            setFocusModeActive(true);
+          }
+        } else {
+          // Timer would have completed - reset
+          clearTimerState();
+          setTimeLeft(TIMER_PRESETS[savedState.mode]);
+        }
+      } else if (savedState.status === 'paused') {
+        setTimeLeft(savedState.timeLeft);
+        setStatus('paused');
+      }
+    }
+    setIsRestoringState(false);
+  }, []);
+  
+  // Persist timer state when it changes
+  useEffect(() => {
+    if (isRestoringState) return;
+    
+    if (status !== 'idle') {
+      saveTimerState({
+        mode,
+        status,
+        timeLeft,
+        startedAt: status === 'running' ? Date.now() : null,
+        pausedAt: status === 'paused' ? Date.now() : null,
+        activeTaskId: activeTask?.id || null,
+      });
+    } else {
+      clearTimerState();
+    }
+  }, [mode, status, timeLeft, activeTask, isRestoringState]);
 
   // Generate colored noise
   const createNoiseBuffer = useCallback((type: 'white' | 'pink' | 'brown', sampleRate: number, duration: number) => {

@@ -198,7 +198,7 @@ export const incrementUserStat = async (
   const currentValue = currentStats[statKey] || 0;
   
   // Calculate new experience and level if incrementing stats
-  let updates: Partial<UserStats> = {
+  const updates: Partial<UserStats> = {
     [statKey]: currentValue + amount,
   };
 

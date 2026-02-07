@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, memo } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -279,7 +279,7 @@ export default function TasksPage() {
     );
   }
 
-  const TaskCard = ({ task }: { task: Task }) => {
+  const TaskCard = memo(({ task }: { task: Task }) => {
     const isExpanded = expandedTasks.has(task.id);
     const hasSubtasks = task.subtasks && task.subtasks.length > 0;
     const completedSubtasks = task.subtasks?.filter(s => s.completed).length || 0;
@@ -434,7 +434,9 @@ export default function TasksPage() {
         </div>
       </motion.div>
     );
-  };
+  });
+  
+  TaskCard.displayName = 'TaskCard';
 
   const TaskGroup = ({ title, tasks, icon: Icon }: { title: string; tasks: Task[]; icon: any }) => {
     if (tasks.length === 0) return null;

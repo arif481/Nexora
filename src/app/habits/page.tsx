@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, memo } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -301,7 +301,7 @@ export default function HabitsPage() {
     );
   }
 
-  const HabitCard = ({ habit }: { habit: Habit & { icon?: string; color?: string } }) => {
+  const HabitCard = memo(({ habit }: { habit: Habit & { icon?: string; color?: string } }) => {
     const Icon = getIcon(habit.icon || 'default');
     const isCompletedToday = completionData[habit.id]?.[todayKey];
     const isDueToday = habit.targetDays?.includes(dayOfWeek);
@@ -438,7 +438,9 @@ export default function HabitsPage() {
         </div>
       </motion.div>
     );
-  };
+  });
+  
+  HabitCard.displayName = 'HabitCard';
 
   return (
     <MainLayout>

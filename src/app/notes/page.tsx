@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, memo } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -196,7 +196,7 @@ export default function NotesPage() {
     );
   }
 
-  const NoteCard = ({ note }: { note: Note }) => {
+  const NoteCard = memo(({ note }: { note: Note }) => {
     const categoryColor = categoryOptions.find(c => c.value === note.category)?.color || 'neon-cyan';
     
     return (
@@ -252,7 +252,9 @@ export default function NotesPage() {
         </div>
       </motion.div>
     );
-  };
+  });
+  
+  NoteCard.displayName = 'NoteCard';
 
   return (
     <MainLayout>

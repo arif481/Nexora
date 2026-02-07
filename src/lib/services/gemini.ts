@@ -46,6 +46,8 @@ export interface AIContext {
   budgets?: any[];
   wellness?: any[];
   focusSessions?: any[];
+  journal?: any[];
+  notes?: any[];
 }
 
 // Format context for the AI
@@ -102,6 +104,58 @@ ${active.slice(0, 3).map(g => `- ${g.title}: ${g.progress || 0}% complete`).join
 - Income: $${income.toLocaleString()}
 - Expenses: $${expenses.toLocaleString()}
 - Net: $${(income - expenses).toLocaleString()}`);
+  }
+  
+  if (context.wellness && context.wellness.length > 0) {
+    const recent = context.wellness
+      .sort((a, b) => new Date(b.date || b.createdAt).getTime() - new Date(a.date || a.createdAt).getTime())
+      .slice(0, 7);
+    
+    const avgMood = recent.reduce((sum, w) => sum + (w.mood || 0), 0) / recent.length;
+    const avgEnergy = recent.reduce((sum, w) => sum + (w.energy || 0), 0) / recent.length;
+    const avgSleep = recent.reduce((sum, w) => sum + (w.sleepHours || 0), 0) / recent.length;
+    
+    parts.push(`\n**Wellness (Last 7 entries):**
+- Average Mood: ${avgMood.toFixed(1)}/10
+- Average Energy: ${avgEnergy.toFixed(1)}/10
+- Average Sleep: ${avgSleep.toFixed(1)} hours`);
+  }
+  
+  if (context.focusSessions && context.focusSessions.length > 0) {
+    const thisWeek = context.focusSessions.filter(s => {
+      const date = new Date(s.startTime || s.createdAt);
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      return date >= weekAgo;
+    });
+    
+    const totalMinutes = thisWeek.reduce((sum, s) => sum + (s.duration || 0), 0);
+    const completedSessions = thisWeek.filter(s => s.completed).length;
+    
+    parts.push(`\n**Focus Sessions (This Week):**
+- Total Focus Time: ${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m
+- Completed Sessions: ${completedSessions}/${thisWeek.length}`);
+  }
+  
+  if (context.journal && context.journal.length > 0) {
+    const recent = context.journal
+      .sort((a, b) => new Date(b.date || b.createdAt).getTime() - new Date(a.date || a.createdAt).getTime())
+      .slice(0, 3);
+    
+    const moods = recent.map(j => j.mood).filter(Boolean);
+    parts.push(`\n**Recent Journal Entries:**
+- Last ${recent.length} entries
+${moods.length > 0 ? `- Moods: ${moods.join(', ')}` : ''}
+${recent.map(j => `- ${new Date(j.date || j.createdAt).toLocaleDateString()}: "${(j.title || j.content?.substring(0, 50) || 'Entry')}..."`).join('\n')}`);
+  }
+  
+  if (context.notes && context.notes.length > 0) {
+    const recentNotes = context.notes
+      .sort((a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime())
+      .slice(0, 5);
+    
+    parts.push(`\n**Recent Notes:**
+${recentNotes.map(n => `- ${n.title || 'Untitled'} (${n.folder || 'Unfiled'})`).join('\n')}`);
   }
   
   return parts.length > 0 
