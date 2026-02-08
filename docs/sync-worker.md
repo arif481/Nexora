@@ -44,6 +44,10 @@ Worker authentication (required in CI and local server environments):
 - `FIREBASE_CLIENT_EMAIL`
 - `FIREBASE_PRIVATE_KEY`
 
+Optional alternative in one secret:
+
+- `FIREBASE_SERVICE_ACCOUNT_JSON`
+
 Alternative local auth:
 
 - `FIREBASE_SERVICE_ACCOUNT_JSON` (full JSON string)
@@ -61,7 +65,10 @@ Workflow: `.github/workflows/sync-worker.yml`
 
 - Runs every 15 minutes
 - Supports manual run via Actions UI
-- Requires the same Firebase secrets in repository settings
+- Requires either:
+  - `FIREBASE_SERVICE_ACCOUNT_JSON`, or
+  - `FIREBASE_CLIENT_EMAIL` + `FIREBASE_PRIVATE_KEY`
+- `FIREBASE_PROJECT_ID` defaults to `nexora-400d6` in workflow, but can be overridden via secret
 
 ## Inbox Payload Shape
 
