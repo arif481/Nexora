@@ -48,6 +48,15 @@ const defaultPreferences: UserPreferences = {
     localStorageOnly: false,
     encryptionEnabled: false,
   },
+  dataPermissions: {
+    allowHealthDataSync: true,
+    allowFinanceDataSync: true,
+    allowCalendarDataSync: true,
+    allowTaskDataSync: true,
+    allowLocationDataSync: false,
+    allowBackgroundSync: true,
+    allowAIExternalDataAccess: true,
+  },
   aiPersonality: {
     name: 'Nexora',
     tone: 'friendly',
@@ -67,6 +76,10 @@ const mergePreferences = (preferences?: Partial<UserPreferences>): UserPreferenc
     privacy: {
       ...defaultPreferences.privacy,
       ...(preferences?.privacy || {}),
+    },
+    dataPermissions: {
+      ...defaultPreferences.dataPermissions,
+      ...(preferences?.dataPermissions || {}),
     },
     aiPersonality: {
       ...defaultPreferences.aiPersonality,

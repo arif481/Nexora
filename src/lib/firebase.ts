@@ -75,6 +75,11 @@ export const COLLECTIONS = {
   KNOWLEDGE_NODES: 'knowledgeNodes',
   FOCUS_BLOCKS: 'focusBlocks',
   FOCUS_SESSIONS: 'focusSessions',
+  USER_INTEGRATIONS: 'userIntegrations',
+  USER_LINKED_ACCOUNTS: 'userLinkedAccounts',
+  INTEGRATION_SYNC_JOBS: 'integrationSyncJobs',
+  INTEGRATION_SYNC_LOGS: 'integrationSyncLogs',
+  INTEGRATION_MAPPINGS: 'integrationMappings',
 } as const;
 
 // Storage paths

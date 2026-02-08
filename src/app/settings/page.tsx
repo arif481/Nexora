@@ -66,9 +66,11 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useUser } from '@/hooks/useUser';
 import { useIntegrations, useLinkedAccounts } from '@/hooks/useIntegrations';
+import { useAutoSync } from '@/hooks/useAutoSync';
 import type { GenderIdentity } from '@/types';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDoc, getDocs, query, where, doc } from 'firebase/firestore';
+import type { IntegrationKey } from '@/lib/services/integrations';
 import {
   COMMON_CURRENCIES,
   COMMON_TIMEZONES,
@@ -1192,47 +1194,199 @@ function AISettingsSection({ onDirty }: { onDirty: () => void }) {
 
 // Integrations Section with real data
 function IntegrationsSection() {
+  const { profile, updatePreferences } = useUser();
   const { 
     integrations,
     loading,
+    supportedIntegrations,
     isGoogleCalendarConnected,
     isAppleCalendarConnected,
     connectGoogleCalendar,
     connectAppleCalendar,
+    connectProvider,
     disconnect,
   } = useIntegrations();
+  const { jobs, logs, loading: syncLoading, requestSync } = useAutoSync();
   
   const [disconnecting, setDisconnecting] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState<string | null>(null);
+  const [savingPermissions, setSavingPermissions] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [permissionSettings, setPermissionSettings] = useState({
+    allowHealthDataSync: true,
+    allowFinanceDataSync: true,
+    allowCalendarDataSync: true,
+    allowTaskDataSync: true,
+    allowLocationDataSync: false,
+    allowBackgroundSync: true,
+    allowAIExternalDataAccess: true,
+  });
 
-  const integrationsList = [
-    { 
-      name: 'Google Calendar', 
-      key: 'googleCalendar' as const,
-      icon: Calendar, 
-      connected: isGoogleCalendarConnected, 
-      description: 'Add-only sync for sending Nexora events to Google Calendar',
-      details: integrations.googleCalendar?.email,
-      onConnect: connectGoogleCalendar,
+  useEffect(() => {
+    const persisted = profile?.preferences?.dataPermissions;
+    if (!persisted) return;
+    setPermissionSettings(prev => ({
+      ...prev,
+      ...persisted,
+    }));
+  }, [profile]);
+
+  const providerIconMap: Record<IntegrationKey, any> = {
+    googleCalendar: Calendar,
+    appleCalendar: Apple,
+    appleHealth: Heart,
+    healthConnect: Smartphone,
+    fitbit: Heart,
+    googleFit: Target,
+    plaid: CreditCard,
+    todoist: Check,
+    notion: FileText,
+    mobileBridge: Smartphone,
+  };
+
+  const providerDefaults: Record<IntegrationKey, Record<string, unknown>> = {
+    googleCalendar: {
+      syncMode: 'two-way',
+      platform: 'web',
+      autoImport: { calendar: true },
     },
-    {
-      name: 'Apple Calendar',
-      key: 'appleCalendar' as const,
-      icon: Apple,
-      connected: isAppleCalendarConnected,
-      description: 'Add-only sync for exporting Nexora events to Apple Calendar',
-      details: integrations.appleCalendar?.accountLabel,
-      onConnect: connectAppleCalendar,
+    appleCalendar: {
+      syncMode: 'add-only',
+      platform: 'ios',
+      autoImport: { calendar: true },
     },
-  ];
+    appleHealth: {
+      provider: 'apple-health',
+      syncMode: 'pull',
+      platform: 'ios',
+      metrics: ['steps', 'sleep', 'workouts', 'heart-rate', 'cycle'],
+      autoImport: { wellness: true },
+    },
+    healthConnect: {
+      provider: 'health-connect',
+      syncMode: 'pull',
+      platform: 'android',
+      metrics: ['steps', 'sleep', 'active-minutes', 'heart-rate'],
+      autoImport: { wellness: true },
+    },
+    fitbit: {
+      provider: 'fitbit',
+      syncMode: 'pull',
+      platform: 'cloud',
+      metrics: ['steps', 'sleep', 'workouts', 'resting-heart-rate'],
+      autoImport: { wellness: true },
+    },
+    googleFit: {
+      provider: 'google-fit',
+      syncMode: 'pull',
+      platform: 'android',
+      metrics: ['steps', 'sleep', 'workouts'],
+      autoImport: { wellness: true },
+    },
+    plaid: {
+      provider: 'plaid',
+      syncMode: 'pull',
+      platform: 'cloud',
+      autoImport: { finance: true },
+    },
+    todoist: {
+      provider: 'todoist',
+      syncMode: 'two-way',
+      platform: 'cloud',
+      autoImport: { tasks: true },
+    },
+    notion: {
+      provider: 'notion',
+      syncMode: 'pull',
+      platform: 'cloud',
+      autoImport: { tasks: true },
+    },
+    mobileBridge: {
+      provider: 'nexora-mobile-bridge',
+      syncMode: 'push',
+      platform: 'cloud',
+      appInstalled: false,
+      platforms: ['ios', 'android'],
+      autoImport: { wellness: true, calendar: true },
+    },
+  };
+
+  const toDate = (value: unknown): Date | null => {
+    if (!value) return null;
+    if (value instanceof Date) return value;
+    if (typeof value === 'object' && value !== null && 'toDate' in value && typeof (value as any).toDate === 'function') {
+      return (value as any).toDate();
+    }
+    const parsed = new Date(value as any);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  };
+
+  const getDetailText = (providerKey: IntegrationKey, fallback: string): string => {
+    const integration = integrations[providerKey];
+    if (!integration) return fallback;
+    if ('email' in integration && integration.email) return integration.email;
+    if ('accountLabel' in integration && integration.accountLabel) return integration.accountLabel;
+    if ('institution' in integration && integration.institution) return integration.institution;
+    if ('provider' in integration && integration.provider) return `provider: ${integration.provider}`;
+    return fallback;
+  };
+
+  const updatePermission = (key: keyof typeof permissionSettings, value: boolean) => {
+    setPermissionSettings(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleSavePermissions = async () => {
+    setSavingPermissions(true);
+    setSaveMessage(null);
+    try {
+      await updatePreferences({
+        dataPermissions: permissionSettings,
+      });
+      setSaveMessage('Automatic collection permissions saved.');
+      setTimeout(() => setSaveMessage(null), 3000);
+    } catch (error) {
+      console.error('Failed to save data permissions:', error);
+      setSaveMessage('Failed to save permissions');
+    } finally {
+      setSavingPermissions(false);
+    }
+  };
+
+  const handleConnect = async (providerKey: IntegrationKey) => {
+    try {
+      if (providerKey === 'googleCalendar') {
+        connectGoogleCalendar();
+        return;
+      }
+      if (providerKey === 'appleCalendar') {
+        await connectAppleCalendar();
+        return;
+      }
+      await connectProvider(providerKey, providerDefaults[providerKey]);
+    } catch (error) {
+      console.error(`Failed to connect ${providerKey}:`, error);
+    }
+  };
 
   const handleDisconnect = async (key: string) => {
     setDisconnecting(key);
     try {
-      await disconnect(key as keyof typeof integrations);
+      await disconnect(key as IntegrationKey);
     } catch (error) {
       console.error('Failed to disconnect:', error);
     } finally {
       setDisconnecting(null);
+    }
+  };
+
+  const handleManualSync = async (providerKey: IntegrationKey) => {
+    setSyncing(providerKey);
+    try {
+      await requestSync(providerKey);
+    } catch (error) {
+      console.error('Failed to request sync:', error);
+    } finally {
+      setSyncing(null);
     }
   };
 
@@ -1246,58 +1400,255 @@ function IntegrationsSection() {
               <Loader2 className="w-6 h-6 text-neon-cyan animate-spin" />
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {integrationsList.map(integration => (
-                <div
-                  key={integration.name}
-                  className="flex items-center justify-between p-4 rounded-xl bg-dark-800/30"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={cn(
-                      "p-2 rounded-lg",
-                      integration.connected ? "bg-neon-cyan/20" : "bg-dark-700/50"
-                    )}>
-                      <integration.icon className={cn(
-                        "w-5 h-5",
-                        integration.connected ? "text-neon-cyan" : "text-dark-300"
-                      )} />
-                    </div>
-                    <div>
-                      <p className="font-medium text-white">{integration.name}</p>
-                      <p className="text-xs text-dark-400">
-                        {integration.connected && integration.details 
-                          ? integration.details 
-                          : integration.description}
-                      </p>
+            <div className="space-y-3">
+              {supportedIntegrations.map(provider => {
+                const integration = integrations[provider.key];
+                const connected = provider.key === 'googleCalendar'
+                  ? isGoogleCalendarConnected
+                  : provider.key === 'appleCalendar'
+                  ? isAppleCalendarConnected
+                  : integration?.connected ?? false;
+                const Icon = providerIconMap[provider.key] || Link2;
+                const lastSynced = toDate(integration?.lastSynced);
+                const status = integration?.status || (connected ? 'idle' : 'disconnected');
+
+                return (
+                  <div
+                    key={provider.key}
+                    className="p-4 rounded-xl bg-dark-800/30 border border-dark-700/40"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3">
+                        <div className={cn(
+                          'p-2 rounded-lg mt-0.5',
+                          connected ? 'bg-neon-cyan/20' : 'bg-dark-700/50'
+                        )}>
+                          <Icon className={cn(
+                            'w-5 h-5',
+                            connected ? 'text-neon-cyan' : 'text-dark-300'
+                          )} />
+                        </div>
+                        <div>
+                          <p className="font-medium text-white">{provider.name}</p>
+                          <p className="text-xs text-dark-400">
+                            {getDetailText(provider.key, provider.description)}
+                          </p>
+                          <div className="flex items-center gap-2 mt-2">
+                            <Badge variant={connected ? 'green' : 'default'} size="sm">
+                              {connected ? 'Connected' : 'Not connected'}
+                            </Badge>
+                            <Badge variant="outline" size="sm">{provider.platform}</Badge>
+                            {connected && (
+                              <Badge variant={status === 'error' ? 'orange' : 'cyan'} size="sm">
+                                {status}
+                              </Badge>
+                            )}
+                          </div>
+                          {lastSynced && (
+                            <p className="text-[11px] text-dark-500 mt-1">
+                              Last sync: {lastSynced.toLocaleString()}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {connected && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleManualSync(provider.key)}
+                            disabled={syncing === provider.key}
+                          >
+                            {syncing === provider.key ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              'Sync now'
+                            )}
+                          </Button>
+                        )}
+                        {connected ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDisconnect(provider.key)}
+                            disabled={disconnecting === provider.key}
+                          >
+                            {disconnecting === provider.key ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              'Disconnect'
+                            )}
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleConnect(provider.key)}
+                          >
+                            Connect
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
-                  {integration.connected ? (
-                    <div className="flex items-center gap-2">
-                      <Badge variant="green" size="sm">Connected</Badge>
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => handleDisconnect(integration.key)}
-                        disabled={disconnecting === integration.key}
-                      >
-                        {disconnecting === integration.key ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          'Disconnect'
-                        )}
-                      </Button>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card variant="glass">
+        <CardHeader title="Automatic Collection Permissions" icon={<Shield className="w-5 h-5 text-neon-purple" />} />
+        <CardContent className="p-6 space-y-4">
+          <SettingToggle
+            label="Health Data Sync"
+            description="Allow importing wellness metrics from Apple Health, Health Connect, Fitbit, and Google Fit."
+            value={permissionSettings.allowHealthDataSync}
+            onChange={value => updatePermission('allowHealthDataSync', value)}
+            icon={Heart}
+          />
+          <SettingToggle
+            label="Finance Data Sync"
+            description="Allow secure transaction imports from connected finance providers."
+            value={permissionSettings.allowFinanceDataSync}
+            onChange={value => updatePermission('allowFinanceDataSync', value)}
+            icon={CreditCard}
+          />
+          <SettingToggle
+            label="Calendar Data Sync"
+            description="Allow automatic calendar event ingestion and updates."
+            value={permissionSettings.allowCalendarDataSync}
+            onChange={value => updatePermission('allowCalendarDataSync', value)}
+            icon={Calendar}
+          />
+          <SettingToggle
+            label="Task Data Sync"
+            description="Allow importing tasks and milestones from external productivity apps."
+            value={permissionSettings.allowTaskDataSync}
+            onChange={value => updatePermission('allowTaskDataSync', value)}
+            icon={Target}
+          />
+          <SettingToggle
+            label="Background Sync"
+            description="Allow background sync jobs to keep data fresh automatically."
+            value={permissionSettings.allowBackgroundSync}
+            onChange={value => updatePermission('allowBackgroundSync', value)}
+            icon={RefreshCw}
+          />
+          <SettingToggle
+            label="AI Access to Synced Data"
+            description="Allow AI to use imported external data for more personalized insights."
+            value={permissionSettings.allowAIExternalDataAccess}
+            onChange={value => updatePermission('allowAIExternalDataAccess', value)}
+            icon={Brain}
+          />
+          <SettingToggle
+            label="Location Context Sync"
+            description="Allow optional location context for commute and reminder suggestions."
+            value={permissionSettings.allowLocationDataSync}
+            onChange={value => updatePermission('allowLocationDataSync', value)}
+            icon={MapPin}
+          />
+
+          <div className="flex items-center justify-end gap-3 pt-2">
+            {saveMessage && (
+              <span className={cn(
+                'text-sm',
+                saveMessage.includes('saved') ? 'text-neon-green' : 'text-status-error'
+              )}>
+                {saveMessage}
+              </span>
+            )}
+            <Button
+              variant="glow"
+              size="sm"
+              onClick={handleSavePermissions}
+              disabled={savingPermissions}
+            >
+              {savingPermissions ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-1" />
+                  Save Permissions
+                </>
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card variant="glass">
+        <CardHeader title="Sync Activity" icon={<RefreshCw className="w-5 h-5 text-neon-cyan" />} />
+        <CardContent className="p-6">
+          {syncLoading ? (
+            <div className="flex items-center justify-center py-6">
+              <Loader2 className="w-5 h-5 text-neon-cyan animate-spin" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-white">Recent Sync Jobs</p>
+                {jobs.length === 0 ? (
+                  <p className="text-xs text-dark-500">No sync jobs yet.</p>
+                ) : (
+                  jobs.slice(0, 6).map(job => (
+                    <div key={job.id} className="p-2.5 rounded-lg bg-dark-800/40 border border-dark-700/50">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm text-white">{job.provider}</p>
+                        <Badge
+                          variant={
+                            job.status === 'succeeded'
+                              ? 'green'
+                              : job.status === 'failed'
+                              ? 'orange'
+                              : 'default'
+                          }
+                          size="sm"
+                        >
+                          {job.status}
+                        </Badge>
+                      </div>
+                      <p className="text-[11px] text-dark-500 mt-1">
+                        {job.createdAt.toLocaleString()}
+                      </p>
                     </div>
-                  ) : (
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={integration.onConnect}
-                    >
-                      Connect
-                    </Button>
-                  )}
-                </div>
-              ))}
+                  ))
+                )}
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-white">Recent Sync Logs</p>
+                {logs.length === 0 ? (
+                  <p className="text-xs text-dark-500">No sync logs yet.</p>
+                ) : (
+                  logs.slice(0, 6).map(log => (
+                    <div key={log.id} className="p-2.5 rounded-lg bg-dark-800/40 border border-dark-700/50">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs text-white">{log.message}</p>
+                        <Badge
+                          variant={
+                            log.level === 'error'
+                              ? 'orange'
+                              : log.level === 'warning'
+                              ? 'yellow'
+                              : 'cyan'
+                          }
+                          size="sm"
+                        >
+                          {log.level}
+                        </Badge>
+                      </div>
+                      <p className="text-[11px] text-dark-500 mt-1">
+                        {log.provider} • {log.createdAt.toLocaleString()}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           )}
         </CardContent>
@@ -1331,7 +1682,11 @@ function DataSection() {
         'wellnessEntries',
         'focusSessions',
         'goals',
+        'integrationSyncJobs',
+        'integrationSyncLogs',
+        'integrationMappings',
       ];
+      const userDocumentCollections = ['userIntegrations', 'userLinkedAccounts'];
 
       const exportData: Record<string, any> = {
         exportDate: new Date().toISOString(),
@@ -1353,6 +1708,21 @@ function DataSection() {
         } catch (err) {
           console.log(`Skipping ${collectionName}:`, err);
           exportData[collectionName] = [];
+        }
+      }
+
+      for (const collectionName of userDocumentCollections) {
+        try {
+          const snapshot = await getDoc(doc(db, collectionName, user.uid));
+          exportData[collectionName] = snapshot.exists()
+            ? {
+                id: snapshot.id,
+                ...snapshot.data(),
+              }
+            : null;
+        } catch (err) {
+          console.log(`Skipping ${collectionName}:`, err);
+          exportData[collectionName] = null;
         }
       }
 

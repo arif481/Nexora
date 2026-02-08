@@ -16,3 +16,4 @@ export * from './useNotifications';
 export * from './useAI';
 export * from './useFocus';
 export * from './useIntegrations';
+export * from './useAutoSync';

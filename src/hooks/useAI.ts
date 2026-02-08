@@ -89,6 +89,7 @@ export function useAIChat(conversationId: string | null) {
   const { profile } = useUser();
   const { subjects } = useStudy();
   const { entries: wellnessEntries } = useRecentWellness(21);
+  const allowAIExternalDataAccess = profile?.preferences?.dataPermissions?.allowAIExternalDataAccess !== false;
   
   const [conversation, setConversation] = useState<AIConversationWithMessages | null>(null);
   const [loading, setLoading] = useState(true);
@@ -127,10 +128,10 @@ export function useAIChat(conversationId: string | null) {
         habits,
         events,
         goals,
-        transactions,
+        transactions: allowAIExternalDataAccess ? transactions : [],
         profile,
-        subjects,
-        wellness: wellnessEntries,
+        subjects: allowAIExternalDataAccess ? subjects : [],
+        wellness: allowAIExternalDataAccess ? wellnessEntries : [],
       };
       
       const aiResponse = await generateAIResponse(content, context);
@@ -146,7 +147,7 @@ export function useAIChat(conversationId: string | null) {
     } finally {
       setSending(false);
     }
-  }, [conversationId, sending, tasks, habits, events, goals, transactions, profile, subjects, wellnessEntries]);
+  }, [conversationId, sending, tasks, habits, events, goals, transactions, profile, subjects, wellnessEntries, allowAIExternalDataAccess]);
 
   return {
     conversation,
@@ -167,6 +168,7 @@ export function useSimpleAI() {
   const { profile } = useUser();
   const { subjects } = useStudy();
   const { entries: wellnessEntries } = useRecentWellness(21);
+  const allowAIExternalDataAccess = profile?.preferences?.dataPermissions?.allowAIExternalDataAccess !== false;
   
   const [messages, setMessages] = useState<AIMessage[]>([
     {
@@ -201,10 +203,10 @@ export function useSimpleAI() {
         habits,
         events,
         goals,
-        transactions,
+        transactions: allowAIExternalDataAccess ? transactions : [],
         profile,
-        subjects,
-        wellness: wellnessEntries,
+        subjects: allowAIExternalDataAccess ? subjects : [],
+        wellness: allowAIExternalDataAccess ? wellnessEntries : [],
       };
       
       // Build conversation history for context
@@ -237,7 +239,7 @@ export function useSimpleAI() {
     } finally {
       setIsThinking(false);
     }
-  }, [isThinking, tasks, habits, events, goals, transactions, profile, subjects, wellnessEntries, messages]);
+  }, [isThinking, tasks, habits, events, goals, transactions, profile, subjects, wellnessEntries, messages, allowAIExternalDataAccess]);
 
   const regenerateLastResponse = useCallback(async () => {
     if (!lastUserMessage || isThinking) return;
@@ -259,10 +261,10 @@ export function useSimpleAI() {
         habits,
         events,
         goals,
-        transactions,
+        transactions: allowAIExternalDataAccess ? transactions : [],
         profile,
-        subjects,
-        wellness: wellnessEntries,
+        subjects: allowAIExternalDataAccess ? subjects : [],
+        wellness: allowAIExternalDataAccess ? wellnessEntries : [],
       };
       
       const aiResponse = await generateAIResponse(lastUserMessage, context);
@@ -288,7 +290,7 @@ export function useSimpleAI() {
     } finally {
       setIsThinking(false);
     }
-  }, [isThinking, lastUserMessage, tasks, habits, events, goals, transactions, profile, subjects, wellnessEntries]);
+  }, [isThinking, lastUserMessage, tasks, habits, events, goals, transactions, profile, subjects, wellnessEntries, allowAIExternalDataAccess]);
 
   const clearMessages = useCallback(() => {
     setMessages([

@@ -27,6 +27,7 @@ export interface UserPreferences {
   animations?: boolean;
   notifications: NotificationPreferences;
   privacy: PrivacySettings;
+  dataPermissions: DataPermissionSettings;
   aiPersonality: AIPersonality;
 }
 
@@ -47,6 +48,16 @@ export interface PrivacySettings {
   analyticsEnabled: boolean;
   localStorageOnly: boolean;
   encryptionEnabled: boolean;
+}
+
+export interface DataPermissionSettings {
+  allowHealthDataSync: boolean;
+  allowFinanceDataSync: boolean;
+  allowCalendarDataSync: boolean;
+  allowTaskDataSync: boolean;
+  allowLocationDataSync: boolean;
+  allowBackgroundSync: boolean;
+  allowAIExternalDataAccess: boolean;
 }
 
 export interface AIPersonality {
@@ -470,6 +481,10 @@ export interface Transaction {
   recurrenceRule?: RecurrenceRule;
   tags: string[];
   attachments: Attachment[];
+  externalSource?: string;
+  externalId?: string;
+  importedAt?: Date;
+  lastSyncedAt?: Date;
   createdAt: Date;
 }
 

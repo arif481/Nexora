@@ -6,14 +6,19 @@ import {
   subscribeToIntegrations,
   subscribeToLinkedAccounts,
   connectAppleCalendar as connectAppleCalendarService,
+  connectDataIntegration,
   disconnectGoogleCalendar,
   disconnectAppleCalendar,
+  disconnectDataIntegration,
+  queueIntegrationSyncJob,
   unlinkAccount,
+  type IntegrationKey,
   type UserIntegrations,
   type UserLinkedAccounts,
+  SUPPORTED_INTEGRATIONS,
 } from '@/lib/services/integrations';
 
-// Hook for managing Google Calendar integration
+// Hook for managing external integrations
 export function useIntegrations() {
   const { user } = useAuth();
   const [integrations, setIntegrations] = useState<UserIntegrations>({});
@@ -38,22 +43,20 @@ export function useIntegrations() {
   // Connect Google Calendar - opens OAuth flow
   const connectGoogleCalendar = useCallback(() => {
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CALENDAR_CLIENT_ID;
-    
+
     if (!clientId) {
       console.warn('Google Calendar integration requires setup. Please add NEXT_PUBLIC_GOOGLE_CALENDAR_CLIENT_ID to your environment variables.');
-      // Show user-friendly message
       if (typeof window !== 'undefined') {
-        const message = 'Google Calendar integration is not configured. Please contact support.';
-        // Use native confirm as fallback since there's no toast system
+        const message = 'Google Calendar integration is not configured yet.';
         window.confirm(message);
       }
       return;
     }
-    
+
     const redirectUri = `${window.location.origin}/Nexora/api/integrations/google-calendar/callback`;
     const scope = encodeURIComponent('https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events');
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&access_type=offline&prompt=consent`;
-    
+
     window.open(authUrl, '_blank', 'width=600,height=700');
   }, []);
 
@@ -66,8 +69,34 @@ export function useIntegrations() {
     }
   }, [user]);
 
-  // Disconnect Google Calendar
-  const disconnect = useCallback(async (service: keyof UserIntegrations) => {
+  const connectProvider = useCallback(async (
+    provider: IntegrationKey,
+    overrides: Record<string, unknown> = {}
+  ) => {
+    if (!user) return;
+
+    try {
+      await connectDataIntegration(user.uid, provider, overrides);
+    } catch (error) {
+      console.error(`Failed to connect ${provider}:`, error);
+      throw error;
+    }
+  }, [user]);
+
+  const requestSync = useCallback(async (provider: IntegrationKey) => {
+    if (!user) return null;
+
+    try {
+      const jobId = await queueIntegrationSyncJob(user.uid, provider, 'manual');
+      return jobId;
+    } catch (error) {
+      console.error(`Failed to queue sync for ${provider}:`, error);
+      throw error;
+    }
+  }, [user]);
+
+  // Disconnect integration
+  const disconnect = useCallback(async (service: IntegrationKey) => {
     if (!user) return;
 
     try {
@@ -75,6 +104,8 @@ export function useIntegrations() {
         await disconnectGoogleCalendar(user.uid);
       } else if (service === 'appleCalendar') {
         await disconnectAppleCalendar(user.uid);
+      } else {
+        await disconnectDataIntegration(user.uid, service);
       }
     } catch (error) {
       console.error(`Failed to disconnect ${service}:`, error);
@@ -85,11 +116,14 @@ export function useIntegrations() {
   return {
     integrations,
     loading,
+    supportedIntegrations: SUPPORTED_INTEGRATIONS,
     isGoogleCalendarConnected: integrations.googleCalendar?.connected ?? false,
     isAppleCalendarConnected: integrations.appleCalendar?.connected ?? false,
     connectGoogleCalendar,
     connectAppleCalendar,
+    connectProvider,
     disconnect,
+    requestSync,
   };
 }
 
@@ -102,9 +136,9 @@ export function useLinkedAccounts() {
   // Check if user signed in with Google
   const getProviderData = useCallback(() => {
     if (!user) return {};
-    
+
     const providerData: UserLinkedAccounts = {};
-    
+
     user.providerData.forEach(provider => {
       if (provider.providerId === 'google.com') {
         providerData.google = {
@@ -117,7 +151,7 @@ export function useLinkedAccounts() {
         };
       }
     });
-    
+
     return providerData;
   }, [user]);
 
@@ -143,14 +177,13 @@ export function useLinkedAccounts() {
 
   const connectAccount = useCallback((provider: 'google' | 'github' | 'twitter' | 'linkedin') => {
     if (provider === 'google') {
-      // Provide guidance without blocking alert
       console.info('To connect Google, user should sign out and sign in with Google.');
     }
   }, []);
 
   const disconnectAccount = useCallback(async (provider: 'google' | 'github' | 'twitter' | 'linkedin') => {
     if (!user) return;
-    
+
     try {
       await unlinkAccount(user.uid, provider);
     } catch (error) {
