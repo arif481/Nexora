@@ -26,6 +26,8 @@ import {
 export type SyncJobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'partial';
 export type SyncLogLevel = 'info' | 'warning' | 'error';
 export type MappingEntityType = 'transaction' | 'calendarEvent' | 'wellnessEntry' | 'task';
+export type InboxEntityType = 'transaction' | 'wellnessSnapshot' | 'calendarEvent' | 'task';
+export type InboxStatus = 'pending' | 'processing' | 'processed' | 'failed';
 
 export interface IntegrationSyncJob {
   id: string;
@@ -104,9 +106,26 @@ interface ImportedWellnessPayload {
   };
 }
 
+export interface IntegrationSyncInboxItem {
+  id: string;
+  userId: string;
+  provider: IntegrationKey;
+  entityType: InboxEntityType;
+  payload: Record<string, unknown>;
+  externalId?: string;
+  checksum?: string;
+  source?: string;
+  status: InboxStatus;
+  error?: string;
+  syncJobId?: string;
+  createdAt: Date;
+  processedAt?: Date;
+}
+
 const INTEGRATION_SYNC_JOBS = COLLECTIONS.INTEGRATION_SYNC_JOBS;
 const INTEGRATION_SYNC_LOGS = COLLECTIONS.INTEGRATION_SYNC_LOGS;
 const INTEGRATION_MAPPINGS = COLLECTIONS.INTEGRATION_MAPPINGS;
+const INTEGRATION_SYNC_INBOX = COLLECTIONS.INTEGRATION_SYNC_INBOX;
 
 const convertTimestamp = (value: Timestamp | Date | null | undefined): Date => {
   if (!value) return new Date();
@@ -222,6 +241,35 @@ export const addSyncLog = async (
     message,
     metadata: metadata || null,
     createdAt: serverTimestamp(),
+  });
+  return docRef.id;
+};
+
+export const enqueueIntegrationPayload = async (
+  userId: string,
+  provider: IntegrationKey,
+  entityType: InboxEntityType,
+  payload: Record<string, unknown>,
+  options: {
+    externalId?: string;
+    checksum?: string;
+    source?: string;
+  } = {}
+): Promise<string> => {
+  const inboxRef = collection(db, INTEGRATION_SYNC_INBOX);
+  const docRef = await addDoc(inboxRef, {
+    userId,
+    provider,
+    entityType,
+    payload,
+    externalId: options.externalId || null,
+    checksum: options.checksum || null,
+    source: options.source || 'manual',
+    status: 'pending',
+    error: null,
+    syncJobId: null,
+    createdAt: serverTimestamp(),
+    processedAt: null,
   });
   return docRef.id;
 };

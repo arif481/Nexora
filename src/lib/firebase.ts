@@ -80,6 +80,7 @@ export const COLLECTIONS = {
   INTEGRATION_SYNC_JOBS: 'integrationSyncJobs',
   INTEGRATION_SYNC_LOGS: 'integrationSyncLogs',
   INTEGRATION_MAPPINGS: 'integrationMappings',
+  INTEGRATION_SYNC_INBOX: 'integrationSyncInbox',
 } as const;
 
 // Storage paths

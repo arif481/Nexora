@@ -37,7 +37,14 @@ npm run dev
 
 # Build for production
 npm run build
+
+# Run integration sync worker
+npm run sync:worker
 ```
+
+## Integration Sync Worker
+
+- Setup and operations guide: `docs/sync-worker.md`
 
 ## License
 

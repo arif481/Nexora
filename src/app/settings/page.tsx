@@ -1685,6 +1685,7 @@ function DataSection() {
         'integrationSyncJobs',
         'integrationSyncLogs',
         'integrationMappings',
+        'integrationSyncInbox',
       ];
       const userDocumentCollections = ['userIntegrations', 'userLinkedAccounts'];
 
