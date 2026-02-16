@@ -5,6 +5,7 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
+  getDocs,
   query,
   where,
   orderBy,
@@ -12,10 +13,18 @@ import {
   serverTimestamp,
   Timestamp,
   writeBatch,
+  increment,
   limit,
 } from 'firebase/firestore';
 import { db, COLLECTIONS } from '../firebase';
-import type { Transaction, Budget, Subscription } from '@/types';
+import type {
+  Transaction,
+  Budget,
+  Subscription,
+  PersonAccount,
+  PersonAccountEntry,
+  PersonAccountType,
+} from '@/types';
 
 // Convert Firestore timestamp to Date
 const convertTimestamp = (timestamp: Timestamp | Date | null | undefined): Date => {
@@ -400,6 +409,245 @@ export const subscribeToActiveSubscriptions = (
     },
     (error) => {
       console.error('Error subscribing to active subscriptions:', error);
+      if (onError) onError(error);
+    }
+  );
+
+  return unsubscribe;
+};
+
+// ====== PEOPLE ACCOUNTS ======
+
+const convertPersonAccountFromFirestore = (doc: any): PersonAccount => {
+  const data = doc.data();
+  return {
+    id: doc.id,
+    userId: data.userId,
+    name: data.name,
+    contactInfo: data.contactInfo || undefined,
+    notes: data.notes || undefined,
+    currency: data.currency || 'USD',
+    balance: typeof data.balance === 'number' ? data.balance : 0,
+    createdAt: convertTimestamp(data.createdAt),
+    updatedAt: convertTimestamp(data.updatedAt || data.createdAt),
+    lastActivityAt: data.lastActivityAt ? convertTimestamp(data.lastActivityAt) : undefined,
+  };
+};
+
+export const createPersonAccount = async (
+  userId: string,
+  accountData: Partial<Omit<PersonAccount, 'id' | 'userId' | 'balance' | 'createdAt' | 'updatedAt'>>
+): Promise<string> => {
+  const accountsRef = collection(db, COLLECTIONS.FINANCE_PEOPLE_ACCOUNTS);
+
+  const newAccount = {
+    userId,
+    name: accountData.name || 'New Person',
+    contactInfo: accountData.contactInfo || null,
+    notes: accountData.notes || null,
+    currency: accountData.currency || 'USD',
+    balance: 0,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    lastActivityAt: null,
+  };
+
+  const docRef = await addDoc(accountsRef, newAccount);
+  return docRef.id;
+};
+
+export const updatePersonAccount = async (
+  accountId: string,
+  updates: Partial<PersonAccount>
+): Promise<void> => {
+  const accountRef = doc(db, COLLECTIONS.FINANCE_PEOPLE_ACCOUNTS, accountId);
+  await updateDoc(accountRef, {
+    ...updates,
+    updatedAt: serverTimestamp(),
+  });
+};
+
+export const deletePersonAccount = async (userId: string, accountId: string): Promise<void> => {
+  const accountRef = doc(db, COLLECTIONS.FINANCE_PEOPLE_ACCOUNTS, accountId);
+  const entriesRef = collection(db, COLLECTIONS.FINANCE_PEOPLE_ENTRIES);
+  const entriesQuery = query(
+    entriesRef,
+    where('userId', '==', userId),
+    where('accountId', '==', accountId)
+  );
+  const entriesSnapshot = await getDocs(entriesQuery);
+
+  const batch = writeBatch(db);
+  entriesSnapshot.docs.forEach((entryDoc) => batch.delete(entryDoc.ref));
+  batch.delete(accountRef);
+  await batch.commit();
+};
+
+export const subscribeToPersonAccounts = (
+  userId: string,
+  callback: (accounts: PersonAccount[]) => void,
+  onError?: (error: Error) => void
+): (() => void) => {
+  const accountsRef = collection(db, COLLECTIONS.FINANCE_PEOPLE_ACCOUNTS);
+  const q = query(
+    accountsRef,
+    where('userId', '==', userId),
+    orderBy('updatedAt', 'desc')
+  );
+
+  const unsubscribe = onSnapshot(
+    q,
+    (snapshot) => {
+      const accounts = snapshot.docs.map(convertPersonAccountFromFirestore);
+      callback(accounts);
+    },
+    (error) => {
+      console.error('Error subscribing to person accounts:', error);
+      if (onError) onError(error);
+    }
+  );
+
+  return unsubscribe;
+};
+
+// ====== PEOPLE ACCOUNT ENTRIES ======
+
+const convertPersonAccountEntryFromFirestore = (doc: any): PersonAccountEntry => {
+  const data = doc.data();
+  return {
+    id: doc.id,
+    userId: data.userId,
+    accountId: data.accountId,
+    amount: data.amount || 0,
+    currency: data.currency || 'USD',
+    typeKey: data.typeKey || 'custom',
+    typeLabel: data.typeLabel || 'Record',
+    balanceEffect: data.balanceEffect === 'decrease' ? 'decrease' : 'increase',
+    note: data.note || undefined,
+    date: convertTimestamp(data.date),
+    createdAt: convertTimestamp(data.createdAt),
+  };
+};
+
+export const createPersonAccountEntry = async (
+  userId: string,
+  accountId: string,
+  entryData: Partial<Omit<PersonAccountEntry, 'id' | 'userId' | 'accountId' | 'createdAt'>>
+): Promise<string> => {
+  const entriesRef = collection(db, COLLECTIONS.FINANCE_PEOPLE_ENTRIES);
+
+  const amount = entryData.amount || 0;
+  const balanceEffect = entryData.balanceEffect === 'decrease' ? 'decrease' : 'increase';
+  const delta = balanceEffect === 'increase' ? amount : -amount;
+
+  const newEntry = {
+    userId,
+    accountId,
+    amount,
+    currency: entryData.currency || 'USD',
+    typeKey: entryData.typeKey || 'custom',
+    typeLabel: entryData.typeLabel || 'Record',
+    balanceEffect,
+    note: entryData.note || null,
+    date: entryData.date || new Date(),
+    createdAt: serverTimestamp(),
+  };
+
+  const docRef = await addDoc(entriesRef, newEntry);
+
+  const accountRef = doc(db, COLLECTIONS.FINANCE_PEOPLE_ACCOUNTS, accountId);
+  await updateDoc(accountRef, {
+    balance: increment(delta),
+    updatedAt: serverTimestamp(),
+    lastActivityAt: entryData.date || new Date(),
+  });
+
+  return docRef.id;
+};
+
+export const subscribeToPersonAccountEntries = (
+  userId: string,
+  accountId: string,
+  callback: (entries: PersonAccountEntry[]) => void,
+  onError?: (error: Error) => void
+): (() => void) => {
+  const entriesRef = collection(db, COLLECTIONS.FINANCE_PEOPLE_ENTRIES);
+  const q = query(
+    entriesRef,
+    where('userId', '==', userId),
+    where('accountId', '==', accountId),
+    orderBy('date', 'desc')
+  );
+
+  const unsubscribe = onSnapshot(
+    q,
+    (snapshot) => {
+      const entries = snapshot.docs.map(convertPersonAccountEntryFromFirestore);
+      callback(entries);
+    },
+    (error) => {
+      console.error('Error subscribing to person account entries:', error);
+      if (onError) onError(error);
+    }
+  );
+
+  return unsubscribe;
+};
+
+// ====== PEOPLE ACCOUNT TYPES ======
+
+const convertPersonAccountTypeFromFirestore = (doc: any): PersonAccountType => {
+  const data = doc.data();
+  return {
+    id: doc.id,
+    userId: data.userId,
+    name: data.name,
+    balanceEffect: data.balanceEffect === 'decrease' ? 'decrease' : 'increase',
+    createdAt: convertTimestamp(data.createdAt),
+  };
+};
+
+export const createPersonAccountType = async (
+  userId: string,
+  typeData: Partial<Omit<PersonAccountType, 'id' | 'userId' | 'createdAt'>>
+): Promise<string> => {
+  const typesRef = collection(db, COLLECTIONS.FINANCE_PEOPLE_TYPES);
+  const newType = {
+    userId,
+    name: typeData.name || 'Custom type',
+    balanceEffect: typeData.balanceEffect === 'decrease' ? 'decrease' : 'increase',
+    createdAt: serverTimestamp(),
+  };
+
+  const docRef = await addDoc(typesRef, newType);
+  return docRef.id;
+};
+
+export const deletePersonAccountType = async (typeId: string): Promise<void> => {
+  const typeRef = doc(db, COLLECTIONS.FINANCE_PEOPLE_TYPES, typeId);
+  await deleteDoc(typeRef);
+};
+
+export const subscribeToPersonAccountTypes = (
+  userId: string,
+  callback: (types: PersonAccountType[]) => void,
+  onError?: (error: Error) => void
+): (() => void) => {
+  const typesRef = collection(db, COLLECTIONS.FINANCE_PEOPLE_TYPES);
+  const q = query(
+    typesRef,
+    where('userId', '==', userId),
+    orderBy('createdAt', 'asc')
+  );
+
+  const unsubscribe = onSnapshot(
+    q,
+    (snapshot) => {
+      const types = snapshot.docs.map(convertPersonAccountTypeFromFirestore);
+      callback(types);
+    },
+    (error) => {
+      console.error('Error subscribing to person account types:', error);
       if (onError) onError(error);
     }
   );

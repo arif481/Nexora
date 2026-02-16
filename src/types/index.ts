@@ -522,6 +522,43 @@ export interface Subscription {
   notes?: string;
 }
 
+export type PersonAccountBalanceEffect = 'increase' | 'decrease';
+
+export interface PersonAccount {
+  id: string;
+  userId: string;
+  name: string;
+  contactInfo?: string;
+  notes?: string;
+  currency: string;
+  balance: number;
+  createdAt: Date;
+  updatedAt: Date;
+  lastActivityAt?: Date;
+}
+
+export interface PersonAccountEntry {
+  id: string;
+  userId: string;
+  accountId: string;
+  amount: number;
+  currency: string;
+  typeKey: string;
+  typeLabel: string;
+  balanceEffect: PersonAccountBalanceEffect;
+  note?: string;
+  date: Date;
+  createdAt: Date;
+}
+
+export interface PersonAccountType {
+  id: string;
+  userId: string;
+  name: string;
+  balanceEffect: PersonAccountBalanceEffect;
+  createdAt: Date;
+}
+
 // ===== AI Context Types =====
 export interface UserContext {
   userId: string;
