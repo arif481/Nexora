@@ -39,11 +39,13 @@ import {
   BarChart3,
   PieChart,
   LogIn,
+  Users,
+  UserPlus,
 } from 'lucide-react';
 import { MainLayout, PageContainer } from '@/components/layout/MainLayout';
 import { Card, CardHeader, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
+import { Input, Textarea } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { Progress, CircularProgress } from '@/components/ui/Progress';
 import { Modal } from '@/components/ui/Modal';
@@ -52,8 +54,23 @@ import { useUIStore } from '@/stores/uiStore';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useUser } from '@/hooks/useUser';
-import { useTransactions, useBudgets, useSubscriptions, useFinanceStats } from '@/hooks/useFinance';
-import type { Transaction, Budget } from '@/types';
+import {
+  useTransactions,
+  useBudgets,
+  useSubscriptions,
+  useFinanceStats,
+  usePersonAccounts,
+  usePersonAccountEntries,
+  usePersonAccountTypes,
+} from '@/hooks/useFinance';
+import type {
+  Transaction,
+  Budget,
+  PersonAccount,
+  PersonAccountEntry,
+  PersonAccountType,
+  PersonAccountBalanceEffect,
+} from '@/types';
 
 // Category config
 const categoryConfig: Record<string, { label: string; icon: any; color: string }> = {
@@ -72,6 +89,17 @@ const categoryConfig: Record<string, { label: string; icon: any; color: string }
   investment: { label: 'Investment', icon: TrendingUp, color: '#a855f7' },
 };
 
+const defaultPersonRecordTypes: {
+  key: string;
+  label: string;
+  balanceEffect: PersonAccountBalanceEffect;
+}[] = [
+  { key: 'lent_money', label: 'I lent money', balanceEffect: 'increase' },
+  { key: 'borrowed_money', label: 'I borrowed money', balanceEffect: 'decrease' },
+  { key: 'received_payback', label: 'They paid me back', balanceEffect: 'decrease' },
+  { key: 'paid_back', label: 'I paid them back', balanceEffect: 'increase' },
+];
+
 export default function FinancePage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
@@ -79,6 +107,18 @@ export default function FinancePage() {
   const { transactions, loading: transactionsLoading, createTransaction, updateTransaction, deleteTransaction: deleteTransactionFn } = useTransactions();
   const { budgets, loading: budgetsLoading, createBudget, updateBudget, deleteBudget } = useBudgets();
   const { subscriptions, loading: subscriptionsLoading, createSubscription, updateSubscription, deleteSubscription } = useSubscriptions();
+  const {
+    personAccounts,
+    loading: personAccountsLoading,
+    createPersonAccount,
+    deletePersonAccount: deletePersonAccountFn,
+  } = usePersonAccounts();
+  const {
+    customTypes: personCustomTypes,
+    loading: personTypesLoading,
+    createType: createPersonType,
+    deleteType: deletePersonType,
+  } = usePersonAccountTypes();
   const stats = useFinanceStats(transactions, budgets);
   
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
@@ -88,12 +128,25 @@ export default function FinancePage() {
   const [selectedBudget, setSelectedBudget] = useState<Budget | null>(null);
   const [isAddSubscriptionOpen, setIsAddSubscriptionOpen] = useState(false);
   const [selectedSubscription, setSelectedSubscription] = useState<any>(null);
+  const [isAddPersonAccountOpen, setIsAddPersonAccountOpen] = useState(false);
+  const [selectedPersonAccount, setSelectedPersonAccount] = useState<PersonAccount | null>(null);
   const [filter, setFilter] = useState<'all' | 'income' | 'expense'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const { openAIPanel } = useUIStore();
 
-  const loading = authLoading || transactionsLoading || budgetsLoading || subscriptionsLoading;
+  const {
+    entries: selectedPersonEntries,
+    loading: selectedPersonEntriesLoading,
+    createEntry: createPersonEntry,
+  } = usePersonAccountEntries(selectedPersonAccount?.id || null);
+
+  const loading = authLoading || transactionsLoading || budgetsLoading || subscriptionsLoading || personAccountsLoading || personTypesLoading;
   const preferredCurrency = profile?.preferences?.currency || 'USD';
+
+  const activePersonAccount = useMemo(() => {
+    if (!selectedPersonAccount) return null;
+    return personAccounts.find((account) => account.id === selectedPersonAccount.id) || selectedPersonAccount;
+  }, [personAccounts, selectedPersonAccount]);
 
   // Calculate monthly stats - MUST be called before any early returns
   const safeTransactions = Array.isArray(transactions) ? transactions : [];
@@ -121,6 +174,21 @@ export default function FinancePage() {
       )
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [safeTransactions, filter, searchQuery]);
+
+  const peopleSummary = useMemo(() => {
+    const owedToYou = personAccounts
+      .filter((account) => account.balance > 0)
+      .reduce((sum, account) => sum + account.balance, 0);
+    const youOwe = personAccounts
+      .filter((account) => account.balance < 0)
+      .reduce((sum, account) => sum + Math.abs(account.balance), 0);
+
+    return {
+      owedToYou,
+      youOwe,
+      net: owedToYou - youOwe,
+    };
+  }, [personAccounts]);
 
   // Show loading state
   if (loading) {
@@ -476,6 +544,87 @@ export default function FinancePage() {
               </CardContent>
             </Card>
 
+            {/* People Accounts */}
+            <Card variant="glass">
+              <CardHeader
+                title="People Accounts"
+                icon={<Users className="w-5 h-5 text-neon-cyan" />}
+                action={
+                  <Button variant="ghost" size="sm" onClick={() => setIsAddPersonAccountOpen(true)}>
+                    <UserPlus className="w-4 h-4 mr-1" />
+                    Add
+                  </Button>
+                }
+              />
+              <CardContent className="space-y-3">
+                {personAccounts.length > 0 ? personAccounts.map(account => {
+                  const balance = account.balance || 0;
+                  const isPositive = balance > 0;
+                  const isNegative = balance < 0;
+
+                  return (
+                    <div
+                      key={account.id}
+                      className="flex items-center justify-between p-3 rounded-lg hover:bg-dark-700/30 cursor-pointer transition-colors"
+                      onClick={() => setSelectedPersonAccount(account)}
+                    >
+                      <div>
+                        <p className="text-sm font-medium text-white">{account.name}</p>
+                        <p className="text-xs text-dark-400">
+                          {isPositive
+                            ? `${account.name} owes you`
+                            : isNegative
+                            ? `You owe ${account.name}`
+                            : 'Settled'}
+                        </p>
+                      </div>
+                      <p
+                        className={cn(
+                          'text-sm font-semibold',
+                          isPositive ? 'text-neon-green' : isNegative ? 'text-neon-orange' : 'text-dark-300'
+                        )}
+                      >
+                        {isPositive ? '+' : isNegative ? '-' : ''}
+                        {formatCurrency(Math.abs(balance), account.currency || preferredCurrency)}
+                      </p>
+                    </div>
+                  );
+                }) : (
+                  <p className="text-sm text-dark-400 text-center py-4">
+                    No people accounts yet. Add one to track lending and paybacks.
+                  </p>
+                )}
+
+                {personAccounts.length > 0 && (
+                  <div className="pt-2 border-t border-dark-700 space-y-1.5">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-dark-400">They owe you</span>
+                      <span className="text-neon-green font-medium">
+                        {formatCurrency(peopleSummary.owedToYou)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-dark-400">You owe</span>
+                      <span className="text-neon-orange font-medium">
+                        {formatCurrency(peopleSummary.youOwe)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-dark-400">Net</span>
+                      <span
+                        className={cn(
+                          'font-semibold',
+                          peopleSummary.net >= 0 ? 'text-neon-green' : 'text-neon-orange'
+                        )}
+                      >
+                        {formatCurrency(peopleSummary.net)}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             {/* AI Insights */}
             <Card variant="glass">
               <CardHeader
@@ -661,6 +810,49 @@ export default function FinancePage() {
                 setSelectedSubscription(null);
               }}
               onClose={() => setSelectedSubscription(null)}
+            />
+          )}
+        </Modal>
+
+        {/* Add People Account Modal */}
+        <Modal
+          isOpen={isAddPersonAccountOpen}
+          onClose={() => setIsAddPersonAccountOpen(false)}
+          title="Add People Account"
+          size="md"
+        >
+          <AddPersonAccountForm
+            currency={preferredCurrency}
+            onAdd={async (data) => {
+              await createPersonAccount(data);
+              setIsAddPersonAccountOpen(false);
+            }}
+            onClose={() => setIsAddPersonAccountOpen(false)}
+          />
+        </Modal>
+
+        {/* People Account Details Modal */}
+        <Modal
+          isOpen={!!activePersonAccount}
+          onClose={() => setSelectedPersonAccount(null)}
+          title={activePersonAccount ? activePersonAccount.name : 'People Account'}
+          size="md"
+        >
+          {activePersonAccount && (
+            <PersonAccountDetails
+              account={activePersonAccount}
+              entries={selectedPersonEntries}
+              entriesLoading={selectedPersonEntriesLoading}
+              customTypes={personCustomTypes}
+              fallbackCurrency={preferredCurrency}
+              onAddEntry={createPersonEntry}
+              onCreateCustomType={createPersonType}
+              onDeleteCustomType={deletePersonType}
+              onDeleteAccount={async () => {
+                await deletePersonAccountFn(activePersonAccount.id);
+                setSelectedPersonAccount(null);
+              }}
+              onClose={() => setSelectedPersonAccount(null)}
             />
           )}
         </Modal>
@@ -1695,5 +1887,445 @@ function SubscriptionDetailsForm({
         </div>
       </div>
     </form>
+  );
+}
+
+interface CreatePersonAccountFormData {
+  name: string;
+  contactInfo?: string;
+  notes?: string;
+  currency?: string;
+}
+
+function AddPersonAccountForm({
+  currency,
+  onAdd,
+  onClose,
+}: {
+  currency: string;
+  onAdd: (data: CreatePersonAccountFormData) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [name, setName] = useState('');
+  const [contactInfo, setContactInfo] = useState('');
+  const [notes, setNotes] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name || isSubmitting) return;
+
+    setIsSubmitting(true);
+    try {
+      await onAdd({
+        name: name.trim(),
+        contactInfo: contactInfo.trim() || undefined,
+        notes: notes.trim() || undefined,
+        currency,
+      });
+    } catch (error) {
+      console.error('Failed to create people account:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <Input
+        label="Person Name"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder="e.g., Alex"
+        required
+      />
+
+      <Input
+        label="Contact Info (optional)"
+        value={contactInfo}
+        onChange={(e) => setContactInfo(e.target.value)}
+        placeholder="Phone, email, or handle"
+      />
+
+      <Textarea
+        label="Notes (optional)"
+        value={notes}
+        onChange={(e) => setNotes(e.target.value)}
+        placeholder="Any reminders for this account"
+        rows={3}
+      />
+
+      <div className="flex justify-end gap-3 pt-4">
+        <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
+        <Button type="submit" variant="glow" disabled={isSubmitting}>
+          {isSubmitting ? 'Creating...' : 'Create Account'}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+interface PersonRecordTypeOption {
+  key: string;
+  label: string;
+  balanceEffect: PersonAccountBalanceEffect;
+  typeId?: string;
+  isCustom: boolean;
+}
+
+function PersonAccountDetails({
+  account,
+  entries,
+  entriesLoading,
+  customTypes,
+  fallbackCurrency,
+  onAddEntry,
+  onCreateCustomType,
+  onDeleteCustomType,
+  onDeleteAccount,
+  onClose,
+}: {
+  account: PersonAccount;
+  entries: PersonAccountEntry[];
+  entriesLoading: boolean;
+  customTypes: PersonAccountType[];
+  fallbackCurrency: string;
+  onAddEntry: (data: {
+    amount: number;
+    currency?: string;
+    typeKey: string;
+    typeLabel: string;
+    balanceEffect: PersonAccountBalanceEffect;
+    note?: string;
+    date?: Date;
+  }) => Promise<string>;
+  onCreateCustomType: (data: { name: string; balanceEffect: PersonAccountBalanceEffect }) => Promise<string>;
+  onDeleteCustomType: (typeId: string) => Promise<void>;
+  onDeleteAccount: () => Promise<void>;
+  onClose: () => void;
+}) {
+  const [selectedTypeKey, setSelectedTypeKey] = useState(defaultPersonRecordTypes[0].key);
+  const [amount, setAmount] = useState('');
+  const [entryDate, setEntryDate] = useState(new Date().toISOString().split('T')[0]);
+  const [note, setNote] = useState('');
+  const [isSubmittingEntry, setIsSubmittingEntry] = useState(false);
+  const [customTypeName, setCustomTypeName] = useState('');
+  const [customTypeEffect, setCustomTypeEffect] = useState<PersonAccountBalanceEffect>('increase');
+  const [isCreatingType, setIsCreatingType] = useState(false);
+  const [isDeletingTypeId, setIsDeletingTypeId] = useState<string | null>(null);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+
+  const typeOptions = useMemo<PersonRecordTypeOption[]>(() => {
+    const defaults = defaultPersonRecordTypes.map((type) => ({
+      key: type.key,
+      label: type.label,
+      balanceEffect: type.balanceEffect,
+      isCustom: false,
+    }));
+    const custom = customTypes.map((type) => ({
+      key: `custom_${type.id}`,
+      label: type.name,
+      balanceEffect: type.balanceEffect,
+      typeId: type.id,
+      isCustom: true,
+    }));
+    return [...defaults, ...custom];
+  }, [customTypes]);
+
+  const selectedType =
+    typeOptions.find((type) => type.key === selectedTypeKey) ||
+    typeOptions[0] ||
+    {
+      key: 'default',
+      label: 'Record',
+      balanceEffect: 'increase' as PersonAccountBalanceEffect,
+      isCustom: false,
+    };
+
+  const effectiveTypeKey = typeOptions.some((type) => type.key === selectedTypeKey)
+    ? selectedTypeKey
+    : selectedType.key;
+
+  const formatCurrency = (value: number, currency: string = account.currency || fallbackCurrency) => {
+    try {
+      return new Intl.NumberFormat(undefined, {
+        style: 'currency',
+        currency,
+      }).format(value);
+    } catch {
+      return `${currency} ${value.toFixed(2)}`;
+    }
+  };
+
+  const balance = account.balance || 0;
+  const balanceText = balance > 0 ? `${account.name} owes you` : balance < 0 ? `You owe ${account.name}` : 'Settled';
+
+  const handleAddEntry = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!amount || isSubmittingEntry) return;
+
+    const parsedAmount = parseFloat(amount);
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) return;
+
+    setIsSubmittingEntry(true);
+    try {
+      await onAddEntry({
+        amount: parsedAmount,
+        currency: account.currency || fallbackCurrency,
+        typeKey: selectedType.key,
+        typeLabel: selectedType.label,
+        balanceEffect: selectedType.balanceEffect,
+        note: note.trim() || undefined,
+        date: new Date(entryDate),
+      });
+      setAmount('');
+      setNote('');
+    } catch (error) {
+      console.error('Failed to add people account record:', error);
+    } finally {
+      setIsSubmittingEntry(false);
+    }
+  };
+
+  const handleCreateType = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customTypeName.trim() || isCreatingType) return;
+
+    setIsCreatingType(true);
+    try {
+      await onCreateCustomType({
+        name: customTypeName.trim(),
+        balanceEffect: customTypeEffect,
+      });
+      setCustomTypeName('');
+    } catch (error) {
+      console.error('Failed to create custom type:', error);
+    } finally {
+      setIsCreatingType(false);
+    }
+  };
+
+  const handleDeleteType = async (typeId: string) => {
+    if (!confirm('Delete this custom type? Existing records will stay unchanged.')) return;
+
+    setIsDeletingTypeId(typeId);
+    try {
+      await onDeleteCustomType(typeId);
+    } catch (error) {
+      console.error('Failed to delete custom type:', error);
+    } finally {
+      setIsDeletingTypeId(null);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!confirm(`Delete ${account.name}'s account and all related records?`)) return;
+
+    setIsDeletingAccount(true);
+    try {
+      await onDeleteAccount();
+    } catch (error) {
+      console.error('Failed to delete people account:', error);
+      setIsDeletingAccount(false);
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      <div className="p-4 rounded-lg bg-dark-800/50">
+        <p className="text-sm text-dark-400 mb-1">{balanceText}</p>
+        <p
+          className={cn(
+            'text-2xl font-bold',
+            balance > 0 ? 'text-neon-green' : balance < 0 ? 'text-neon-orange' : 'text-white'
+          )}
+        >
+          {balance > 0 ? '+' : balance < 0 ? '-' : ''}
+          {formatCurrency(Math.abs(balance))}
+        </p>
+        {account.contactInfo && <p className="text-xs text-dark-400 mt-2">{account.contactInfo}</p>}
+        {account.notes && <p className="text-xs text-dark-400 mt-1">{account.notes}</p>}
+      </div>
+
+      <form onSubmit={handleAddEntry} className="space-y-3 p-4 rounded-lg bg-dark-800/30">
+        <p className="text-sm font-medium text-white">Add Record</p>
+
+        <div>
+          <label className="block text-sm font-medium text-dark-200 mb-2">Type</label>
+          <select
+            value={effectiveTypeKey}
+            onChange={(e) => setSelectedTypeKey(e.target.value)}
+            className="w-full px-3 py-2 rounded-lg bg-dark-800 border border-glass-border text-white focus:outline-none focus:ring-2 focus:ring-neon-cyan/20"
+          >
+            {typeOptions.map((type) => (
+              <option key={type.key} value={type.key}>
+                {type.label} ({type.balanceEffect === 'increase' ? 'increases balance' : 'decreases balance'})
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <Input
+          label="Amount"
+          type="number"
+          step="0.01"
+          min="0"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          placeholder="0.00"
+          required
+        />
+
+        <Input
+          label="Date"
+          type="date"
+          value={entryDate}
+          onChange={(e) => setEntryDate(e.target.value)}
+          required
+        />
+
+        <Input
+          label="Note (optional)"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="What happened?"
+        />
+
+        <div className="flex justify-end">
+          <Button type="submit" variant="glow" disabled={isSubmittingEntry}>
+            {isSubmittingEntry ? 'Saving...' : 'Save Record'}
+          </Button>
+        </div>
+      </form>
+
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-medium text-white">Recent Records</p>
+          <Badge variant="outline" size="sm">{entries.length}</Badge>
+        </div>
+        <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+          {entriesLoading ? (
+            <p className="text-sm text-dark-400 py-4 text-center">Loading records...</p>
+          ) : entries.length > 0 ? (
+            entries.slice(0, 20).map((entry) => {
+              const isIncrease = entry.balanceEffect === 'increase';
+              return (
+                <div key={entry.id} className="p-3 rounded-lg bg-dark-800/30">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm text-white">{entry.typeLabel}</p>
+                      <p className="text-xs text-dark-400">
+                        {entry.date.toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })}
+                      </p>
+                    </div>
+                    <p className={cn('text-sm font-semibold', isIncrease ? 'text-neon-green' : 'text-neon-orange')}>
+                      {isIncrease ? '+' : '-'}
+                      {formatCurrency(entry.amount, entry.currency || account.currency || fallbackCurrency)}
+                    </p>
+                  </div>
+                  {entry.note && <p className="text-xs text-dark-400 mt-2">{entry.note}</p>}
+                </div>
+              );
+            })
+          ) : (
+            <p className="text-sm text-dark-400 py-4 text-center">No records yet.</p>
+          )}
+        </div>
+      </div>
+
+      <form onSubmit={handleCreateType} className="space-y-3 p-4 rounded-lg bg-dark-800/30">
+        <p className="text-sm font-medium text-white">Custom Types</p>
+
+        {customTypes.length > 0 && (
+          <div className="space-y-2">
+            {customTypes.map((type) => (
+              <div key={type.id} className="flex items-center justify-between p-2 rounded-lg bg-dark-700/40">
+                <div>
+                  <p className="text-sm text-white">{type.name}</p>
+                  <p className="text-xs text-dark-400">
+                    {type.balanceEffect === 'increase' ? 'Increases balance' : 'Decreases balance'}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-status-error"
+                  disabled={isDeletingTypeId === type.id}
+                  onClick={() => handleDeleteType(type.id)}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <Input
+          label="New Type Name"
+          value={customTypeName}
+          onChange={(e) => setCustomTypeName(e.target.value)}
+          placeholder="e.g., Group Expense Settlement"
+        />
+
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-dark-200">Effect on Balance</label>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setCustomTypeEffect('increase')}
+              className={cn(
+                'py-2 rounded-lg border text-sm',
+                customTypeEffect === 'increase'
+                  ? 'border-neon-green bg-neon-green/10 text-neon-green'
+                  : 'border-dark-700 text-dark-400 hover:border-dark-500'
+              )}
+            >
+              Increase
+            </button>
+            <button
+              type="button"
+              onClick={() => setCustomTypeEffect('decrease')}
+              className={cn(
+                'py-2 rounded-lg border text-sm',
+                customTypeEffect === 'decrease'
+                  ? 'border-neon-orange bg-neon-orange/10 text-neon-orange'
+                  : 'border-dark-700 text-dark-400 hover:border-dark-500'
+              )}
+            >
+              Decrease
+            </button>
+          </div>
+        </div>
+
+        <div className="flex justify-end">
+          <Button type="submit" variant="outline" disabled={isCreatingType}>
+            {isCreatingType ? 'Adding...' : 'Add Custom Type'}
+          </Button>
+        </div>
+      </form>
+
+      <div className="flex justify-between pt-2">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="text-status-error"
+          onClick={handleDeleteAccount}
+          disabled={isDeletingAccount}
+        >
+          <Trash2 className="w-4 h-4 mr-1" />
+          {isDeletingAccount ? 'Deleting...' : 'Delete Account'}
+        </Button>
+
+        <Button type="button" variant="ghost" onClick={onClose}>
+          Close
+        </Button>
+      </div>
+    </div>
   );
 }

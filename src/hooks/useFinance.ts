@@ -2,7 +2,15 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from './useAuth';
-import type { Transaction, Budget, Subscription } from '@/types';
+import type {
+  Transaction,
+  Budget,
+  Subscription,
+  PersonAccount,
+  PersonAccountEntry,
+  PersonAccountType,
+  PersonAccountBalanceEffect,
+} from '@/types';
 import {
   subscribeToTransactions,
   subscribeToRecentTransactions,
@@ -21,6 +29,15 @@ import {
   updateSubscription,
   deleteSubscription,
   toggleSubscriptionActive,
+  subscribeToPersonAccounts,
+  createPersonAccount,
+  updatePersonAccount,
+  deletePersonAccount,
+  subscribeToPersonAccountEntries,
+  createPersonAccountEntry,
+  subscribeToPersonAccountTypes,
+  createPersonAccountType,
+  deletePersonAccountType,
 } from '@/lib/services/finance';
 
 // ====== TRANSACTIONS HOOK ======
@@ -384,6 +401,284 @@ export function useSubscriptions(activeOnly: boolean = false): UseSubscriptionsR
     updateSubscription: handleUpdateSubscription,
     deleteSubscription: handleDeleteSubscription,
     toggleActive: handleToggleActive,
+    refresh,
+  };
+}
+
+// ====== PEOPLE ACCOUNTS HOOK ======
+
+interface UsePersonAccountsReturn {
+  personAccounts: PersonAccount[];
+  loading: boolean;
+  error: string | null;
+  createPersonAccount: (data: CreatePersonAccountData) => Promise<string>;
+  updatePersonAccount: (accountId: string, updates: Partial<PersonAccount>) => Promise<void>;
+  deletePersonAccount: (accountId: string) => Promise<void>;
+  refresh: () => void;
+}
+
+interface CreatePersonAccountData {
+  name: string;
+  contactInfo?: string;
+  notes?: string;
+  currency?: string;
+}
+
+export function usePersonAccounts(): UsePersonAccountsReturn {
+  const { user } = useAuth();
+  const [personAccounts, setPersonAccounts] = useState<PersonAccount[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) {
+      setPersonAccounts([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    const unsubscribe = subscribeToPersonAccounts(
+      user.uid,
+      (fetchedAccounts) => {
+        setPersonAccounts(fetchedAccounts);
+        setLoading(false);
+        setError(null);
+      },
+      (err) => {
+        console.error('Person accounts subscription error:', err);
+        setError(err.message);
+        setPersonAccounts([]);
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [user]);
+
+  const handleCreatePersonAccount = useCallback(
+    async (data: CreatePersonAccountData): Promise<string> => {
+      if (!user) throw new Error('User not authenticated');
+
+      try {
+        const accountId = await createPersonAccount(user.uid, data);
+        return accountId;
+      } catch (err: any) {
+        setError(err.message);
+        throw err;
+      }
+    },
+    [user]
+  );
+
+  const handleUpdatePersonAccount = useCallback(
+    async (accountId: string, updates: Partial<PersonAccount>): Promise<void> => {
+      try {
+        await updatePersonAccount(accountId, updates);
+      } catch (err: any) {
+        setError(err.message);
+        throw err;
+      }
+    },
+    []
+  );
+
+  const handleDeletePersonAccount = useCallback(
+    async (accountId: string): Promise<void> => {
+      if (!user) throw new Error('User not authenticated');
+
+      try {
+        await deletePersonAccount(user.uid, accountId);
+      } catch (err: any) {
+        setError(err.message);
+        throw err;
+      }
+    },
+    [user]
+  );
+
+  const refresh = useCallback(() => {
+    setLoading(true);
+  }, []);
+
+  return {
+    personAccounts,
+    loading,
+    error,
+    createPersonAccount: handleCreatePersonAccount,
+    updatePersonAccount: handleUpdatePersonAccount,
+    deletePersonAccount: handleDeletePersonAccount,
+    refresh,
+  };
+}
+
+// ====== PEOPLE ACCOUNT ENTRIES HOOK ======
+
+interface UsePersonAccountEntriesReturn {
+  entries: PersonAccountEntry[];
+  loading: boolean;
+  error: string | null;
+  createEntry: (data: CreatePersonAccountEntryData) => Promise<string>;
+  refresh: () => void;
+}
+
+interface CreatePersonAccountEntryData {
+  amount: number;
+  currency?: string;
+  typeKey: string;
+  typeLabel: string;
+  balanceEffect: PersonAccountBalanceEffect;
+  note?: string;
+  date?: Date;
+}
+
+export function usePersonAccountEntries(accountId: string | null): UsePersonAccountEntriesReturn {
+  const { user } = useAuth();
+  const [entries, setEntries] = useState<PersonAccountEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user || !accountId) {
+      setEntries([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    const unsubscribe = subscribeToPersonAccountEntries(
+      user.uid,
+      accountId,
+      (fetchedEntries) => {
+        setEntries(fetchedEntries);
+        setLoading(false);
+        setError(null);
+      },
+      (err) => {
+        console.error('Person account entries subscription error:', err);
+        setError(err.message);
+        setEntries([]);
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [user, accountId]);
+
+  const handleCreateEntry = useCallback(
+    async (data: CreatePersonAccountEntryData): Promise<string> => {
+      if (!user) throw new Error('User not authenticated');
+      if (!accountId) throw new Error('No account selected');
+
+      try {
+        const entryId = await createPersonAccountEntry(user.uid, accountId, data);
+        return entryId;
+      } catch (err: any) {
+        setError(err.message);
+        throw err;
+      }
+    },
+    [user, accountId]
+  );
+
+  const refresh = useCallback(() => {
+    setLoading(true);
+  }, []);
+
+  return {
+    entries,
+    loading,
+    error,
+    createEntry: handleCreateEntry,
+    refresh,
+  };
+}
+
+// ====== PEOPLE ACCOUNT TYPES HOOK ======
+
+interface UsePersonAccountTypesReturn {
+  customTypes: PersonAccountType[];
+  loading: boolean;
+  error: string | null;
+  createType: (data: CreatePersonAccountTypeData) => Promise<string>;
+  deleteType: (typeId: string) => Promise<void>;
+  refresh: () => void;
+}
+
+interface CreatePersonAccountTypeData {
+  name: string;
+  balanceEffect: PersonAccountBalanceEffect;
+}
+
+export function usePersonAccountTypes(): UsePersonAccountTypesReturn {
+  const { user } = useAuth();
+  const [customTypes, setCustomTypes] = useState<PersonAccountType[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) {
+      setCustomTypes([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    const unsubscribe = subscribeToPersonAccountTypes(
+      user.uid,
+      (fetchedTypes) => {
+        setCustomTypes(fetchedTypes);
+        setLoading(false);
+        setError(null);
+      },
+      (err) => {
+        console.error('Person account types subscription error:', err);
+        setError(err.message);
+        setCustomTypes([]);
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [user]);
+
+  const handleCreateType = useCallback(
+    async (data: CreatePersonAccountTypeData): Promise<string> => {
+      if (!user) throw new Error('User not authenticated');
+
+      try {
+        const typeId = await createPersonAccountType(user.uid, data);
+        return typeId;
+      } catch (err: any) {
+        setError(err.message);
+        throw err;
+      }
+    },
+    [user]
+  );
+
+  const handleDeleteType = useCallback(
+    async (typeId: string): Promise<void> => {
+      try {
+        await deletePersonAccountType(typeId);
+      } catch (err: any) {
+        setError(err.message);
+        throw err;
+      }
+    },
+    []
+  );
+
+  const refresh = useCallback(() => {
+    setLoading(true);
+  }, []);
+
+  return {
+    customTypes,
+    loading,
+    error,
+    createType: handleCreateType,
+    deleteType: handleDeleteType,
     refresh,
   };
 }
