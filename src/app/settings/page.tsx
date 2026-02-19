@@ -237,7 +237,7 @@ function ProfileSection({ onDirty }: { onDirty: () => void }) {
   const { profile: userProfile, updateProfile, updatePreferences } = useUser();
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
-  
+
   const [formData, setFormData] = useState({
     name: '',
     gender: 'prefer-not-to-say' as GenderIdentity,
@@ -430,9 +430,9 @@ function ProfileSection({ onDirty }: { onDirty: () => void }) {
                 {saveMessage}
               </span>
             )}
-            <Button 
-              variant="glow" 
-              size="sm" 
+            <Button
+              variant="glow"
+              size="sm"
               onClick={handleSave}
               disabled={saving}
               className="ml-auto"
@@ -461,12 +461,12 @@ function ProfileSection({ onDirty }: { onDirty: () => void }) {
 
 // Connected Accounts Component - Shows Google sign-in status
 function ConnectedAccountsCard() {
-  const { 
-    linkedAccounts, 
-    loading, 
-    isGoogleLinked, 
+  const {
+    linkedAccounts,
+    loading,
+    isGoogleLinked,
     connectAccount,
-    disconnectAccount 
+    disconnectAccount
   } = useLinkedAccounts();
 
   return (
@@ -491,8 +491,8 @@ function ConnectedAccountsCard() {
             {isGoogleLinked ? (
               <Badge variant="green" size="sm">Connected</Badge>
             ) : (
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size="sm"
                 onClick={() => connectAccount('google')}
               >
@@ -553,7 +553,7 @@ function AppearanceSection({ onDirty }: { onDirty: () => void }) {
   const applyTheme = (newTheme: 'dark' | 'light' | 'system') => {
     localStorage.setItem('nexora-theme', newTheme);
     document.documentElement.classList.remove('light', 'dark');
-    
+
     if (newTheme === 'system') {
       // Use system preference
       const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -712,8 +712,8 @@ function AppearanceSection({ onDirty }: { onDirty: () => void }) {
             {saveMessage}
           </span>
         )}
-        <Button 
-          variant="glow" 
+        <Button
+          variant="glow"
           onClick={handleSave}
           disabled={saving}
         >
@@ -899,8 +899,8 @@ function NotificationsSection({ onDirty }: { onDirty: () => void }) {
             {saveMessage}
           </span>
         )}
-        <Button 
-          variant="glow" 
+        <Button
+          variant="glow"
           onClick={handleSave}
           disabled={saving}
         >
@@ -924,6 +924,40 @@ function NotificationsSection({ onDirty }: { onDirty: () => void }) {
 // Privacy Section
 function PrivacySection({ onDirty }: { onDirty: () => void }) {
   const { user } = useAuth();
+  const { profile, updatePreferences } = useUser();
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [privacySettings, setPrivacySettings] = useState({
+    analyticsEnabled: true,
+    dataCollection: true,
+    localStorageOnly: false,
+    encryptionEnabled: true,
+  });
+
+  useEffect(() => {
+    const stored = profile?.preferences?.privacy;
+    if (!stored) return;
+    setPrivacySettings(prev => ({ ...prev, ...stored }));
+  }, [profile]);
+
+  const updateSetting = (key: keyof typeof privacySettings, value: boolean) => {
+    setPrivacySettings(prev => ({ ...prev, [key]: value }));
+    onDirty();
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setSaveMsg(null);
+    try {
+      await updatePreferences({ privacy: privacySettings });
+      setSaveMsg('Privacy settings saved.');
+      setTimeout(() => setSaveMsg(null), 3000);
+    } catch {
+      setSaveMsg('Failed to save settings.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -949,6 +983,51 @@ function PrivacySection({ onDirty }: { onDirty: () => void }) {
                 <p className="text-sm text-dark-400">Your data is encrypted and stored securely in Firebase</p>
               </div>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Privacy Toggles */}
+      <Card variant="glass">
+        <CardHeader title="Privacy Controls" icon={<Eye className="w-5 h-5 text-neon-purple" />} />
+        <CardContent className="p-6 space-y-4">
+          <SettingToggle
+            label="Firebase Analytics"
+            description="Allow anonymous usage analytics to help improve the app."
+            value={privacySettings.analyticsEnabled}
+            onChange={value => updateSetting('analyticsEnabled', value)}
+            icon={Target}
+          />
+          <SettingToggle
+            label="Data Collection"
+            description="Allow the app to collect usage patterns for AI insights."
+            value={privacySettings.dataCollection}
+            onChange={value => updateSetting('dataCollection', value)}
+            icon={Database}
+          />
+          <SettingToggle
+            label="Local Storage Only"
+            description="Prefer storing non-essential data locally instead of in the cloud."
+            value={privacySettings.localStorageOnly}
+            onChange={value => updateSetting('localStorageOnly', value)}
+            icon={Smartphone}
+          />
+          <div className="flex items-center justify-end gap-3 pt-2">
+            {saveMsg && (
+              <span className={cn(
+                'text-sm',
+                saveMsg.includes('saved') ? 'text-neon-green' : 'text-status-error'
+              )}>
+                {saveMsg}
+              </span>
+            )}
+            <Button variant="glow" size="sm" onClick={handleSave} disabled={saving}>
+              {saving ? (
+                <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Saving...</>
+              ) : (
+                <><Save className="w-4 h-4 mr-1" /> Save Privacy Settings</>
+              )}
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -996,16 +1075,16 @@ function AISettingsSection({ onDirty }: { onDirty: () => void }) {
 
   const handleValidateKey = async () => {
     if (!apiKey.trim()) return;
-    
+
     // Basic format validation first
     if (apiKey.trim().length < 20) {
       setValidationResult('invalid');
       return;
     }
-    
+
     setIsValidating(true);
     setValidationResult(null);
-    
+
     try {
       const { validateGeminiApiKey } = await import('@/lib/services/gemini');
       const isValid = await validateGeminiApiKey(apiKey.trim());
@@ -1021,11 +1100,11 @@ function AISettingsSection({ onDirty }: { onDirty: () => void }) {
 
   const handleSaveKey = async () => {
     if (!apiKey.trim()) return;
-    
+
     // Allow saving if validated OR if key looks valid (39 chars for Gemini)
     const canSave = validationResult === 'valid' || apiKey.trim().length >= 35;
     if (!canSave) return;
-    
+
     setIsSaving(true);
     try {
       const { saveGeminiApiKey, getGeminiApiKeyMasked, isAIConfigured } = await import('@/lib/services/gemini');
@@ -1061,7 +1140,7 @@ function AISettingsSection({ onDirty }: { onDirty: () => void }) {
                 {isConfigured ? 'AI is Active' : 'AI Not Configured'}
               </p>
               <p className="text-sm text-dark-400">
-                {isConfigured 
+                {isConfigured
                   ? `Using Gemini 1.5 Flash • Key: ${maskedKey}`
                   : 'Add your Gemini API key to enable AI features'
                 }
@@ -1099,7 +1178,7 @@ function AISettingsSection({ onDirty }: { onDirty: () => void }) {
                   Validate
                 </button>
               </div>
-              
+
               {/* Validation feedback */}
               {validationResult && (
                 <div className={`mt-2 text-sm flex items-center gap-2 ${validationResult === 'valid' ? 'text-green-400' : 'text-red-400'}`}>
@@ -1132,7 +1211,7 @@ function AISettingsSection({ onDirty }: { onDirty: () => void }) {
                 )}
                 Save API Key
               </button>
-              
+
               {isConfigured && (
                 <button
                   onClick={handleRemoveKey}
@@ -1195,7 +1274,7 @@ function AISettingsSection({ onDirty }: { onDirty: () => void }) {
 // Integrations Section with real data
 function IntegrationsSection() {
   const { profile, updatePreferences } = useUser();
-  const { 
+  const {
     integrations,
     loading,
     supportedIntegrations,
@@ -1207,7 +1286,7 @@ function IntegrationsSection() {
     disconnect,
   } = useIntegrations();
   const { jobs, logs, loading: syncLoading, requestSync } = useAutoSync();
-  
+
   const [disconnecting, setDisconnecting] = useState<string | null>(null);
   const [syncing, setSyncing] = useState<string | null>(null);
   const [savingPermissions, setSavingPermissions] = useState(false);
@@ -1403,11 +1482,13 @@ function IntegrationsSection() {
             <div className="space-y-3">
               {supportedIntegrations.map(provider => {
                 const integration = integrations[provider.key];
+                const isComingSoon = provider.setupStatus === 'coming-soon';
+                const needsConfig = provider.setupStatus === 'needs-config';
                 const connected = provider.key === 'googleCalendar'
                   ? isGoogleCalendarConnected
                   : provider.key === 'appleCalendar'
-                  ? isAppleCalendarConnected
-                  : integration?.connected ?? false;
+                    ? isAppleCalendarConnected
+                    : integration?.connected ?? false;
                 const Icon = providerIconMap[provider.key] || Link2;
                 const lastSynced = toDate(integration?.lastSynced);
                 const status = integration?.status || (connected ? 'idle' : 'disconnected');
@@ -1415,7 +1496,10 @@ function IntegrationsSection() {
                 return (
                   <div
                     key={provider.key}
-                    className="p-4 rounded-xl bg-dark-800/30 border border-dark-700/40"
+                    className={cn(
+                      'p-4 rounded-xl bg-dark-800/30 border border-dark-700/40',
+                      isComingSoon && 'opacity-60'
+                    )}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-start gap-3">
@@ -1429,13 +1513,25 @@ function IntegrationsSection() {
                           )} />
                         </div>
                         <div>
-                          <p className="font-medium text-white">{provider.name}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-white">{provider.name}</p>
+                            {isComingSoon && (
+                              <Badge variant="default" size="sm" className="text-[10px]">Coming Soon</Badge>
+                            )}
+                            {needsConfig && !connected && (
+                              <Badge variant="orange" size="sm" className="text-[10px]">Needs Config</Badge>
+                            )}
+                          </div>
                           <p className="text-xs text-dark-400">
-                            {getDetailText(provider.key, provider.description)}
+                            {isComingSoon
+                              ? provider.description
+                              : needsConfig && !connected
+                                ? 'Requires OAuth environment variable setup'
+                                : getDetailText(provider.key, provider.description)}
                           </p>
                           <div className="flex items-center gap-2 mt-2">
                             <Badge variant={connected ? 'green' : 'default'} size="sm">
-                              {connected ? 'Connected' : 'Not connected'}
+                              {connected ? 'Connected' : isComingSoon ? 'Unavailable' : 'Not connected'}
                             </Badge>
                             <Badge variant="outline" size="sm">{provider.platform}</Badge>
                             {connected && (
@@ -1452,7 +1548,7 @@ function IntegrationsSection() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        {connected && (
+                        {connected && !isComingSoon && (
                           <Button
                             variant="outline"
                             size="sm"
@@ -1484,8 +1580,9 @@ function IntegrationsSection() {
                             variant="outline"
                             size="sm"
                             onClick={() => handleConnect(provider.key)}
+                            disabled={isComingSoon}
                           >
-                            Connect
+                            {isComingSoon ? 'Unavailable' : 'Connect'}
                           </Button>
                         )}
                       </div>
@@ -1605,8 +1702,8 @@ function IntegrationsSection() {
                             job.status === 'succeeded'
                               ? 'green'
                               : job.status === 'failed'
-                              ? 'orange'
-                              : 'default'
+                                ? 'orange'
+                                : 'default'
                           }
                           size="sm"
                         >
@@ -1634,8 +1731,8 @@ function IntegrationsSection() {
                             log.level === 'error'
                               ? 'orange'
                               : log.level === 'warning'
-                              ? 'yellow'
-                              : 'cyan'
+                                ? 'yellow'
+                                : 'cyan'
                           }
                           size="sm"
                         >
@@ -1659,15 +1756,20 @@ function IntegrationsSection() {
 
 // Data Section
 function DataSection() {
-  const { user, logout } = useAuth();
+  const router = useRouter();
+  const { user, logout, deleteAccount } = useAuth();
   const [isExporting, setIsExporting] = useState(false);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const handleExportJSON = async () => {
     if (!user) return;
     setIsExporting(true);
     setExportMessage(null);
-    
+
     try {
       // Fetch all user data from Firebase collections
       const collections = [
@@ -1717,9 +1819,9 @@ function DataSection() {
           const snapshot = await getDoc(doc(db, collectionName, user.uid));
           exportData[collectionName] = snapshot.exists()
             ? {
-                id: snapshot.id,
-                ...snapshot.data(),
-              }
+              id: snapshot.id,
+              ...snapshot.data(),
+            }
             : null;
         } catch (err) {
           console.log(`Skipping ${collectionName}:`, err);
@@ -1739,7 +1841,7 @@ function DataSection() {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      
+
       setExportMessage('Data exported successfully!');
     } catch (error) {
       console.error('Export error:', error);
@@ -1755,6 +1857,24 @@ function DataSection() {
       window.location.href = '/Nexora/auth/login';
     } catch (error) {
       console.error('Sign out error:', error);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== 'DELETE') return;
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteAccount();
+      window.location.href = '/Nexora/auth/login';
+    } catch (error: any) {
+      console.error('Delete account error:', error);
+      if (error?.code === 'auth/requires-recent-login') {
+        setDeleteError('For security, please sign out and sign back in, then try again.');
+      } else {
+        setDeleteError(error?.message || 'Failed to delete account. Please try again.');
+      }
+      setIsDeleting(false);
     }
   };
 
@@ -1777,8 +1897,8 @@ function DataSection() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={handleExportJSON}
               disabled={isExporting}
             >
@@ -1819,6 +1939,99 @@ function DataSection() {
           </Button>
         </CardContent>
       </Card>
+
+      {/* Danger Zone - Delete Account */}
+      <Card variant="glass" className="border-status-error/30">
+        <CardHeader title="Danger Zone" icon={<AlertTriangle className="w-5 h-5 text-status-error" />} />
+        <CardContent className="p-6">
+          <p className="text-sm text-dark-400 mb-4">
+            Permanently delete your account and all associated data. This action cannot be undone.
+          </p>
+          <Button
+            variant="outline"
+            className="border-status-error/50 text-status-error hover:bg-status-error/10"
+            onClick={() => setShowDeleteModal(true)}
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            Delete Account
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={showDeleteModal}
+        onClose={() => {
+          setShowDeleteModal(false);
+          setDeleteConfirmText('');
+          setDeleteError(null);
+        }}
+        title="Delete Account"
+      >
+        <div className="space-y-4">
+          <div className="p-4 rounded-xl bg-status-error/10 border border-status-error/20">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-status-error shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-status-error">This action is permanent</p>
+                <p className="text-xs text-dark-400 mt-1">
+                  All your tasks, habits, goals, journal entries, financial data, and every other piece of data will be permanently deleted. This cannot be reversed.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm text-dark-400 mb-2">
+              Type <span className="text-white font-mono font-bold">DELETE</span> to confirm:
+            </label>
+            <input
+              type="text"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="Type DELETE here"
+              className="w-full px-4 py-3 rounded-xl bg-dark-800/50 border border-dark-700/50 focus:border-status-error/50 focus:ring-1 focus:ring-status-error/30 outline-none text-white placeholder-dark-500 transition-all"
+              disabled={isDeleting}
+            />
+          </div>
+
+          {deleteError && (
+            <p className="text-sm text-status-error">{deleteError}</p>
+          )}
+
+          <div className="flex justify-end gap-3 pt-2">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setShowDeleteModal(false);
+                setDeleteConfirmText('');
+                setDeleteError(null);
+              }}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="outline"
+              className="border-status-error/50 text-status-error hover:bg-status-error/20"
+              onClick={handleDeleteAccount}
+              disabled={deleteConfirmText !== 'DELETE' || isDeleting}
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete My Account
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
@@ -1878,9 +2091,9 @@ function AboutSection() {
           <p className="text-xs text-dark-500 mt-2">
             © 2024 Nexora. All rights reserved.
           </p>
-          <a 
-            href="https://github.com/arif481/Nexora" 
-            target="_blank" 
+          <a
+            href="https://github.com/arif481/Nexora"
+            target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 text-xs text-neon-cyan hover:underline mt-2"
           >

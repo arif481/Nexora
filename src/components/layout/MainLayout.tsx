@@ -11,6 +11,7 @@ import { NotificationPanel } from '../features/NotificationPanel';
 import { AIAssistantPanel } from '../features/AIAssistantPanel';
 import { GlobalModals } from '../GlobalModals';
 import { ErrorBoundary } from '../ErrorBoundary';
+import { useNotificationTriggers } from '@/hooks/useNotificationTriggers';
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -19,17 +20,20 @@ interface MainLayoutProps {
 export function MainLayout({ children }: MainLayoutProps) {
   const { sidebarCollapsed, focusModeActive } = useUIStore();
 
+  // Auto-check for due tasks and upcoming events
+  useNotificationTriggers();
+
   return (
     <div className="min-h-screen bg-dark-950">
       {/* Background Effects */}
       <div className="fixed inset-0 pointer-events-none">
         {/* Grid Pattern */}
         <div className="absolute inset-0 grid-background opacity-30" />
-        
+
         {/* Gradient Orbs */}
         <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-neon-cyan/5 rounded-full blur-[100px]" />
         <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-neon-purple/5 rounded-full blur-[100px]" />
-        
+
         {/* Vignette */}
         <div className="absolute inset-0 bg-gradient-radial from-transparent via-transparent to-dark-950/50" />
       </div>

@@ -54,8 +54,8 @@ export default function HelpPage() {
       icon: Shield,
       items: [
         { question: 'Is my data secure?', answer: 'Yes, all data is stored in Firebase with secure authentication. We never share your personal data.' },
-        { question: 'Can I export my data?', answer: 'Data export feature coming soon. Contact support for manual export requests.' },
-        { question: 'How do I delete my account?', answer: 'Go to Settings > Account and click "Delete Account". This action is irreversible.' },
+        { question: 'Can I export my data?', answer: 'Yes! Go to Settings → Data & Storage and click "Export All Data" to download all your data as a JSON file.' },
+        { question: 'How do I delete my account?', answer: 'Go to Settings → Data & Storage and click "Delete Account" in the Danger Zone section. You will be asked to type DELETE to confirm.' },
       ],
     },
   ];

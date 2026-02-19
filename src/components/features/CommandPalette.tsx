@@ -54,14 +54,14 @@ export function CommandPalette() {
     { id: 'nav-wellness', title: 'Go to Wellness', icon: Heart, category: 'navigation', action: () => router.push('/wellness') },
     { id: 'nav-finance', title: 'Go to Finance', icon: Wallet, category: 'navigation', action: () => router.push('/finance') },
     { id: 'nav-settings', title: 'Go to Settings', icon: Settings, category: 'navigation', action: () => router.push('/settings'), shortcut: 'G S' },
-    
+
     // Actions
     { id: 'action-new-task', title: 'Create New Task', subtitle: 'Add a task to your list', icon: Plus, category: 'actions', action: () => openModal('create-task'), shortcut: 'N T' },
     { id: 'action-new-event', title: 'Create New Event', subtitle: 'Schedule a calendar event', icon: Calendar, category: 'actions', action: () => openModal('create-event'), shortcut: 'N E' },
     { id: 'action-new-note', title: 'Create New Note', subtitle: 'Capture your thoughts', icon: FileText, category: 'actions', action: () => openModal('create-note'), shortcut: 'N N' },
     { id: 'action-journal', title: 'Write Journal Entry', subtitle: 'Reflect on your day', icon: BookOpen, category: 'actions', action: () => openModal('journal-entry'), shortcut: 'N J' },
     { id: 'action-focus', title: 'Start Focus Session', subtitle: 'Enter deep work mode', icon: Brain, category: 'actions', action: () => router.push('/focus'), shortcut: 'F' },
-    
+
     // AI
     { id: 'ai-chat', title: 'Ask AI Assistant', subtitle: 'Get help with anything', icon: Sparkles, category: 'ai', action: () => router.push('/ai'), shortcut: 'A' },
     { id: 'ai-insights', title: 'View AI Insights', subtitle: 'See personalized recommendations', icon: Zap, category: 'ai', action: () => router.push('/ai') },
@@ -84,7 +84,7 @@ export function CommandPalette() {
       navigation: [],
       recent: [],
     };
-    
+
     filteredCommands.forEach((cmd) => {
       groups[cmd.category].push(cmd);
     });
@@ -92,7 +92,7 @@ export function CommandPalette() {
     return groups;
   }, [filteredCommands]);
 
-  // Keyboard navigation
+  // Keyboard navigation for command palette
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!commandPaletteOpen) {
@@ -134,6 +134,75 @@ export function CommandPalette() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [commandPaletteOpen, filteredCommands, selectedIndex, toggleCommandPalette]);
+
+  // Keyboard shortcut sequences (G D, G T, N T, etc.)
+  useEffect(() => {
+    let lastKey = '';
+    let lastKeyTime = 0;
+
+    const shortcutMap: Record<string, () => void> = {
+      'g d': () => router.push('/dashboard'),
+      'g t': () => router.push('/tasks'),
+      'g c': () => router.push('/calendar'),
+      'g n': () => router.push('/notes'),
+      'g j': () => router.push('/journal'),
+      'g h': () => router.push('/habits'),
+      'g s': () => router.push('/settings'),
+      'n t': () => openModal('create-task'),
+      'n e': () => openModal('create-event'),
+      'n n': () => openModal('create-note'),
+      'n j': () => openModal('journal-entry'),
+    };
+
+    const singleKeyMap: Record<string, () => void> = {
+      'f': () => router.push('/focus'),
+      'a': () => router.push('/ai'),
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger shortcuts when typing in inputs
+      const target = e.target as HTMLElement;
+      const tagName = target.tagName.toLowerCase();
+      if (tagName === 'input' || tagName === 'textarea' || tagName === 'select' || target.isContentEditable) {
+        return;
+      }
+      // Don't trigger when palette is open or when modifier keys are held
+      if (commandPaletteOpen || e.metaKey || e.ctrlKey || e.altKey) {
+        return;
+      }
+
+      const key = e.key.toLowerCase();
+      const now = Date.now();
+
+      // Check for two-key sequence
+      if (now - lastKeyTime < 800 && lastKey) {
+        const combo = `${lastKey} ${key}`;
+        if (shortcutMap[combo]) {
+          e.preventDefault();
+          shortcutMap[combo]();
+          lastKey = '';
+          lastKeyTime = 0;
+          return;
+        }
+      }
+
+      // Check for single-key shortcut
+      if (singleKeyMap[key] && !['g', 'n'].includes(key)) {
+        e.preventDefault();
+        singleKeyMap[key]();
+        lastKey = '';
+        lastKeyTime = 0;
+        return;
+      }
+
+      // Store for potential two-key sequence
+      lastKey = key;
+      lastKeyTime = now;
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [commandPaletteOpen, router, openModal]);
 
   // Reset state when closing
   useEffect(() => {
@@ -204,7 +273,7 @@ export function CommandPalette() {
                   <div className="p-2">
                     {Object.entries(groupedCommands).map(([category, items]) => {
                       if (items.length === 0) return null;
-                      
+
                       return (
                         <div key={category} className="mb-4 last:mb-0">
                           <div className="px-3 py-2">

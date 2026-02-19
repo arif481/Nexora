@@ -111,6 +111,7 @@ export interface SupportedIntegrationProvider {
   platform: IntegrationPlatform;
   description: string;
   defaultSyncMode: BaseIntegration['syncMode'];
+  setupStatus: 'ready' | 'needs-config' | 'coming-soon';
 }
 
 export const SUPPORTED_INTEGRATIONS: SupportedIntegrationProvider[] = [
@@ -121,6 +122,7 @@ export const SUPPORTED_INTEGRATIONS: SupportedIntegrationProvider[] = [
     platform: 'web',
     description: 'Sync events and reminders from Google Calendar.',
     defaultSyncMode: 'two-way',
+    setupStatus: 'needs-config',
   },
   {
     key: 'appleCalendar',
@@ -129,6 +131,7 @@ export const SUPPORTED_INTEGRATIONS: SupportedIntegrationProvider[] = [
     platform: 'ios',
     description: 'Add-only event export for Apple Calendar.',
     defaultSyncMode: 'add-only',
+    setupStatus: 'coming-soon',
   },
   {
     key: 'appleHealth',
@@ -137,6 +140,7 @@ export const SUPPORTED_INTEGRATIONS: SupportedIntegrationProvider[] = [
     platform: 'ios',
     description: 'Import sleep, steps, workouts, and cycle logs via mobile bridge.',
     defaultSyncMode: 'pull',
+    setupStatus: 'coming-soon',
   },
   {
     key: 'healthConnect',
@@ -145,6 +149,7 @@ export const SUPPORTED_INTEGRATIONS: SupportedIntegrationProvider[] = [
     platform: 'android',
     description: 'Import wellness metrics from Android Health Connect.',
     defaultSyncMode: 'pull',
+    setupStatus: 'coming-soon',
   },
   {
     key: 'fitbit',
@@ -153,6 +158,7 @@ export const SUPPORTED_INTEGRATIONS: SupportedIntegrationProvider[] = [
     platform: 'cloud',
     description: 'Sync Fitbit health and activity data.',
     defaultSyncMode: 'pull',
+    setupStatus: 'coming-soon',
   },
   {
     key: 'googleFit',
@@ -161,6 +167,7 @@ export const SUPPORTED_INTEGRATIONS: SupportedIntegrationProvider[] = [
     platform: 'android',
     description: 'Sync activity and sleep from Google Fit.',
     defaultSyncMode: 'pull',
+    setupStatus: 'coming-soon',
   },
   {
     key: 'plaid',
@@ -169,6 +176,7 @@ export const SUPPORTED_INTEGRATIONS: SupportedIntegrationProvider[] = [
     platform: 'cloud',
     description: 'Import transactions from linked bank and card accounts.',
     defaultSyncMode: 'pull',
+    setupStatus: 'coming-soon',
   },
   {
     key: 'todoist',
@@ -177,6 +185,7 @@ export const SUPPORTED_INTEGRATIONS: SupportedIntegrationProvider[] = [
     platform: 'cloud',
     description: 'Keep tasks and due dates synced with Todoist.',
     defaultSyncMode: 'two-way',
+    setupStatus: 'coming-soon',
   },
   {
     key: 'notion',
@@ -185,6 +194,7 @@ export const SUPPORTED_INTEGRATIONS: SupportedIntegrationProvider[] = [
     platform: 'cloud',
     description: 'Import linked task databases and milestones from Notion.',
     defaultSyncMode: 'pull',
+    setupStatus: 'coming-soon',
   },
   {
     key: 'mobileBridge',
@@ -193,6 +203,7 @@ export const SUPPORTED_INTEGRATIONS: SupportedIntegrationProvider[] = [
     platform: 'cloud',
     description: 'Device bridge for iOS/Android protected data ingestion.',
     defaultSyncMode: 'push',
+    setupStatus: 'coming-soon',
   },
 ];
 
@@ -420,9 +431,9 @@ export function getGitHubAuthUrl(redirectUri: string): string {
 }
 
 export function getTwitterAuthUrl(): string {
-  // Twitter OAuth 2.0 - requires PKCE flow
-  // This is a placeholder - actual implementation requires backend
-  return '#';
+  // Twitter OAuth 2.0 - requires PKCE flow and backend setup
+  // Not yet implemented
+  return '';
 }
 
 export function getLinkedInAuthUrl(redirectUri: string): string {

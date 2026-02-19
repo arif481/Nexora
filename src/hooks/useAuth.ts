@@ -10,9 +10,19 @@ import {
   signInWithPopup,
   sendPasswordResetEmail,
   updateProfile,
+  deleteUser,
   User as FirebaseUser,
 } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  writeBatch,
+  doc,
+  deleteDoc,
+} from 'firebase/firestore';
+import { auth, db, COLLECTIONS } from '@/lib/firebase';
 import { createOrUpdateUser, updateLastLogin, updateStreak } from '@/lib/services/user';
 
 interface AuthState {
@@ -66,7 +76,7 @@ export function useAuth() {
     setState((prev) => ({ ...prev, loading: true, error: null }));
     try {
       const result = await createUserWithEmailAndPassword(auth, email, password);
-      
+
       if (displayName) {
         await updateProfile(result.user, { displayName });
       }
@@ -127,6 +137,73 @@ export function useAuth() {
     setState((prev) => ({ ...prev, error: null }));
   }, []);
 
+  const deleteAccount = useCallback(async () => {
+    const currentUser = state.user;
+    if (!currentUser) throw new Error('Not authenticated');
+
+    // All collections that store per-user documents
+    const userQueryCollections = [
+      COLLECTIONS.TASKS,
+      COLLECTIONS.CALENDAR_EVENTS,
+      COLLECTIONS.NOTES,
+      COLLECTIONS.JOURNAL_ENTRIES,
+      COLLECTIONS.HABITS,
+      COLLECTIONS.SUBJECTS,
+      COLLECTIONS.WELLNESS_ENTRIES,
+      COLLECTIONS.TRANSACTIONS,
+      COLLECTIONS.BUDGETS,
+      COLLECTIONS.SUBSCRIPTIONS,
+      COLLECTIONS.FINANCE_PEOPLE_ACCOUNTS,
+      COLLECTIONS.FINANCE_PEOPLE_ENTRIES,
+      COLLECTIONS.FINANCE_PEOPLE_TYPES,
+      COLLECTIONS.NOTIFICATIONS,
+      COLLECTIONS.FOCUS_SESSIONS,
+      COLLECTIONS.FOCUS_BLOCKS,
+      COLLECTIONS.INTEGRATION_SYNC_JOBS,
+      COLLECTIONS.INTEGRATION_SYNC_LOGS,
+      COLLECTIONS.INTEGRATION_MAPPINGS,
+      COLLECTIONS.INTEGRATION_SYNC_INBOX,
+      'aiConversations',
+      'aiFeedback',
+      'goals',
+    ];
+
+    // Collections where the doc ID === userId
+    const userDocCollections = [
+      COLLECTIONS.USERS,
+      COLLECTIONS.USER_INTEGRATIONS,
+      COLLECTIONS.USER_LINKED_ACCOUNTS,
+    ];
+
+    // Batch delete queried collections
+    for (const colName of userQueryCollections) {
+      try {
+        const q = query(collection(db, colName), where('userId', '==', currentUser.uid));
+        const snapshot = await getDocs(q);
+        if (snapshot.empty) continue;
+
+        const batch = writeBatch(db);
+        snapshot.docs.forEach((d) => batch.delete(d.ref));
+        await batch.commit();
+      } catch {
+        // Skip collections that don't exist or fail
+      }
+    }
+
+    // Delete user-keyed documents
+    for (const colName of userDocCollections) {
+      try {
+        await deleteDoc(doc(db, colName, currentUser.uid));
+      } catch {
+        // Skip if doesn't exist
+      }
+    }
+
+    // Delete the Firebase Auth user
+    await deleteUser(currentUser);
+    setState({ user: null, loading: false, error: null });
+  }, [state.user]);
+
   return {
     user: state.user,
     loading: state.loading,
@@ -136,6 +213,7 @@ export function useAuth() {
     signInWithGoogle,
     logout,
     resetPassword,
+    deleteAccount,
     clearError,
     isAuthenticated: !!state.user,
   };
