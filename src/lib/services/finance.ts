@@ -24,7 +24,15 @@ import type {
   PersonAccount,
   PersonAccountEntry,
   PersonAccountType,
+  NetWorthAccount,
+  NetWorthSnapshot,
+  SavingsGoal,
+  BodyMetricEntry,
+  GoalMilestone,
+  InboxItem,
+  InboxItemType,
 } from '@/types';
+
 
 // Convert Firestore timestamp to Date
 const convertTimestamp = (timestamp: Timestamp | Date | null | undefined): Date => {
@@ -68,7 +76,7 @@ export const createTransaction = async (
   transactionData: Partial<Omit<Transaction, 'id' | 'userId' | 'createdAt'>>
 ): Promise<string> => {
   const transactionsRef = collection(db, COLLECTIONS.TRANSACTIONS);
-  
+
   const newTransaction = {
     userId,
     amount: transactionData.amount || 0,
@@ -220,7 +228,7 @@ export const createBudget = async (
   budgetData: Partial<Omit<Budget, 'id' | 'userId'>>
 ): Promise<string> => {
   const budgetsRef = collection(db, COLLECTIONS.BUDGETS);
-  
+
   const newBudget = {
     userId,
     name: budgetData.name || 'New Budget',
@@ -317,7 +325,7 @@ export const createSubscription = async (
   subscriptionData: Partial<Omit<Subscription, 'id' | 'userId'>>
 ): Promise<string> => {
   const subscriptionsRef = collection(db, COLLECTIONS.SUBSCRIPTIONS);
-  
+
   const newSubscription = {
     userId,
     name: subscriptionData.name || 'New Subscription',
@@ -655,11 +663,377 @@ export const subscribeToPersonAccountTypes = (
   return unsubscribe;
 };
 
-// Batch operations
 export const batchDeleteTransactions = async (transactionIds: string[]): Promise<void> => {
   const batch = writeBatch(db);
   transactionIds.forEach((id) => {
     batch.delete(doc(db, COLLECTIONS.TRANSACTIONS, id));
   });
   await batch.commit();
+};
+
+// ====== NET WORTH ACCOUNTS ======
+
+const convertNetWorthAccount = (d: any): NetWorthAccount => {
+  const data = d.data();
+  return {
+    id: d.id,
+    userId: data.userId,
+    name: data.name,
+    type: data.type,
+    subtype: data.subtype,
+    balance: data.balance ?? 0,
+    currency: data.currency || 'USD',
+    institution: data.institution || undefined,
+    notes: data.notes || undefined,
+    createdAt: convertTimestamp(data.createdAt),
+    updatedAt: convertTimestamp(data.updatedAt),
+  };
+};
+
+export const createNetWorthAccount = async (
+  userId: string,
+  data: Omit<NetWorthAccount, 'id' | 'userId' | 'createdAt' | 'updatedAt'>
+): Promise<string> => {
+  const ref = collection(db, COLLECTIONS.NET_WORTH_ACCOUNTS);
+  const docRef = await addDoc(ref, {
+    userId,
+    ...data,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  return docRef.id;
+};
+
+export const updateNetWorthAccount = async (
+  accountId: string,
+  updates: Partial<Omit<NetWorthAccount, 'id' | 'userId' | 'createdAt'>>
+): Promise<void> => {
+  await updateDoc(doc(db, COLLECTIONS.NET_WORTH_ACCOUNTS, accountId), {
+    ...updates,
+    updatedAt: serverTimestamp(),
+  });
+};
+
+export const deleteNetWorthAccount = async (accountId: string): Promise<void> => {
+  await deleteDoc(doc(db, COLLECTIONS.NET_WORTH_ACCOUNTS, accountId));
+};
+
+export const subscribeToNetWorthAccounts = (
+  userId: string,
+  callback: (accounts: NetWorthAccount[]) => void,
+  onError?: (err: Error) => void
+): (() => void) => {
+  const q = query(
+    collection(db, COLLECTIONS.NET_WORTH_ACCOUNTS),
+    where('userId', '==', userId),
+    orderBy('type', 'asc'),
+    orderBy('name', 'asc')
+  );
+  return onSnapshot(
+    q,
+    (snap) => callback(snap.docs.map(convertNetWorthAccount)),
+    (err) => { if (onError) onError(err); }
+  );
+};
+
+// ====== NET WORTH SNAPSHOTS ======
+
+const convertSnapshot = (d: any): NetWorthSnapshot => {
+  const data = d.data();
+  return {
+    id: d.id,
+    userId: data.userId,
+    date: convertTimestamp(data.date),
+    totalAssets: data.totalAssets ?? 0,
+    totalLiabilities: data.totalLiabilities ?? 0,
+    netWorth: data.netWorth ?? 0,
+  };
+};
+
+export const saveNetWorthSnapshot = async (
+  userId: string,
+  totalAssets: number,
+  totalLiabilities: number
+): Promise<void> => {
+  const netWorth = totalAssets - totalLiabilities;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  await addDoc(collection(db, COLLECTIONS.NET_WORTH_SNAPSHOTS), {
+    userId,
+    date: today,
+    totalAssets,
+    totalLiabilities,
+    netWorth,
+  });
+};
+
+export const subscribeToNetWorthSnapshots = (
+  userId: string,
+  callback: (snapshots: NetWorthSnapshot[]) => void,
+  onError?: (err: Error) => void
+): (() => void) => {
+  const q = query(
+    collection(db, COLLECTIONS.NET_WORTH_SNAPSHOTS),
+    where('userId', '==', userId),
+    orderBy('date', 'asc'),
+    limit(24)
+  );
+  return onSnapshot(
+    q,
+    (snap) => callback(snap.docs.map(convertSnapshot)),
+    (err) => { if (onError) onError(err); }
+  );
+};
+
+// ====== SAVINGS GOALS ======
+
+const convertSavingsGoal = (d: any): SavingsGoal => {
+  const data = d.data();
+  return {
+    id: d.id,
+    userId: data.userId,
+    name: data.name,
+    emoji: data.emoji || '🎯',
+    targetAmount: data.targetAmount ?? 0,
+    currentAmount: data.currentAmount ?? 0,
+    currency: data.currency || 'USD',
+    targetDate: data.targetDate ? convertTimestamp(data.targetDate) : undefined,
+    category: data.category || 'general',
+    color: data.color || '#06b6d4',
+    notes: data.notes || undefined,
+    createdAt: convertTimestamp(data.createdAt),
+    updatedAt: convertTimestamp(data.updatedAt),
+  };
+};
+
+export const createSavingsGoal = async (
+  userId: string,
+  data: Omit<SavingsGoal, 'id' | 'userId' | 'createdAt' | 'updatedAt'>
+): Promise<string> => {
+  const ref = collection(db, COLLECTIONS.SAVINGS_GOALS);
+  const docRef = await addDoc(ref, {
+    userId,
+    ...data,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  return docRef.id;
+};
+
+export const updateSavingsGoal = async (
+  goalId: string,
+  updates: Partial<Omit<SavingsGoal, 'id' | 'userId' | 'createdAt'>>
+): Promise<void> => {
+  await updateDoc(doc(db, COLLECTIONS.SAVINGS_GOALS, goalId), {
+    ...updates,
+    updatedAt: serverTimestamp(),
+  });
+};
+
+export const deleteSavingsGoal = async (goalId: string): Promise<void> => {
+  await deleteDoc(doc(db, COLLECTIONS.SAVINGS_GOALS, goalId));
+};
+
+export const subscribeToSavingsGoals = (
+  userId: string,
+  callback: (goals: SavingsGoal[]) => void,
+  onError?: (err: Error) => void
+): (() => void) => {
+  const q = query(
+    collection(db, COLLECTIONS.SAVINGS_GOALS),
+    where('userId', '==', userId),
+    orderBy('createdAt', 'desc')
+  );
+  return onSnapshot(
+    q,
+    (snap) => callback(snap.docs.map(convertSavingsGoal)),
+    (err) => { if (onError) onError(err); }
+  );
+};
+
+// ====== BODY METRICS ======
+
+const convertBodyMetric = (d: any): BodyMetricEntry => {
+  const data = d.data();
+  return {
+    id: d.id,
+    userId: data.userId,
+    date: convertTimestamp(data.date),
+    weight: data.weight ?? undefined,
+    weightUnit: data.weightUnit || 'kg',
+    bodyFatPct: data.bodyFatPct ?? undefined,
+    bmi: data.bmi ?? undefined,
+    notes: data.notes || undefined,
+    createdAt: convertTimestamp(data.createdAt),
+  };
+};
+
+export const createBodyMetricEntry = async (
+  userId: string,
+  data: Omit<BodyMetricEntry, 'id' | 'userId' | 'createdAt'>
+): Promise<string> => {
+  const ref = collection(db, COLLECTIONS.BODY_METRICS);
+  const docRef = await addDoc(ref, {
+    userId,
+    ...data,
+    createdAt: serverTimestamp(),
+  });
+  return docRef.id;
+};
+
+export const subscribeToBodyMetrics = (
+  userId: string,
+  callback: (entries: BodyMetricEntry[]) => void,
+  onError?: (err: Error) => void
+): (() => void) => {
+  const q = query(
+    collection(db, COLLECTIONS.BODY_METRICS),
+    where('userId', '==', userId),
+    orderBy('date', 'asc'),
+    limit(90)
+  );
+  return onSnapshot(
+    q,
+    (snap) => callback(snap.docs.map(convertBodyMetric)),
+    (err) => { if (onError) onError(err); }
+  );
+};
+
+// ====== GOAL MILESTONES ======
+
+const convertGoalMilestone = (d: any): GoalMilestone => {
+  const data = d.data();
+  return {
+    id: d.id,
+    goalId: data.goalId,
+    userId: data.userId,
+    title: data.title,
+    description: data.description || undefined,
+    dueDate: data.dueDate ? convertTimestamp(data.dueDate) : undefined,
+    completed: data.completed ?? false,
+    completedAt: data.completedAt ? convertTimestamp(data.completedAt) : undefined,
+    createdAt: convertTimestamp(data.createdAt),
+  };
+};
+
+export const createGoalMilestone = async (
+  userId: string,
+  goalId: string,
+  data: Omit<GoalMilestone, 'id' | 'userId' | 'goalId' | 'createdAt' | 'completed' | 'completedAt'>
+): Promise<string> => {
+  const ref = collection(db, COLLECTIONS.GOAL_MILESTONES);
+  const docRef = await addDoc(ref, {
+    userId,
+    goalId,
+    ...data,
+    completed: false,
+    createdAt: serverTimestamp(),
+  });
+  return docRef.id;
+};
+
+export const updateGoalMilestone = async (
+  milestoneId: string,
+  updates: Partial<Omit<GoalMilestone, 'id' | 'userId' | 'goalId' | 'createdAt'>>
+): Promise<void> => {
+  await updateDoc(doc(db, COLLECTIONS.GOAL_MILESTONES, milestoneId), updates);
+};
+
+export const deleteGoalMilestone = async (milestoneId: string): Promise<void> => {
+  await deleteDoc(doc(db, COLLECTIONS.GOAL_MILESTONES, milestoneId));
+};
+
+export const subscribeToGoalMilestones = (
+  userId: string,
+  goalId: string,
+  callback: (milestones: GoalMilestone[]) => void,
+  onError?: (err: Error) => void
+): (() => void) => {
+  const q = query(
+    collection(db, COLLECTIONS.GOAL_MILESTONES),
+    where('userId', '==', userId),
+    where('goalId', '==', goalId),
+    orderBy('createdAt', 'asc')
+  );
+  return onSnapshot(
+    q,
+    (snap) => callback(snap.docs.map(convertGoalMilestone)),
+    (err) => { if (onError) onError(err); }
+  );
+};
+
+export const subscribeToAllGoalMilestones = (
+  userId: string,
+  callback: (milestones: GoalMilestone[]) => void,
+  onError?: (err: Error) => void
+): (() => void) => {
+  const q = query(
+    collection(db, COLLECTIONS.GOAL_MILESTONES),
+    where('userId', '==', userId),
+    orderBy('createdAt', 'asc')
+  );
+  return onSnapshot(
+    q,
+    (snap) => callback(snap.docs.map(convertGoalMilestone)),
+    (err) => { if (onError) onError(err); }
+  );
+};
+
+// ====== INBOX ITEMS ======
+
+const convertInboxItem = (d: any): InboxItem => {
+  const data = d.data();
+  return {
+    id: d.id,
+    userId: data.userId,
+    content: data.content,
+    classifiedAs: (data.classifiedAs as InboxItemType) || 'unclassified',
+    processed: data.processed ?? false,
+    createdAt: convertTimestamp(data.createdAt),
+  };
+};
+
+export const createInboxItem = async (
+  userId: string,
+  content: string,
+  classifiedAs: InboxItemType = 'unclassified'
+): Promise<string> => {
+  const ref = collection(db, COLLECTIONS.INBOX_ITEMS);
+  const docRef = await addDoc(ref, {
+    userId,
+    content,
+    classifiedAs,
+    processed: false,
+    createdAt: serverTimestamp(),
+  });
+  return docRef.id;
+};
+
+export const updateInboxItem = async (
+  itemId: string,
+  updates: Partial<Pick<InboxItem, 'classifiedAs' | 'processed'>>
+): Promise<void> => {
+  await updateDoc(doc(db, COLLECTIONS.INBOX_ITEMS, itemId), updates);
+};
+
+export const deleteInboxItem = async (itemId: string): Promise<void> => {
+  await deleteDoc(doc(db, COLLECTIONS.INBOX_ITEMS, itemId));
+};
+
+export const subscribeToInboxItems = (
+  userId: string,
+  callback: (items: InboxItem[]) => void,
+  onError?: (err: Error) => void
+): (() => void) => {
+  const q = query(
+    collection(db, COLLECTIONS.INBOX_ITEMS),
+    where('userId', '==', userId),
+    where('processed', '==', false),
+    orderBy('createdAt', 'desc')
+  );
+  return onSnapshot(
+    q,
+    (snap) => callback(snap.docs.map(convertInboxItem)),
+    (err) => { if (onError) onError(err); }
+  );
 };

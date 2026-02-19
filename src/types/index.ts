@@ -641,7 +641,7 @@ export interface Notification {
   expiresAt?: Date;
 }
 
-export type NotificationType = 
+export type NotificationType =
   | 'task-reminder'
   | 'calendar-alert'
   | 'habit-reminder'
@@ -722,3 +722,105 @@ export interface AISettings {
   contextAwareness: boolean;
   learningEnabled: boolean;
 }
+
+// ===== Net Worth Types =====
+export type NetWorthAccountType = 'asset' | 'liability';
+export type NetWorthAssetSubtype = 'cash' | 'savings' | 'investment' | 'property' | 'crypto' | 'vehicle' | 'other_asset';
+export type NetWorthLiabilitySubtype = 'credit_card' | 'loan' | 'mortgage' | 'student_loan' | 'other_liability';
+
+export interface NetWorthAccount {
+  id: string;
+  userId: string;
+  name: string;
+  type: NetWorthAccountType;
+  subtype: NetWorthAssetSubtype | NetWorthLiabilitySubtype;
+  balance: number;
+  currency: string;
+  institution?: string;
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface NetWorthSnapshot {
+  id: string;
+  userId: string;
+  date: Date;
+  totalAssets: number;
+  totalLiabilities: number;
+  netWorth: number;
+}
+
+// ===== Savings Goal Types =====
+export interface SavingsGoal {
+  id: string;
+  userId: string;
+  name: string;
+  emoji?: string;
+  targetAmount: number;
+  currentAmount: number;
+  currency: string;
+  targetDate?: Date;
+  category: string;
+  color: string;
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ===== Body Metrics =====
+export interface BodyMetricEntry {
+  id: string;
+  userId: string;
+  date: Date;
+  weight?: number; // kg
+  weightUnit?: 'kg' | 'lbs';
+  bodyFatPct?: number;
+  bmi?: number;
+  notes?: string;
+  createdAt: Date;
+}
+
+// ===== Goal Milestone =====
+export interface GoalMilestone {
+  id: string;
+  goalId: string;
+  userId: string;
+  title: string;
+  description?: string;
+  dueDate?: Date;
+  completed: boolean;
+  completedAt?: Date;
+  createdAt: Date;
+}
+
+// ===== Smart Inbox =====
+export type InboxItemType = 'task' | 'note' | 'event' | 'habit' | 'unclassified';
+
+export interface InboxItem {
+  id: string;
+  userId: string;
+  content: string;
+  classifiedAs: InboxItemType;
+  processed: boolean;
+  createdAt: Date;
+}
+
+// ===== Gamification XP Event =====
+export type XPEventType =
+  | 'task_complete'
+  | 'habit_checkin'
+  | 'focus_session'
+  | 'journal_entry'
+  | 'goal_milestone'
+  | 'streak_bonus';
+
+export interface XPEvent {
+  id: string;
+  userId: string;
+  type: XPEventType;
+  xp: number;
+  description: string;
+  createdAt: Date;
+}
+

@@ -30,7 +30,10 @@ import {
   Zap,
   Menu,
   X,
+  Inbox,
+  CalendarCheck,
 } from 'lucide-react';
+
 import { Badge, CountBadge } from '../ui/Badge';
 import { Tooltip } from '../ui/Tooltip';
 
@@ -48,14 +51,18 @@ const mainNavItems: NavItem[] = [
   { name: 'Calendar', href: '/calendar', icon: Calendar },
   { name: 'Notes', href: '/notes', icon: FileText },
   { name: 'Journal', href: '/journal', icon: BookOpen },
+  { name: 'Inbox', href: '/inbox', icon: Inbox, isNew: true },
 ];
+
 
 const productivityItems: NavItem[] = [
   { name: 'Habits', href: '/habits', icon: Target },
   { name: 'Focus Mode', href: '/focus', icon: Brain },
   { name: 'Study', href: '/study', icon: GraduationCap },
   { name: 'Goals', href: '/goals', icon: TrendingUp, isNew: true },
+  { name: 'Weekly Review', href: '/review', icon: CalendarCheck, isNew: true },
 ];
+
 
 const wellnessItems: NavItem[] = [
   { name: 'Wellness', href: '/wellness', icon: Heart },

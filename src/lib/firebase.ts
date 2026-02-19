@@ -84,7 +84,15 @@ export const COLLECTIONS = {
   INTEGRATION_SYNC_LOGS: 'integrationSyncLogs',
   INTEGRATION_MAPPINGS: 'integrationMappings',
   INTEGRATION_SYNC_INBOX: 'integrationSyncInbox',
+  NET_WORTH_ACCOUNTS: 'netWorthAccounts',
+  NET_WORTH_SNAPSHOTS: 'netWorthSnapshots',
+  SAVINGS_GOALS: 'savingsGoals',
+  BODY_METRICS: 'bodyMetrics',
+  GOAL_MILESTONES: 'goalMilestones',
+  INBOX_ITEMS: 'inboxItems',
+  XP_EVENTS: 'xpEvents',
 } as const;
+
 
 // Storage paths
 export const STORAGE_PATHS = {

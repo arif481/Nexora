@@ -62,7 +62,17 @@ import {
   usePersonAccounts,
   usePersonAccountEntries,
   usePersonAccountTypes,
+  useNetWorth,
+  useSavingsGoals,
 } from '@/hooks/useFinance';
+import {
+  PieChart as RechartsPieChart, Pie, Cell, Tooltip as RechartsTooltip,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer,
+  LineChart, Line, AreaChart, Area,
+} from 'recharts';
+import { exportTransactionsToCSV, parseCSV, mapRowsToTransactions } from '@/lib/financeImport';
+import { generateAIResponse } from '@/lib/services/ai';
+
 import type {
   Transaction,
   Budget,
@@ -70,7 +80,10 @@ import type {
   PersonAccountEntry,
   PersonAccountType,
   PersonAccountBalanceEffect,
+  NetWorthAccount,
+  SavingsGoal,
 } from '@/types';
+
 
 // Category config
 const categoryConfig: Record<string, { label: string; icon: any; color: string }> = {
@@ -94,11 +107,11 @@ const defaultPersonRecordTypes: {
   label: string;
   balanceEffect: PersonAccountBalanceEffect;
 }[] = [
-  { key: 'lent_money', label: 'I lent money', balanceEffect: 'increase' },
-  { key: 'borrowed_money', label: 'I borrowed money', balanceEffect: 'decrease' },
-  { key: 'received_payback', label: 'They paid me back', balanceEffect: 'decrease' },
-  { key: 'paid_back', label: 'I paid them back', balanceEffect: 'increase' },
-];
+    { key: 'lent_money', label: 'I lent money', balanceEffect: 'increase' },
+    { key: 'borrowed_money', label: 'I borrowed money', balanceEffect: 'decrease' },
+    { key: 'received_payback', label: 'They paid me back', balanceEffect: 'decrease' },
+    { key: 'paid_back', label: 'I paid them back', balanceEffect: 'increase' },
+  ];
 
 export default function FinancePage() {
   const router = useRouter();
@@ -120,7 +133,7 @@ export default function FinancePage() {
     deleteType: deletePersonType,
   } = usePersonAccountTypes();
   const stats = useFinanceStats(transactions, budgets);
-  
+
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [isAddTransactionOpen, setIsAddTransactionOpen] = useState(false);
   const [isEditTransactionOpen, setIsEditTransactionOpen] = useState(false);
@@ -133,6 +146,130 @@ export default function FinancePage() {
   const [filter, setFilter] = useState<'all' | 'income' | 'expense'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const { openAIPanel } = useUIStore();
+
+  // New advanced hooks
+  const {
+    accounts: nwAccounts,
+    snapshots: nwSnapshots,
+    totalAssets, totalLiabilities, netWorth,
+    loading: nwLoading,
+    createAccount: createNWAccount,
+    updateAccount: updateNWAccount,
+    deleteAccount: deleteNWAccount,
+    saveSnapshot,
+  } = useNetWorth();
+  const { goals: savingsGoals, loading: goalsLoading, createGoal, updateGoal, deleteGoal } = useSavingsGoals();
+
+  // Tab state
+  type FinanceTab = 'overview' | 'transactions' | 'budgets' | 'subscriptions' | 'people' | 'networth' | 'goals' | 'analytics' | 'forecast' | 'nova';
+  const [activeTab, setActiveTab] = useState<FinanceTab>('overview');
+
+  // NetWorth form
+  const [isAddNWOpen, setIsAddNWOpen] = useState(false);
+  const [nwForm, setNwForm] = useState({ name: '', type: 'asset' as 'asset' | 'liability', subtype: 'cash' as any, balance: '', currency: 'USD' });
+
+
+  // Savings goal form
+  const [isAddGoalOpen, setIsAddGoalOpen] = useState(false);
+  const [goalForm, setGoalForm] = useState({ name: '', emoji: '🎯', targetAmount: '', currentAmount: '', color: '#06b6d4', category: 'general', currency: 'USD' });
+
+
+  // AI chat (NOVA tab)
+  const [novaMessages, setNovaMessages] = useState<{ role: 'user' | 'ai', text: string }[]>([]);
+  const [novaInput, setNovaInput] = useState('');
+  const [novaLoading, setNovaLoading] = useState(false);
+
+  const sendNovaMessage = async () => {
+    const msg = novaInput.trim();
+    if (!msg || novaLoading) return;
+    setNovaInput('');
+    setNovaMessages(prev => [...prev, { role: 'user', text: msg }]);
+    setNovaLoading(true);
+    try {
+      const ctx = `User finance context: monthly income $${monthlyStats.income.toFixed(0)}, expenses $${monthlyStats.expenses.toFixed(0)}, savings rate ${monthlyStats.savingsRate}%, net worth $${netWorth.toFixed(0)}. Top categories: ${stats.topCategories.slice(0, 3).map(c => c.category).join(', ')}.`;
+      const res = await generateAIResponse(`${ctx}\n\nUser: ${msg}`);
+      setNovaMessages(prev => [...prev, { role: 'ai', text: res.content }]);
+    } catch {
+      setNovaMessages(prev => [...prev, { role: 'ai', text: 'Sorry, I could not connect to AI. Check your API key in Settings.' }]);
+    } finally {
+      setNovaLoading(false);
+    }
+  };
+
+  // Analytics data
+  const analyticsData = useMemo(() => {
+    const txns = Array.isArray(transactions) ? transactions : [];
+    const categoryTotals: Record<string, number> = {};
+    const monthlyMap: Record<string, { income: number; expense: number }> = {};
+    txns.forEach(t => {
+      const d = new Date(t.date);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (!monthlyMap[key]) monthlyMap[key] = { income: 0, expense: 0 };
+      if (t.type === 'income') monthlyMap[key].income += t.amount;
+      else monthlyMap[key].expense += t.amount;
+      if (t.type === 'expense') categoryTotals[t.category] = (categoryTotals[t.category] || 0) + t.amount;
+    });
+    const pieData = Object.entries(categoryTotals)
+      .sort((a, b) => b[1] - a[1]).slice(0, 7)
+      .map(([cat, val]) => ({ name: categoryConfig[cat]?.label || cat, value: Math.round(val), color: categoryConfig[cat]?.color || '#6b7280' }));
+    const barData = Object.entries(monthlyMap)
+      .sort(([a], [b]) => a.localeCompare(b)).slice(-6)
+      .map(([month, v]) => ({ month: month.slice(5), income: Math.round(v.income), expense: Math.round(v.expense) }));
+    return { pieData, barData };
+  }, [transactions]);
+
+
+  // Forecast data (next 30 days from subscriptions)
+  const forecastData = useMemo(() => {
+    const today = new Date();
+    const days = Array.from({ length: 30 }, (_, i) => {
+      const d = new Date(today); d.setDate(d.getDate() + i);
+      return { date: d, label: `${d.getMonth() + 1}/${d.getDate()}`, amount: 0, balance: 0 };
+    });
+    const safeSubs = Array.isArray(subscriptions) ? subscriptions : [];
+    safeSubs.filter(s => s.isActive && s.nextBillingDate).forEach(sub => {
+      const billingDay = new Date(sub.nextBillingDate).getDate();
+      days.forEach(day => {
+        if (day.date.getDate() === billingDay) day.amount += sub.amount || 0;
+      });
+    });
+    const txns = Array.isArray(transactions) ? transactions : [];
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthlyTxns = txns.filter(t => new Date(t.date) >= startOfMonth);
+    const income = monthlyTxns.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+    const expenses = monthlyTxns.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+    let runningBalance = income - expenses;
+    return days.map(d => { runningBalance -= d.amount; return { ...d, balance: Math.round(runningBalance) }; });
+  }, [subscriptions, transactions]);
+
+
+  // Upcoming bills (next 14 days)
+  const upcomingBills = useMemo(() => {
+    const safeSubs = Array.isArray(subscriptions) ? subscriptions : [];
+    const today = new Date();
+    const in14 = new Date(); in14.setDate(in14.getDate() + 14);
+    return safeSubs
+      .filter(s => s.isActive && s.nextBillingDate)
+      .map(s => { const d = new Date(s.nextBillingDate); d.setFullYear(today.getFullYear(), today.getMonth()); return { ...s, nextDue: d }; })
+      .filter(s => s.nextDue >= today && s.nextDue <= in14)
+      .sort((a, b) => a.nextDue.getTime() - b.nextDue.getTime());
+  }, [subscriptions]);
+
+
+  const TABS: { id: FinanceTab; label: string }[] = [
+    { id: 'overview', label: '📊 Overview' },
+    { id: 'transactions', label: '💳 Transactions' },
+    { id: 'budgets', label: '🎯 Budgets' },
+    { id: 'subscriptions', label: '🔄 Subscriptions' },
+    { id: 'people', label: '👥 People' },
+    { id: 'networth', label: '🏦 Net Worth' },
+    { id: 'goals', label: '🪙 Goals' },
+    { id: 'analytics', label: '📈 Analytics' },
+    { id: 'forecast', label: '🔮 Forecast' },
+    { id: 'nova', label: '✨ NOVA' },
+  ];
+
 
   const {
     entries: selectedPersonEntries,
@@ -153,7 +290,7 @@ export default function FinancePage() {
   const monthlyStats = useMemo(() => {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    
+
     const monthlyTransactions = safeTransactions.filter(t => new Date(t.date) >= startOfMonth);
     const income = monthlyTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
     const expenses = monthlyTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
@@ -167,7 +304,7 @@ export default function FinancePage() {
   const filteredTransactions = useMemo(() => {
     return safeTransactions
       .filter(t => filter === 'all' || t.type === filter)
-      .filter(t => 
+      .filter(t =>
         searchQuery === '' ||
         (t.description && t.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
         categoryConfig[t.category]?.label.toLowerCase().includes(searchQuery.toLowerCase())
@@ -346,334 +483,659 @@ export default function FinancePage() {
           </Card>
         </motion.div>
 
-        {/* Main Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Transactions List */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="lg:col-span-2 space-y-4"
-          >
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="flex gap-2">
-                {(['all', 'income', 'expense'] as const).map(f => (
-                  <button
-                    key={f}
-                    onClick={() => setFilter(f)}
-                    className={cn(
-                      'px-4 py-2 rounded-lg text-sm capitalize transition-all',
-                      filter === f
-                        ? f === 'income'
-                          ? 'bg-neon-green/20 text-neon-green'
-                          : f === 'expense'
-                          ? 'bg-neon-orange/20 text-neon-orange'
-                          : 'bg-neon-cyan/20 text-neon-cyan'
-                        : 'bg-dark-800/50 text-dark-300 hover:text-white'
-                    )}
-                  >
-                    {f}
-                  </button>
-                ))}
-              </div>
-              <div className="flex gap-2 w-full sm:w-auto">
-                <Input
-                  placeholder="Search transactions..."
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  leftIcon={<Search className="w-4 h-4" />}
-                  className="w-full sm:w-64"
-                />
-                <Button variant="glow" onClick={() => setIsAddTransactionOpen(true)}>
-                  <Plus className="w-4 h-4 sm:mr-1" />
-                  <span className="hidden sm:inline">Add</span>
-                </Button>
-              </div>
-            </div>
+        {/* Tab Bar */}
+        <div className="flex gap-1 overflow-x-auto pb-2 mb-6 scrollbar-none">
+          {TABS.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={cn(
+                'px-4 py-2 rounded-xl text-sm whitespace-nowrap transition-all font-medium',
+                activeTab === tab.id
+                  ? 'bg-neon-cyan/20 text-neon-cyan border border-neon-cyan/30'
+                  : 'bg-dark-800/50 text-dark-300 hover:text-white hover:bg-dark-700/50'
+              )}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
 
-            {/* Transactions */}
+        {/* ── NET WORTH TAB ── */}
+        {activeTab === 'networth' && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {[
+                { label: 'Total Assets', value: formatCurrency(totalAssets), color: 'text-neon-green' },
+                { label: 'Total Liabilities', value: formatCurrency(totalLiabilities), color: 'text-neon-orange' },
+                { label: 'Net Worth', value: formatCurrency(netWorth), color: netWorth >= 0 ? 'text-neon-cyan' : 'text-status-error' },
+              ].map(s => (
+                <Card key={s.label} variant="glass" className="p-5">
+                  <p className="text-sm text-dark-400 mb-1">{s.label}</p>
+                  <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
+                </Card>
+              ))}
+            </div>
+            {nwSnapshots.length > 1 && (
+              <Card variant="glass">
+                <CardHeader><h3 className="text-lg font-semibold text-white">Net Worth Over Time</h3></CardHeader>
+                <CardContent>
+                  <div className="h-48">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={nwSnapshots.map(s => ({ date: new Date(s.date).toLocaleDateString('en-US', { month: 'short' }), value: s.netWorth }))}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                        <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                        <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                        <RechartsTooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '0.75rem', color: '#fff', fontSize: 12 }} />
+                        <Line type="monotone" dataKey="value" stroke="#06b6d4" strokeWidth={2} dot={false} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
             <Card variant="glass">
-              <CardHeader
-                title="Recent Transactions"
-                icon={<Receipt className="w-5 h-5 text-neon-cyan" />}
-              />
-              <CardContent className="space-y-2">
-                {filteredTransactions.length > 0 ? (
-                  filteredTransactions.slice(0, 10).map(transaction => (
-                    <TransactionItem key={transaction.id} transaction={transaction} />
-                  ))
+              <CardHeader className="flex flex-row items-center justify-between">
+                <h3 className="text-lg font-semibold text-white">Accounts</h3>
+                <Button variant="glow" size="sm" onClick={() => setIsAddNWOpen(true)} leftIcon={<Plus className="w-4 h-4" />}>Add Account</Button>
+              </CardHeader>
+              <CardContent>
+                {nwAccounts.length === 0 ? (
+                  <p className="text-dark-400 text-center py-6">No accounts yet. Add your first asset or liability.</p>
                 ) : (
-                  <EmptyState
-                    icon={<Receipt className="w-12 h-12" />}
-                    title="No transactions"
-                    description="Add your first transaction to start tracking"
-                  />
+                  <div className="space-y-2">
+                    {['asset', 'liability'].map(type => (
+                      <div key={type}>
+                        <p className="text-xs font-medium text-dark-400 uppercase tracking-wide mb-2">{type === 'asset' ? '📈 Assets' : '📉 Liabilities'}</p>
+                        {nwAccounts.filter(a => a.type === type).map(acc => (
+                          <div key={acc.id} className="flex items-center justify-between p-3 rounded-xl bg-dark-800/40 mb-2">
+                            <div>
+                              <p className="text-sm font-medium text-white">{acc.name}</p>
+                              <p className="text-xs text-dark-400 capitalize">{acc.subtype.replace('_', ' ')} {acc.institution ? `· ${acc.institution}` : ''}</p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <p className={`font-semibold ${acc.type === 'asset' ? 'text-neon-green' : 'text-neon-orange'}`}>{formatCurrency(acc.balance, acc.currency)}</p>
+                              <Button variant="ghost" size="sm" onClick={() => deleteNWAccount(acc.id)}><Trash2 className="w-3.5 h-3.5 text-dark-400 hover:text-neon-orange" /></Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
                 )}
               </CardContent>
             </Card>
-          </motion.div>
+            {/* Add NW Account Modal */}
+            <Modal isOpen={isAddNWOpen} onClose={() => setIsAddNWOpen(false)} title="Add Account">
+              <div className="space-y-4 p-1">
+                <Input label="Account Name" value={nwForm.name} onChange={e => setNwForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Savings Account" />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-sm text-dark-400 mb-1 block">Type</label>
+                    <select className="w-full bg-dark-800 border border-dark-600 rounded-xl p-2.5 text-sm text-white" value={nwForm.type} onChange={e => setNwForm(f => ({ ...f, type: e.target.value as any }))}>
+                      <option value="asset">Asset</option>
+                      <option value="liability">Liability</option>
+                    </select>
+                  </div>
+                  <Input label="Balance" type="number" value={nwForm.balance} onChange={e => setNwForm(f => ({ ...f, balance: e.target.value }))} placeholder="0" />
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <Button variant="outline" className="flex-1" onClick={() => setIsAddNWOpen(false)}>Cancel</Button>
+                  <Button variant="glow" className="flex-1" onClick={async () => {
+                    if (!nwForm.name || !nwForm.balance) return;
+                    await createNWAccount({ name: nwForm.name, type: nwForm.type, subtype: nwForm.type === 'asset' ? 'savings' : 'loan', balance: parseFloat(nwForm.balance) || 0, currency: preferredCurrency });
+                    setIsAddNWOpen(false); setNwForm({ name: '', type: 'asset', subtype: 'cash', balance: '', currency: 'USD' });
+                    saveSnapshot();
+                  }}>Add Account</Button>
+                </div>
+              </div>
+            </Modal>
+          </div>
+        )}
 
-          {/* Sidebar */}
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.2 }}
-            className="space-y-6"
-          >
-            {/* Budget Overview */}
-            <Card variant="glass">
-              <CardHeader
-                title="Budget Overview"
-                icon={<PieChart className="w-5 h-5 text-neon-orange" />}
-                action={
-                  <Button variant="ghost" size="sm" onClick={() => setIsAddBudgetOpen(true)}>
-                    <Plus className="w-4 h-4 mr-1" />
-                    Add
-                  </Button>
-                }
-              />
-              <CardContent className="space-y-4">
-                {budgets.length > 0 ? budgets.map(budget => {
-                  const percentage = Math.round((budget.spent / budget.amount) * 100);
-                  const isOverBudget = percentage > 100;
-                  const isNearLimit = percentage >= 80 && percentage <= 100;
-                  const config = categoryConfig[budget.category] || categoryConfig.other;
-                  const Icon = config.icon;
-
+        {/* ── GOALS TAB ── */}
+        {activeTab === 'goals' && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-semibold text-white">Savings Goals</h3>
+              <Button variant="glow" size="sm" onClick={() => setIsAddGoalOpen(true)} leftIcon={<Plus className="w-4 h-4" />}>New Goal</Button>
+            </div>
+            {savingsGoals.length === 0 ? (
+              <Card variant="glass" className="p-10 text-center">
+                <PiggyBank className="w-10 h-10 text-dark-500 mx-auto mb-3" />
+                <p className="text-dark-400">No savings goals yet. Create your first one!</p>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {savingsGoals.map(goal => {
+                  const pct = goal.targetAmount > 0 ? Math.min(100, Math.round((goal.currentAmount / goal.targetAmount) * 100)) : 0;
+                  const monthlySavings = monthlyStats.balance > 0 ? monthlyStats.balance : 1;
+                  const remaining = goal.targetAmount - goal.currentAmount;
+                  const monthsLeft = remaining > 0 ? Math.ceil(remaining / monthlySavings) : 0;
                   return (
-                    <div 
-                      key={budget.id} 
-                      className="p-3 rounded-lg hover:bg-dark-700/30 cursor-pointer transition-colors"
-                      onClick={() => setSelectedBudget(budget)}
-                    >
-                      <div className="flex items-center justify-between mb-2">
+                    <Card key={goal.id} variant="glass" className="p-5" style={{ borderColor: `${goal.color}30` }}>
+                      <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center gap-2">
-                          <Icon className="w-4 h-4" style={{ color: config.color }} />
-                          <span className="text-sm text-white">
-                            {budget.name || config.label}
-                          </span>
+                          <span className="text-2xl">{goal.emoji}</span>
+                          <div>
+                            <p className="font-semibold text-white">{goal.name}</p>
+                            <p className="text-xs text-dark-400 capitalize">{goal.category}</p>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          {(isOverBudget || isNearLimit) && (
-                            <AlertTriangle className={cn(
-                              'w-4 h-4',
-                              isOverBudget ? 'text-status-error' : 'text-neon-orange'
-                            )} />
-                          )}
-                          <span className="text-xs text-dark-400">
-                            {formatCurrency(budget.spent)} / {formatCurrency(budget.amount)}
-                          </span>
-                          <Edit3 className="w-3 h-3 text-dark-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <Button variant="ghost" size="sm" onClick={() => deleteGoal(goal.id)}><Trash2 className="w-3.5 h-3.5 text-dark-400" /></Button>
+                      </div>
+                      <div className="mb-3">
+                        <div className="flex justify-between text-sm mb-1">
+                          <span className="text-dark-400">{formatCurrency(goal.currentAmount, goal.currency)}</span>
+                          <span className="text-white font-medium">{formatCurrency(goal.targetAmount, goal.currency)}</span>
+                        </div>
+                        <div className="h-2 rounded-full bg-dark-700 overflow-hidden">
+                          <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, backgroundColor: goal.color }} />
+                        </div>
+                        <p className="text-xs text-right text-dark-400 mt-1">{pct}% complete</p>
+                      </div>
+                      {monthsLeft > 0 && <p className="text-xs text-neon-cyan">✨ At current rate: ~{monthsLeft} month{monthsLeft !== 1 ? 's' : ''} to go</p>}
+                      {pct >= 100 && <p className="text-xs text-neon-green font-medium">🎉 Goal reached!</p>}
+                      <div className="flex gap-2 mt-3">
+                        <Input type="number" placeholder="Add savings" className="flex-1 text-sm h-8" onChange={() => { }} value="" onKeyDown={(e: any) => { if (e.key === 'Enter' && e.currentTarget.value) { updateGoal(goal.id, { currentAmount: goal.currentAmount + parseFloat(e.currentTarget.value) || 0 }); e.currentTarget.value = ''; } }} />
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+            <Modal isOpen={isAddGoalOpen} onClose={() => setIsAddGoalOpen(false)} title="New Savings Goal">
+              <div className="space-y-4 p-1">
+                <div className="flex gap-3">
+                  <Input label="Emoji" value={goalForm.emoji} onChange={e => setGoalForm(f => ({ ...f, emoji: e.target.value }))} className="w-20" />
+                  <Input label="Goal Name" value={goalForm.name} onChange={e => setGoalForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Emergency Fund" className="flex-1" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Input label="Target Amount" type="number" value={goalForm.targetAmount} onChange={e => setGoalForm(f => ({ ...f, targetAmount: e.target.value }))} placeholder="5000" />
+                  <Input label="Current Amount" type="number" value={goalForm.currentAmount} onChange={e => setGoalForm(f => ({ ...f, currentAmount: e.target.value }))} placeholder="0" />
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <Button variant="outline" className="flex-1" onClick={() => setIsAddGoalOpen(false)}>Cancel</Button>
+                  <Button variant="glow" className="flex-1" onClick={async () => {
+                    if (!goalForm.name || !goalForm.targetAmount) return;
+                    await createGoal({ name: goalForm.name, emoji: goalForm.emoji, targetAmount: parseFloat(goalForm.targetAmount) || 0, currentAmount: parseFloat(goalForm.currentAmount) || 0, currency: preferredCurrency, category: goalForm.category, color: goalForm.color });
+                    setIsAddGoalOpen(false); setGoalForm({ name: '', emoji: '🎯', targetAmount: '', currentAmount: '', color: '#06b6d4', category: 'general', currency: 'USD' });
+                  }}>Create Goal</Button>
+                </div>
+              </div>
+            </Modal>
+          </div>
+        )}
+
+        {/* ── ANALYTICS TAB ── */}
+        {activeTab === 'analytics' && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card variant="glass">
+                <CardHeader><h3 className="text-lg font-semibold text-white">Spending by Category</h3></CardHeader>
+                <CardContent>
+                  {analyticsData.pieData.length === 0 ? <p className="text-dark-400 text-center py-8">No expense data yet.</p> : (
+                    <div className="h-56">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <RechartsPieChart>
+                          <Pie data={analyticsData.pieData} cx="50%" cy="50%" innerRadius={50} outerRadius={90} paddingAngle={3} dataKey="value">
+                            {analyticsData.pieData.map((entry, i) => <Cell key={i} fill={entry.color} fillOpacity={0.85} />)}
+                          </Pie>
+                          <RechartsTooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '0.75rem', color: '#fff', fontSize: 12 }} formatter={(v: number) => [formatCurrency(v), '']} />
+                        </RechartsPieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {analyticsData.pieData.map(d => (
+                      <span key={d.name} className="flex items-center gap-1 text-xs text-dark-300">
+                        <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: d.color }} />{d.name}
+                      </span>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+              <Card variant="glass">
+                <CardHeader><h3 className="text-lg font-semibold text-white">Monthly Income vs Expenses</h3></CardHeader>
+                <CardContent>
+                  {analyticsData.barData.length === 0 ? <p className="text-dark-400 text-center py-8">No transaction data yet.</p> : (
+                    <div className="h-56">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={analyticsData.barData} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                          <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                          <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                          <RechartsTooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '0.75rem', color: '#fff', fontSize: 12 }} />
+                          <Bar dataKey="income" fill="#22c55e" fillOpacity={0.8} radius={[3, 3, 0, 0]} />
+                          <Bar dataKey="expense" fill="#f97316" fillOpacity={0.8} radius={[3, 3, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        )}
+
+        {/* ── FORECAST TAB ── */}
+        {activeTab === 'forecast' && (
+          <div className="space-y-6">
+            <Card variant="glass">
+              <CardHeader>
+                <h3 className="text-lg font-semibold text-white">30-Day Balance Projection</h3>
+                <p className="text-sm text-dark-400">Based on subscriptions and recurring bills</p>
+              </CardHeader>
+              <CardContent>
+                <div className="h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={forecastData.filter((_, i) => i % 3 === 0)} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="forecastFill" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.4} />
+                          <stop offset="100%" stopColor="#06b6d4" stopOpacity={0.02} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                      <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                      <RechartsTooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '0.75rem', color: '#fff', fontSize: 12 }} />
+                      <Area type="monotone" dataKey="balance" stroke="#06b6d4" strokeWidth={2} fill="url(#forecastFill)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+            {upcomingBills.length > 0 && (
+              <Card variant="glass">
+                <CardHeader><h3 className="text-lg font-semibold text-white">Upcoming Bills (Next 14 Days)</h3></CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {upcomingBills.map(bill => (
+                      <div key={bill.id} className="flex items-center justify-between p-3 rounded-xl bg-dark-800/40">
+                        <div>
+                          <p className="text-sm font-medium text-white">{bill.name}</p>
+                          <p className="text-xs text-dark-400">{bill.nextDue.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
+                        </div>
+                        <span className="text-neon-orange font-semibold text-sm">{formatCurrency(bill.amount, bill.currency)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
+
+        {/* ── NOVA TAB ── */}
+        {activeTab === 'nova' && (
+          <div className="max-w-2xl mx-auto">
+            <Card variant="glass" className="border border-neon-cyan/20">
+              <CardHeader>
+                <h3 className="text-lg font-semibold text-white flex items-center gap-2"><Sparkles className="w-5 h-5 text-neon-cyan" />NOVA Financial Advisor</h3>
+                <p className="text-sm text-dark-400">Ask anything about your finances</p>
+              </CardHeader>
+              <CardContent>
+                <div className="h-80 overflow-y-auto space-y-3 mb-4 pr-1">
+                  {novaMessages.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Sparkles className="w-8 h-8 text-neon-cyan mx-auto mb-3" />
+                      <p className="text-dark-400 text-sm">Ask NOVA about your finances</p>
+                      <div className="flex flex-wrap gap-2 justify-center mt-4">
+                        {['Where am I overspending?', 'How can I save more?', 'Analyze my cash flow'].map(p => (
+                          <button key={p} onClick={() => { setNovaInput(p); }} className="text-xs px-3 py-1.5 rounded-lg border border-neon-cyan/30 text-neon-cyan hover:bg-neon-cyan/10 transition-colors">{p}</button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : novaMessages.map((m, i) => (
+                    <div key={i} className={cn('flex', m.role === 'user' ? 'justify-end' : 'justify-start')}>
+                      <div className={cn('max-w-xs lg:max-w-sm rounded-2xl px-4 py-2.5 text-sm', m.role === 'user' ? 'bg-neon-cyan/20 text-white' : 'bg-dark-700/60 text-dark-200')}>
+                        {m.text}
+                      </div>
+                    </div>
+                  ))}
+                  {novaLoading && <div className="flex justify-start"><div className="bg-dark-700/60 rounded-2xl px-4 py-2.5 text-sm text-dark-400">Thinking...</div></div>}
+                </div>
+                <div className="flex gap-3">
+                  <input value={novaInput} onChange={e => setNovaInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendNovaMessage()} placeholder="Ask about your finances..." className="flex-1 bg-dark-800/60 border border-dark-600 rounded-xl px-4 py-2.5 text-sm text-white placeholder-dark-500 focus:outline-none focus:border-neon-cyan/50" />
+                  <Button variant="glow" size="sm" onClick={sendNovaMessage} disabled={!novaInput.trim() || novaLoading}><ChevronRight className="w-4 h-4" /></Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* ── EXISTING CONTENT (wrapped in tab guards) ── */}
+        {(activeTab === 'overview' || activeTab === 'transactions' || activeTab === 'budgets' || activeTab === 'subscriptions' || activeTab === 'people') && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Transactions List */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="lg:col-span-2 space-y-4"
+            >
+
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex gap-2">
+                  {(['all', 'income', 'expense'] as const).map(f => (
+                    <button
+                      key={f}
+                      onClick={() => setFilter(f)}
+                      className={cn(
+                        'px-4 py-2 rounded-lg text-sm capitalize transition-all',
+                        filter === f
+                          ? f === 'income'
+                            ? 'bg-neon-green/20 text-neon-green'
+                            : f === 'expense'
+                              ? 'bg-neon-orange/20 text-neon-orange'
+                              : 'bg-neon-cyan/20 text-neon-cyan'
+                          : 'bg-dark-800/50 text-dark-300 hover:text-white'
+                      )}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex gap-2 w-full sm:w-auto">
+                  <Input
+                    placeholder="Search transactions..."
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    leftIcon={<Search className="w-4 h-4" />}
+                    className="w-full sm:w-64"
+                  />
+                  <Button variant="glow" onClick={() => setIsAddTransactionOpen(true)}>
+                    <Plus className="w-4 h-4 sm:mr-1" />
+                    <span className="hidden sm:inline">Add</span>
+                  </Button>
+                </div>
+              </div>
+
+              {/* Transactions */}
+              <Card variant="glass">
+                <CardHeader
+                  title="Recent Transactions"
+                  icon={<Receipt className="w-5 h-5 text-neon-cyan" />}
+                />
+                <CardContent className="space-y-2">
+                  {filteredTransactions.length > 0 ? (
+                    filteredTransactions.slice(0, 10).map(transaction => (
+                      <TransactionItem key={transaction.id} transaction={transaction} />
+                    ))
+                  ) : (
+                    <EmptyState
+                      icon={<Receipt className="w-12 h-12" />}
+                      title="No transactions"
+                      description="Add your first transaction to start tracking"
+                    />
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            {/* Sidebar */}
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.2 }}
+              className="space-y-6"
+            >
+              {/* Budget Overview */}
+              <Card variant="glass">
+                <CardHeader
+                  title="Budget Overview"
+                  icon={<PieChart className="w-5 h-5 text-neon-orange" />}
+                  action={
+                    <Button variant="ghost" size="sm" onClick={() => setIsAddBudgetOpen(true)}>
+                      <Plus className="w-4 h-4 mr-1" />
+                      Add
+                    </Button>
+                  }
+                />
+                <CardContent className="space-y-4">
+                  {budgets.length > 0 ? budgets.map(budget => {
+                    const percentage = Math.round((budget.spent / budget.amount) * 100);
+                    const isOverBudget = percentage > 100;
+                    const isNearLimit = percentage >= 80 && percentage <= 100;
+                    const config = categoryConfig[budget.category] || categoryConfig.other;
+                    const Icon = config.icon;
+
+                    return (
+                      <div
+                        key={budget.id}
+                        className="p-3 rounded-lg hover:bg-dark-700/30 cursor-pointer transition-colors"
+                        onClick={() => setSelectedBudget(budget)}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Icon className="w-4 h-4" style={{ color: config.color }} />
+                            <span className="text-sm text-white">
+                              {budget.name || config.label}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {(isOverBudget || isNearLimit) && (
+                              <AlertTriangle className={cn(
+                                'w-4 h-4',
+                                isOverBudget ? 'text-status-error' : 'text-neon-orange'
+                              )} />
+                            )}
+                            <span className="text-xs text-dark-400">
+                              {formatCurrency(budget.spent)} / {formatCurrency(budget.amount)}
+                            </span>
+                            <Edit3 className="w-3 h-3 text-dark-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                          </div>
+                        </div>
+                        <Progress
+                          value={Math.min(percentage, 100)}
+                          variant={isOverBudget ? 'purple' : isNearLimit ? 'orange' : 'cyan'}
+                          size="sm"
+                        />
+                      </div>
+                    );
+                  }) : (
+                    <p className="text-sm text-dark-400 text-center py-4">No budgets set. Create one to track spending.</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Subscriptions */}
+              <Card variant="glass">
+                <CardHeader
+                  title="Subscriptions"
+                  icon={<CreditCard className="w-5 h-5 text-neon-purple" />}
+                  action={
+                    <Button variant="ghost" size="sm" onClick={() => setIsAddSubscriptionOpen(true)}>
+                      <Plus className="w-4 h-4 mr-1" />
+                      Add
+                    </Button>
+                  }
+                />
+                <CardContent className="space-y-3">
+                  {subscriptions.length > 0 ? subscriptions.map(sub => {
+                    const nextBilling = sub.nextBillingDate instanceof Date
+                      ? sub.nextBillingDate
+                      : new Date(sub.nextBillingDate);
+                    const daysUntil = Math.ceil((nextBilling.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+
+                    return (
+                      <div
+                        key={sub.id}
+                        className="flex items-center justify-between p-3 rounded-lg hover:bg-dark-700/30 cursor-pointer transition-colors"
+                        onClick={() => setSelectedSubscription(sub)}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-lg bg-dark-700 flex items-center justify-center">
+                            <CreditCard className="w-5 h-5 text-neon-purple" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-white">{sub.name}</p>
+                            <p className="text-xs text-dark-400">
+                              {daysUntil <= 0 ? 'Due today' : daysUntil === 1 ? 'Due tomorrow' : `Due in ${daysUntil} days`}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-medium text-white">{formatCurrency(sub.amount, sub.currency || preferredCurrency)}</p>
+                          <p className="text-xs text-dark-400">/{sub.billingCycle}</p>
                         </div>
                       </div>
-                      <Progress
-                        value={Math.min(percentage, 100)}
-                        variant={isOverBudget ? 'purple' : isNearLimit ? 'orange' : 'cyan'}
-                        size="sm"
-                      />
+                    );
+                  }) : (
+                    <p className="text-sm text-dark-400 text-center py-4">No subscriptions tracked. Add one to monitor recurring payments.</p>
+                  )}
+                  {subscriptions.length > 0 && (
+                    <div className="pt-2 border-t border-dark-700">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-dark-400">Monthly Total</span>
+                        <span className="text-white font-medium">
+                          {formatCurrency(subscriptions.reduce((sum, s) => {
+                            const amount = s.amount;
+                            if (s.billingCycle === 'yearly') return sum + (amount / 12);
+                            if (s.billingCycle === 'quarterly') return sum + (amount / 3);
+                            if (s.billingCycle === 'weekly') return sum + (amount * 4);
+                            return sum + amount;
+                          }, 0))}
+                        </span>
+                      </div>
                     </div>
-                  );
-                }) : (
-                  <p className="text-sm text-dark-400 text-center py-4">No budgets set. Create one to track spending.</p>
-                )}
-              </CardContent>
-            </Card>
+                  )}
+                </CardContent>
+              </Card>
 
-            {/* Subscriptions */}
-            <Card variant="glass">
-              <CardHeader
-                title="Subscriptions"
-                icon={<CreditCard className="w-5 h-5 text-neon-purple" />}
-                action={
-                  <Button variant="ghost" size="sm" onClick={() => setIsAddSubscriptionOpen(true)}>
-                    <Plus className="w-4 h-4 mr-1" />
-                    Add
-                  </Button>
-                }
-              />
-              <CardContent className="space-y-3">
-                {subscriptions.length > 0 ? subscriptions.map(sub => {
-                  const nextBilling = sub.nextBillingDate instanceof Date 
-                    ? sub.nextBillingDate 
-                    : new Date(sub.nextBillingDate);
-                  const daysUntil = Math.ceil((nextBilling.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-                  
-                  return (
-                    <div 
-                      key={sub.id}
-                      className="flex items-center justify-between p-3 rounded-lg hover:bg-dark-700/30 cursor-pointer transition-colors"
-                      onClick={() => setSelectedSubscription(sub)}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-dark-700 flex items-center justify-center">
-                          <CreditCard className="w-5 h-5 text-neon-purple" />
-                        </div>
+              {/* People Accounts */}
+              <Card variant="glass">
+                <CardHeader
+                  title="People Accounts"
+                  icon={<Users className="w-5 h-5 text-neon-cyan" />}
+                  action={
+                    <Button variant="ghost" size="sm" onClick={() => setIsAddPersonAccountOpen(true)}>
+                      <UserPlus className="w-4 h-4 mr-1" />
+                      Add
+                    </Button>
+                  }
+                />
+                <CardContent className="space-y-3">
+                  {personAccounts.length > 0 ? personAccounts.map(account => {
+                    const balance = account.balance || 0;
+                    const isPositive = balance > 0;
+                    const isNegative = balance < 0;
+
+                    return (
+                      <div
+                        key={account.id}
+                        className="flex items-center justify-between p-3 rounded-lg hover:bg-dark-700/30 cursor-pointer transition-colors"
+                        onClick={() => setSelectedPersonAccount(account)}
+                      >
                         <div>
-                          <p className="text-sm font-medium text-white">{sub.name}</p>
+                          <p className="text-sm font-medium text-white">{account.name}</p>
                           <p className="text-xs text-dark-400">
-                            {daysUntil <= 0 ? 'Due today' : daysUntil === 1 ? 'Due tomorrow' : `Due in ${daysUntil} days`}
+                            {isPositive
+                              ? `${account.name} owes you`
+                              : isNegative
+                                ? `You owe ${account.name}`
+                                : 'Settled'}
                           </p>
                         </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-medium text-white">{formatCurrency(sub.amount, sub.currency || preferredCurrency)}</p>
-                        <p className="text-xs text-dark-400">/{sub.billingCycle}</p>
-                      </div>
-                    </div>
-                  );
-                }) : (
-                  <p className="text-sm text-dark-400 text-center py-4">No subscriptions tracked. Add one to monitor recurring payments.</p>
-                )}
-                {subscriptions.length > 0 && (
-                  <div className="pt-2 border-t border-dark-700">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-dark-400">Monthly Total</span>
-                      <span className="text-white font-medium">
-                        {formatCurrency(subscriptions.reduce((sum, s) => {
-                          const amount = s.amount;
-                          if (s.billingCycle === 'yearly') return sum + (amount / 12);
-                          if (s.billingCycle === 'quarterly') return sum + (amount / 3);
-                          if (s.billingCycle === 'weekly') return sum + (amount * 4);
-                          return sum + amount;
-                        }, 0))}
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* People Accounts */}
-            <Card variant="glass">
-              <CardHeader
-                title="People Accounts"
-                icon={<Users className="w-5 h-5 text-neon-cyan" />}
-                action={
-                  <Button variant="ghost" size="sm" onClick={() => setIsAddPersonAccountOpen(true)}>
-                    <UserPlus className="w-4 h-4 mr-1" />
-                    Add
-                  </Button>
-                }
-              />
-              <CardContent className="space-y-3">
-                {personAccounts.length > 0 ? personAccounts.map(account => {
-                  const balance = account.balance || 0;
-                  const isPositive = balance > 0;
-                  const isNegative = balance < 0;
-
-                  return (
-                    <div
-                      key={account.id}
-                      className="flex items-center justify-between p-3 rounded-lg hover:bg-dark-700/30 cursor-pointer transition-colors"
-                      onClick={() => setSelectedPersonAccount(account)}
-                    >
-                      <div>
-                        <p className="text-sm font-medium text-white">{account.name}</p>
-                        <p className="text-xs text-dark-400">
-                          {isPositive
-                            ? `${account.name} owes you`
-                            : isNegative
-                            ? `You owe ${account.name}`
-                            : 'Settled'}
+                        <p
+                          className={cn(
+                            'text-sm font-semibold',
+                            isPositive ? 'text-neon-green' : isNegative ? 'text-neon-orange' : 'text-dark-300'
+                          )}
+                        >
+                          {isPositive ? '+' : isNegative ? '-' : ''}
+                          {formatCurrency(Math.abs(balance), account.currency || preferredCurrency)}
                         </p>
                       </div>
-                      <p
-                        className={cn(
-                          'text-sm font-semibold',
-                          isPositive ? 'text-neon-green' : isNegative ? 'text-neon-orange' : 'text-dark-300'
-                        )}
-                      >
-                        {isPositive ? '+' : isNegative ? '-' : ''}
-                        {formatCurrency(Math.abs(balance), account.currency || preferredCurrency)}
+                    );
+                  }) : (
+                    <p className="text-sm text-dark-400 text-center py-4">
+                      No people accounts yet. Add one to track lending and paybacks.
+                    </p>
+                  )}
+
+                  {personAccounts.length > 0 && (
+                    <div className="pt-2 border-t border-dark-700 space-y-1.5">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-dark-400">They owe you</span>
+                        <span className="text-neon-green font-medium">
+                          {formatCurrency(peopleSummary.owedToYou)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-dark-400">You owe</span>
+                        <span className="text-neon-orange font-medium">
+                          {formatCurrency(peopleSummary.youOwe)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-dark-400">Net</span>
+                        <span
+                          className={cn(
+                            'font-semibold',
+                            peopleSummary.net >= 0 ? 'text-neon-green' : 'text-neon-orange'
+                          )}
+                        >
+                          {formatCurrency(peopleSummary.net)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* AI Insights */}
+              <Card variant="glass">
+                <CardHeader
+                  title="AI Insights"
+                  icon={<Brain className="w-5 h-5 text-neon-purple" />}
+                />
+                <CardContent className="space-y-3">
+                  {stats.budgetUtilization > 80 ? (
+                    <div className="p-3 rounded-lg bg-neon-orange/10 border border-neon-orange/20">
+                      <div className="flex items-center gap-2 mb-1">
+                        <AlertTriangle className="w-4 h-4 text-neon-orange" />
+                        <span className="text-xs font-medium text-neon-orange">Watch Out</span>
+                      </div>
+                      <p className="text-sm text-dark-300">
+                        You've used {Math.round(stats.budgetUtilization)}% of your total budget this period.
                       </p>
                     </div>
-                  );
-                }) : (
-                  <p className="text-sm text-dark-400 text-center py-4">
-                    No people accounts yet. Add one to track lending and paybacks.
-                  </p>
-                )}
+                  ) : monthlyStats.savingsRate > 20 ? (
+                    <div className="p-3 rounded-lg bg-neon-green/10 border border-neon-green/20">
+                      <div className="flex items-center gap-2 mb-1">
+                        <TrendingUp className="w-4 h-4 text-neon-green" />
+                        <span className="text-xs font-medium text-neon-green">Good News!</span>
+                      </div>
+                      <p className="text-sm text-dark-300">
+                        Great job! You're saving {monthlyStats.savingsRate}% of your income this month.
+                      </p>
+                    </div>
+                  ) : null}
 
-                {personAccounts.length > 0 && (
-                  <div className="pt-2 border-t border-dark-700 space-y-1.5">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-dark-400">They owe you</span>
-                      <span className="text-neon-green font-medium">
-                        {formatCurrency(peopleSummary.owedToYou)}
-                      </span>
+                  {stats.topCategories.length > 0 && (
+                    <div className="p-3 rounded-lg bg-dark-800/30">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Sparkles className="w-4 h-4 text-neon-cyan" />
+                        <span className="text-xs font-medium text-dark-200">Top Spending</span>
+                      </div>
+                      <p className="text-sm text-dark-400">
+                        Your highest expense category is {categoryConfig[stats.topCategories[0]?.category]?.label || stats.topCategories[0]?.category} at {formatCurrency(stats.topCategories[0]?.amount || 0)}.
+                      </p>
                     </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-dark-400">You owe</span>
-                      <span className="text-neon-orange font-medium">
-                        {formatCurrency(peopleSummary.youOwe)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-dark-400">Net</span>
-                      <span
-                        className={cn(
-                          'font-semibold',
-                          peopleSummary.net >= 0 ? 'text-neon-green' : 'text-neon-orange'
-                        )}
-                      >
-                        {formatCurrency(peopleSummary.net)}
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                  )}
 
-            {/* AI Insights */}
-            <Card variant="glass">
-              <CardHeader
-                title="AI Insights"
-                icon={<Brain className="w-5 h-5 text-neon-purple" />}
-              />
-              <CardContent className="space-y-3">
-                {stats.budgetUtilization > 80 ? (
-                  <div className="p-3 rounded-lg bg-neon-orange/10 border border-neon-orange/20">
-                    <div className="flex items-center gap-2 mb-1">
-                      <AlertTriangle className="w-4 h-4 text-neon-orange" />
-                      <span className="text-xs font-medium text-neon-orange">Watch Out</span>
-                    </div>
-                    <p className="text-sm text-dark-300">
-                      You've used {Math.round(stats.budgetUtilization)}% of your total budget this period.
-                    </p>
-                  </div>
-                ) : monthlyStats.savingsRate > 20 ? (
-                  <div className="p-3 rounded-lg bg-neon-green/10 border border-neon-green/20">
-                    <div className="flex items-center gap-2 mb-1">
-                      <TrendingUp className="w-4 h-4 text-neon-green" />
-                      <span className="text-xs font-medium text-neon-green">Good News!</span>
-                    </div>
-                    <p className="text-sm text-dark-300">
-                      Great job! You're saving {monthlyStats.savingsRate}% of your income this month.
-                    </p>
-                  </div>
-                ) : null}
-
-                {stats.topCategories.length > 0 && (
-                  <div className="p-3 rounded-lg bg-dark-800/30">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Sparkles className="w-4 h-4 text-neon-cyan" />
-                      <span className="text-xs font-medium text-dark-200">Top Spending</span>
-                    </div>
-                    <p className="text-sm text-dark-400">
-                      Your highest expense category is {categoryConfig[stats.topCategories[0]?.category]?.label || stats.topCategories[0]?.category} at {formatCurrency(stats.topCategories[0]?.amount || 0)}.
-                    </p>
-                  </div>
-                )}
-
-                <Button variant="ghost" size="sm" className="w-full" onClick={openAIPanel}>
-                  <Sparkles className="w-4 h-4 mr-1" />
-                  Get Financial Advice
-                </Button>
-              </CardContent>
-            </Card>
-          </motion.div>
-        </div>
+                  <Button variant="ghost" size="sm" className="w-full" onClick={openAIPanel}>
+                    <Sparkles className="w-4 h-4 mr-1" />
+                    Get Financial Advice
+                  </Button>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </div>
+        )}
 
         {/* Add Transaction Modal */}
         <Modal
@@ -1144,8 +1606,8 @@ function EditTransactionForm({
   const [category, setCategory] = useState(transaction.category);
   const [description, setDescription] = useState(transaction.description || '');
   const [date, setDate] = useState(
-    transaction.date instanceof Date 
-      ? transaction.date.toISOString().split('T')[0] 
+    transaction.date instanceof Date
+      ? transaction.date.toISOString().split('T')[0]
       : new Date(transaction.date).toISOString().split('T')[0]
   );
   const [recurring, setRecurring] = useState(transaction.recurring || false);
@@ -1452,7 +1914,7 @@ function BudgetDetailsForm({
 
   const handleDelete = async () => {
     if (!confirm('Are you sure you want to delete this budget?')) return;
-    
+
     setIsDeleting(true);
     try {
       await onDelete();
@@ -1540,10 +2002,10 @@ function BudgetDetailsForm({
       </div>
 
       <div className="flex justify-between pt-4">
-        <Button 
-          type="button" 
-          variant="ghost" 
-          size="sm" 
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
           className="text-status-error"
           onClick={handleDelete}
           disabled={isDeleting}
@@ -1719,8 +2181,8 @@ function SubscriptionDetailsForm({
     subscription.billingCycle || 'monthly'
   );
   const [nextBillingDate, setNextBillingDate] = useState(() => {
-    const date = subscription.nextBillingDate instanceof Date 
-      ? subscription.nextBillingDate 
+    const date = subscription.nextBillingDate instanceof Date
+      ? subscription.nextBillingDate
       : new Date(subscription.nextBillingDate);
     return date.toISOString().split('T')[0];
   });
@@ -1752,7 +2214,7 @@ function SubscriptionDetailsForm({
 
   const handleDelete = async () => {
     if (!confirm('Are you sure you want to delete this subscription?')) return;
-    
+
     setIsDeleting(true);
     try {
       await onDelete();
@@ -1868,10 +2330,10 @@ function SubscriptionDetailsForm({
       </div>
 
       <div className="flex justify-between pt-4">
-        <Button 
-          type="button" 
-          variant="ghost" 
-          size="sm" 
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
           className="text-status-error"
           onClick={handleDelete}
           disabled={isDeleting}
