@@ -10,6 +10,13 @@ import type {
   PersonAccountEntry,
   PersonAccountType,
   PersonAccountBalanceEffect,
+  NetWorthAccount,
+  NetWorthSnapshot,
+  SavingsGoal,
+  BodyMetricEntry,
+  GoalMilestone,
+  InboxItem,
+  InboxItemType,
 } from '@/types';
 import {
   subscribeToTransactions,
@@ -38,7 +45,29 @@ import {
   subscribeToPersonAccountTypes,
   createPersonAccountType,
   deletePersonAccountType,
+  subscribeToNetWorthAccounts,
+  createNetWorthAccount,
+  updateNetWorthAccount,
+  deleteNetWorthAccount,
+  subscribeToNetWorthSnapshots,
+  saveNetWorthSnapshot,
+  subscribeToSavingsGoals,
+  createSavingsGoal,
+  updateSavingsGoal,
+  deleteSavingsGoal,
+  subscribeToBodyMetrics,
+  createBodyMetricEntry,
+  subscribeToGoalMilestones,
+  subscribeToAllGoalMilestones,
+  createGoalMilestone,
+  updateGoalMilestone,
+  deleteGoalMilestone,
+  subscribeToInboxItems,
+  createInboxItem,
+  updateInboxItem,
+  deleteInboxItem,
 } from '@/lib/services/finance';
+
 
 // ====== TRANSACTIONS HOOK ======
 
@@ -80,7 +109,7 @@ export function useTransactions(): UseTransactionsReturn {
 
     setLoading(true);
     setError(null);
-    
+
     const unsubscribe = subscribeToTransactions(
       user.uid,
       (fetchedTransactions) => {
@@ -102,7 +131,7 @@ export function useTransactions(): UseTransactionsReturn {
   const handleCreateTransaction = useCallback(
     async (data: CreateTransactionData): Promise<string> => {
       if (!user) throw new Error('User not authenticated');
-      
+
       try {
         const transactionId = await createTransaction(user.uid, data);
         return transactionId;
@@ -212,7 +241,7 @@ export function useBudgets(): UseBudgetsReturn {
   const handleCreateBudget = useCallback(
     async (data: CreateBudgetData): Promise<string> => {
       if (!user) throw new Error('User not authenticated');
-      
+
       try {
         const budgetId = await createBudget(user.uid, data);
         return budgetId;
@@ -319,7 +348,7 @@ export function useSubscriptions(activeOnly: boolean = false): UseSubscriptionsR
 
     setLoading(true);
     const subscribeFn = activeOnly ? subscribeToActiveSubscriptions : subscribeToSubscriptions;
-    
+
     const unsubscribe = subscribeFn(
       user.uid,
       (fetchedSubscriptions) => {
@@ -341,7 +370,7 @@ export function useSubscriptions(activeOnly: boolean = false): UseSubscriptionsR
   const handleCreateSubscription = useCallback(
     async (data: CreateSubscriptionData): Promise<string> => {
       if (!user) throw new Error('User not authenticated');
-      
+
       try {
         const subscriptionId = await createSubscription(user.uid, data);
         return subscriptionId;
@@ -757,4 +786,177 @@ export function useFinanceStats(transactions: Transaction[], budgets: Budget[]) 
   }, [safeTransactions, safeBudgets]);
 
   return stats;
+}
+
+// ====== NET WORTH HOOK ======
+
+export function useNetWorth() {
+  const { user } = useAuth();
+  const [accounts, setAccounts] = useState<NetWorthAccount[]>([]);
+  const [snapshots, setSnapshots] = useState<NetWorthSnapshot[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) { setLoading(false); return; }
+    setLoading(true);
+    const unsub1 = subscribeToNetWorthAccounts(
+      user.uid,
+      (accs) => { setAccounts(accs); setLoading(false); },
+      (err) => setError(err.message)
+    );
+    const unsub2 = subscribeToNetWorthSnapshots(
+      user.uid,
+      (snaps) => setSnapshots(snaps),
+      (err) => setError(err.message)
+    );
+    return () => { unsub1(); unsub2(); };
+  }, [user]);
+
+  const totals = useMemo(() => {
+    const totalAssets = accounts.filter(a => a.type === 'asset').reduce((s, a) => s + a.balance, 0);
+    const totalLiabilities = accounts.filter(a => a.type === 'liability').reduce((s, a) => s + a.balance, 0);
+    return { totalAssets, totalLiabilities, netWorth: totalAssets - totalLiabilities };
+  }, [accounts]);
+
+  const handleCreate = useCallback(async (data: Omit<NetWorthAccount, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => {
+    if (!user) throw new Error('Not authenticated');
+    return createNetWorthAccount(user.uid, data);
+  }, [user]);
+
+  const handleUpdate = useCallback(async (id: string, upd: Partial<Omit<NetWorthAccount, 'id' | 'userId' | 'createdAt'>>) => {
+    return updateNetWorthAccount(id, upd);
+  }, []);
+
+  const handleDelete = useCallback(async (id: string) => {
+    return deleteNetWorthAccount(id);
+  }, []);
+
+  const handleSaveSnapshot = useCallback(async () => {
+    if (!user) return;
+    await saveNetWorthSnapshot(user.uid, totals.totalAssets, totals.totalLiabilities);
+  }, [user, totals]);
+
+  return { accounts, snapshots, ...totals, loading, error, createAccount: handleCreate, updateAccount: handleUpdate, deleteAccount: handleDelete, saveSnapshot: handleSaveSnapshot };
+}
+
+// ====== SAVINGS GOALS HOOK ======
+
+export function useSavingsGoals() {
+  const { user } = useAuth();
+  const [goals, setGoals] = useState<SavingsGoal[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) { setLoading(false); return; }
+    setLoading(true);
+    const unsub = subscribeToSavingsGoals(
+      user.uid,
+      (g) => { setGoals(g); setLoading(false); },
+      (err) => setError(err.message)
+    );
+    return unsub;
+  }, [user]);
+
+  const handleCreate = useCallback(async (data: Omit<SavingsGoal, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => {
+    if (!user) throw new Error('Not authenticated');
+    return createSavingsGoal(user.uid, data);
+  }, [user]);
+
+  const handleUpdate = useCallback(async (id: string, upd: Partial<Omit<SavingsGoal, 'id' | 'userId' | 'createdAt'>>) => {
+    return updateSavingsGoal(id, upd);
+  }, []);
+
+  const handleDelete = useCallback(async (id: string) => deleteSavingsGoal(id), []);
+
+  return { goals, loading, error, createGoal: handleCreate, updateGoal: handleUpdate, deleteGoal: handleDelete };
+}
+
+// ====== BODY METRICS HOOK ======
+
+export function useBodyMetrics() {
+  const { user } = useAuth();
+  const [entries, setEntries] = useState<BodyMetricEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user) { setLoading(false); return; }
+    const unsub = subscribeToBodyMetrics(
+      user.uid,
+      (e) => { setEntries(e); setLoading(false); }
+    );
+    return unsub;
+  }, [user]);
+
+  const handleCreate = useCallback(async (data: Omit<BodyMetricEntry, 'id' | 'userId' | 'createdAt'>) => {
+    if (!user) throw new Error('Not authenticated');
+    return createBodyMetricEntry(user.uid, data);
+  }, [user]);
+
+  return { entries, loading, addEntry: handleCreate };
+}
+
+// ====== GOAL MILESTONES HOOK ======
+
+export function useGoalMilestones(goalId?: string) {
+  const { user } = useAuth();
+  const [milestones, setMilestones] = useState<GoalMilestone[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user) { setLoading(false); return; }
+    const unsub = goalId
+      ? subscribeToGoalMilestones(user.uid, goalId, (m) => { setMilestones(m); setLoading(false); })
+      : subscribeToAllGoalMilestones(user.uid, (m) => { setMilestones(m); setLoading(false); });
+    return unsub;
+  }, [user, goalId]);
+
+  const handleCreate = useCallback(async (gId: string, data: Omit<GoalMilestone, 'id' | 'userId' | 'goalId' | 'createdAt' | 'completed' | 'completedAt'>) => {
+    if (!user) throw new Error('Not authenticated');
+    return createGoalMilestone(user.uid, gId, data);
+  }, [user]);
+
+  const handleUpdate = useCallback(async (id: string, upd: Partial<Omit<GoalMilestone, 'id' | 'userId' | 'goalId' | 'createdAt'>>) => {
+    return updateGoalMilestone(id, upd);
+  }, []);
+
+  const handleDelete = useCallback(async (id: string) => deleteGoalMilestone(id), []);
+
+  const handleToggle = useCallback(async (milestone: GoalMilestone) => {
+    return updateGoalMilestone(milestone.id, {
+      completed: !milestone.completed,
+      completedAt: !milestone.completed ? new Date() : undefined,
+    });
+  }, []);
+
+  return { milestones, loading, createMilestone: handleCreate, updateMilestone: handleUpdate, deleteMilestone: handleDelete, toggleMilestone: handleToggle };
+}
+
+// ====== INBOX HOOK ======
+
+export function useInbox() {
+  const { user } = useAuth();
+  const [items, setItems] = useState<InboxItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user) { setLoading(false); return; }
+    const unsub = subscribeToInboxItems(
+      user.uid,
+      (i) => { setItems(i); setLoading(false); }
+    );
+    return unsub;
+  }, [user]);
+
+  const handleCreate = useCallback(async (content: string, classifiedAs: InboxItemType = 'unclassified') => {
+    if (!user) throw new Error('Not authenticated');
+    return createInboxItem(user.uid, content, classifiedAs);
+  }, [user]);
+
+  const handleProcess = useCallback(async (id: string) => updateInboxItem(id, { processed: true }), []);
+  const handleReclassify = useCallback(async (id: string, t: InboxItemType) => updateInboxItem(id, { classifiedAs: t }), []);
+  const handleDelete = useCallback(async (id: string) => deleteInboxItem(id), []);
+
+  return { items, loading, addItem: handleCreate, processItem: handleProcess, reclassifyItem: handleReclassify, deleteItem: handleDelete };
 }
