@@ -580,8 +580,8 @@ export default function CalendarPage() {
     return categoryOptions.find(c => c.value === category)?.hex || '#6b7280';
   };
 
-  // Show loading state
-  if (authLoading || loading) {
+  // Show auth loading state
+  if (authLoading) {
     return (
       <MainLayout>
         <PageContainer title="Calendar" subtitle="Plan and organize your time">

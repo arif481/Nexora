@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { LoadingSpinner, EmptyState } from '@/components/ui/Loading';
 import { useAuth } from '@/hooks/useAuth';
+import { useUIStore } from '@/stores/uiStore';
 import { useTasks, useTaskStats } from '@/hooks/useTasks';
 import { useProjects } from '@/hooks/useProjects';
 import type { Task, TaskStatus } from '@/types';
@@ -19,6 +20,7 @@ import { KanbanBoard } from '@/components/features/tasks/KanbanBoard';
 export default function TasksPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
+  const { openModal } = useUIStore();
 
   const {
     tasks,
@@ -92,8 +94,7 @@ export default function TasksPage() {
   };
 
   const handleTaskClick = (task: Task) => {
-    // For now simple routing or modal
-    console.log('Task clicked', task);
+    openModal('edit-task', { taskId: task.id, task });
   };
 
   const handleCreateTestProject = async () => {
@@ -192,7 +193,7 @@ export default function TasksPage() {
             <Button variant="outline" onClick={handleCreateTestProject}>
               <Folder className="w-4 h-4 mr-1" /> Project
             </Button>
-            <Button variant="glow">
+            <Button variant="glow" onClick={() => openModal('create-task')}>
               <Plus className="w-4 h-4 mr-1" /> Task
             </Button>
           </div>

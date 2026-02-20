@@ -351,14 +351,14 @@ export default function FinancePage() {
     };
   }, [personAccounts]);
 
-  // Show loading state
-  if (loading) {
+  // Show auth loading state
+  if (authLoading) {
     return (
       <MainLayout>
         <PageContainer title="Finance" subtitle="Track spending, grow wealth">
           <div className="flex flex-col items-center justify-center min-h-[400px]">
             <LoadingSpinner size="lg" />
-            <p className="mt-4 text-gray-600">Loading finance data...</p>
+            <p className="mt-4 text-dark-400">Loading finance data...</p>
           </div>
         </PageContainer>
       </MainLayout>

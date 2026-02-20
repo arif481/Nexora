@@ -108,45 +108,45 @@ const clearTimerState = () => {
 
 // Ambient sounds with free audio URLs from Pixabay/FreeSound (royalty-free)
 const ambientSounds = [
-  { 
-    id: 'rain', 
-    name: 'Rain', 
+  {
+    id: 'rain',
+    name: 'Rain',
     icon: '🌧️',
     // Rain sound - white noise generator fallback
     audioUrl: null,
     oscillatorType: 'brown' as const,
   },
-  { 
-    id: 'forest', 
-    name: 'Forest', 
+  {
+    id: 'forest',
+    name: 'Forest',
     icon: '🌲',
     audioUrl: null,
     oscillatorType: 'pink' as const,
   },
-  { 
-    id: 'ocean', 
-    name: 'Ocean', 
+  {
+    id: 'ocean',
+    name: 'Ocean',
     icon: '🌊',
     audioUrl: null,
     oscillatorType: 'brown' as const,
   },
-  { 
-    id: 'fire', 
-    name: 'Fireplace', 
+  {
+    id: 'fire',
+    name: 'Fireplace',
     icon: '🔥',
     audioUrl: null,
     oscillatorType: 'pink' as const,
   },
-  { 
-    id: 'coffee', 
-    name: 'White Noise', 
+  {
+    id: 'coffee',
+    name: 'White Noise',
     icon: '☕',
     audioUrl: null,
     oscillatorType: 'white' as const,
   },
-  { 
-    id: 'lofi', 
-    name: 'Brown Noise', 
+  {
+    id: 'lofi',
+    name: 'Brown Noise',
     icon: '🎵',
     audioUrl: null,
     oscillatorType: 'brown' as const,
@@ -158,7 +158,7 @@ export default function FocusPage() {
   const { user, loading: authLoading } = useAuth();
   const { sessions, tasks, loading: focusLoading, addSession, addTask, updateTask, removeTask } = useFocus();
   const focusStats = useFocusStats(sessions);
-  
+
   const [mode, setMode] = useState<TimerMode>('focus');
   const [status, setStatus] = useState<TimerStatus>('idle');
   const [timeLeft, setTimeLeft] = useState(TIMER_PRESETS.focus);
@@ -171,7 +171,7 @@ export default function FocusPage() {
   const [focusModeActive, setFocusModeActive] = useState(false);
   const [distractionBlocker, setDistractionBlocker] = useState(false);
   const [isRestoringState, setIsRestoringState] = useState(true);
-  
+
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const noiseNodeRef = useRef<AudioBufferSourceNode | null>(null);
@@ -179,19 +179,19 @@ export default function FocusPage() {
   const { openAIPanel } = useUIStore();
 
   const loading = authLoading || focusLoading;
-  
+
   // Restore timer state from localStorage on mount
   useEffect(() => {
     const savedState = loadTimerState();
     if (savedState && savedState.status !== 'idle') {
       // Restore mode
       setMode(savedState.mode);
-      
+
       // Calculate elapsed time if timer was running
       if (savedState.status === 'running' && savedState.startedAt) {
         const elapsedSeconds = Math.floor((Date.now() - savedState.startedAt) / 1000);
         const remaining = Math.max(0, savedState.timeLeft - elapsedSeconds);
-        
+
         if (remaining > 0) {
           setTimeLeft(remaining);
           setStatus('running');
@@ -210,11 +210,11 @@ export default function FocusPage() {
     }
     setIsRestoringState(false);
   }, []);
-  
+
   // Persist timer state when it changes
   useEffect(() => {
     if (isRestoringState) return;
-    
+
     if (status !== 'idle') {
       saveTimerState({
         mode,
@@ -233,7 +233,7 @@ export default function FocusPage() {
   const createNoiseBuffer = useCallback((type: 'white' | 'pink' | 'brown', sampleRate: number, duration: number) => {
     const bufferSize = sampleRate * duration;
     const buffer = new Float32Array(bufferSize);
-    
+
     if (type === 'white') {
       for (let i = 0; i < bufferSize; i++) {
         buffer[i] = Math.random() * 2 - 1;
@@ -260,7 +260,7 @@ export default function FocusPage() {
         buffer[i] *= 3.5;
       }
     }
-    
+
     return buffer;
   }, []);
 
@@ -381,7 +381,7 @@ export default function FocusPage() {
 
   const handleTimerComplete = async () => {
     setStatus('idle');
-    
+
     // Add session to Firebase
     const now = new Date();
     try {
@@ -400,8 +400,8 @@ export default function FocusPage() {
 
     // Update task if focus session
     if (mode === 'focus' && activeTask) {
-      updateTask(activeTask.id, { 
-        completedPomodoros: activeTask.completedPomodoros + 1 
+      updateTask(activeTask.id, {
+        completedPomodoros: activeTask.completedPomodoros + 1
       });
     }
 
@@ -487,13 +487,13 @@ export default function FocusPage() {
   const ModeIcon = currentMode.icon;
 
   // Loading state
-  if (loading) {
+  if (authLoading) {
     return (
       <MainLayout>
         <PageContainer title="Focus Mode" subtitle="Deep work, zero distractions">
           <div className="flex flex-col items-center justify-center min-h-[400px]">
             <LoadingSpinner size="lg" />
-            <p className="mt-4 text-gray-600">Loading focus data...</p>
+            <p className="mt-4 text-dark-400">Loading focus data...</p>
           </div>
         </PageContainer>
       </MainLayout>
@@ -552,11 +552,11 @@ export default function FocusPage() {
                         'px-4 py-2 rounded-xl text-sm font-medium transition-all',
                         mode === m
                           ? cn(
-                              'text-dark-900',
-                              m === 'focus' && 'bg-neon-cyan',
-                              m === 'shortBreak' && 'bg-neon-green',
-                              m === 'longBreak' && 'bg-neon-purple'
-                            )
+                            'text-dark-900',
+                            m === 'focus' && 'bg-neon-cyan',
+                            m === 'shortBreak' && 'bg-neon-green',
+                            m === 'longBreak' && 'bg-neon-purple'
+                          )
                           : 'bg-dark-800/50 text-dark-300 hover:text-white hover:bg-dark-700/50'
                       )}
                     >
@@ -841,8 +841,8 @@ export default function FocusPage() {
                       task.completed
                         ? 'bg-dark-800/30 opacity-50'
                         : activeTask?.id === task.id
-                        ? 'bg-neon-cyan/10 border border-neon-cyan/30'
-                        : 'bg-dark-800/30 hover:bg-dark-700/30'
+                          ? 'bg-neon-cyan/10 border border-neon-cyan/30'
+                          : 'bg-dark-800/30 hover:bg-dark-700/30'
                     )}
                   >
                     <div className="flex items-start gap-3">

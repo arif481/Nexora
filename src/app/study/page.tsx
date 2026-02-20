@@ -131,14 +131,14 @@ export default function StudyPage() {
     return `${hours}h ${mins}m`;
   };
 
-  // Loading state
-  if (loading) {
+  // Auth loading state
+  if (authLoading) {
     return (
       <MainLayout>
         <PageContainer title="Study" subtitle="Track your academic progress">
           <div className="flex flex-col items-center justify-center min-h-[400px]">
             <LoadingSpinner size="lg" />
-            <p className="mt-4 text-gray-600">Loading subjects...</p>
+            <p className="mt-4 text-dark-400">Loading subjects...</p>
           </div>
         </PageContainer>
       </MainLayout>
