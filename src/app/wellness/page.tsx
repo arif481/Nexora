@@ -272,14 +272,14 @@ export default function WellnessPage() {
     { id: 'luteal', label: 'Luteal', emoji: '🫶', range: 'Day 17+' },
   ] as const;
 
-  // Loading state
-  if (loading) {
+  // Auth loading state
+  if (authLoading) {
     return (
       <MainLayout>
         <PageContainer title="Wellness" subtitle="Track your health and well-being">
           <div className="flex flex-col items-center justify-center min-h-[400px]">
             <LoadingSpinner size="lg" />
-            <p className="mt-4 text-gray-600">Loading wellness data...</p>
+            <p className="mt-4 text-dark-400">Loading wellness data...</p>
           </div>
         </PageContainer>
       </MainLayout>
