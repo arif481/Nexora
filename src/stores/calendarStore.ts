@@ -1,9 +1,8 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { 
-  CalendarEvent, 
-  FocusBlock,
-  EventCategory 
+import type {
+  CalendarEvent,
+  FocusBlock
 } from '@/types';
 
 interface CalendarState {
@@ -101,7 +100,7 @@ export const useCalendarStore = create<CalendarState>()(
         const endOfDay = new Date(date);
         endOfDay.setHours(23, 59, 59, 999);
 
-        return events.filter((event) => {
+        return events.filter((event: CalendarEvent) => {
           const eventStart = new Date(event.startTime);
           const eventEnd = new Date(event.endTime);
           return (
@@ -117,7 +116,7 @@ export const useCalendarStore = create<CalendarState>()(
         const endDate = new Date(startDate);
         endDate.setDate(endDate.getDate() + 7);
 
-        return events.filter((event) => {
+        return events.filter((event: CalendarEvent) => {
           const eventStart = new Date(event.startTime);
           return eventStart >= startDate && eventStart < endDate;
         });
@@ -128,7 +127,7 @@ export const useCalendarStore = create<CalendarState>()(
         const startDate = new Date(year, month, 1);
         const endDate = new Date(year, month + 1, 0, 23, 59, 59, 999);
 
-        return events.filter((event) => {
+        return events.filter((event: CalendarEvent) => {
           const eventStart = new Date(event.startTime);
           return eventStart >= startDate && eventStart <= endDate;
         });
@@ -139,9 +138,9 @@ export const useCalendarStore = create<CalendarState>()(
         const now = new Date();
 
         return events
-          .filter((event) => new Date(event.startTime) >= now)
+          .filter((event: CalendarEvent) => new Date(event.startTime) >= now)
           .sort(
-            (a, b) =>
+            (a: CalendarEvent, b: CalendarEvent) =>
               new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
           )
           .slice(0, limit);
@@ -178,7 +177,7 @@ export const useCalendarStore = create<CalendarState>()(
         const endOfDay = new Date(date);
         endOfDay.setHours(23, 59, 59, 999);
 
-        return focusBlocks.filter((block) => {
+        return focusBlocks.filter((block: FocusBlock) => {
           const blockStart = new Date(block.startTime);
           return blockStart >= startOfDay && blockStart <= endOfDay;
         });

@@ -133,6 +133,7 @@ const convertTimestamp = (value: Timestamp | Date | null | undefined): Date => {
   return value instanceof Date ? value : new Date(value);
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const convertSyncJob = (docSnap: any): IntegrationSyncJob => {
   const data = docSnap.data();
   return {
@@ -149,6 +150,7 @@ const convertSyncJob = (docSnap: any): IntegrationSyncJob => {
   };
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const convertSyncLog = (docSnap: any): IntegrationSyncLog => {
   const data = docSnap.data();
   return {

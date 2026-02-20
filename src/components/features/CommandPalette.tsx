@@ -25,6 +25,12 @@ import {
   X,
   Hash,
   Zap,
+  Film,
+  Users,
+  Utensils,
+  PlaneTakeoff,
+  Building2,
+  MessageCircle,
 } from 'lucide-react';
 
 interface CommandItem {
@@ -53,6 +59,12 @@ export function CommandPalette() {
     { id: 'nav-habits', title: 'Go to Habits', icon: Target, category: 'navigation', action: () => router.push('/habits'), shortcut: 'G H' },
     { id: 'nav-wellness', title: 'Go to Wellness', icon: Heart, category: 'navigation', action: () => router.push('/wellness') },
     { id: 'nav-finance', title: 'Go to Finance', icon: Wallet, category: 'navigation', action: () => router.push('/finance') },
+    { id: 'nav-entertainment', title: 'Go to Entertainment', icon: Film, category: 'navigation', action: () => router.push('/entertainment'), shortcut: 'G E' },
+    { id: 'nav-contacts', title: 'Go to Contacts', icon: Users, category: 'navigation', action: () => router.push('/contacts') },
+    { id: 'nav-meals', title: 'Go to Meal Planner', icon: Utensils, category: 'navigation', action: () => router.push('/meals') },
+    { id: 'nav-travel', title: 'Go to Travel Planner', icon: PlaneTakeoff, category: 'navigation', action: () => router.push('/travel') },
+    { id: 'nav-admin', title: 'Go to Life Admin Hub', icon: Building2, category: 'navigation', action: () => router.push('/admin') },
+    { id: 'nav-comms', title: 'Go to Communications Hub', icon: MessageCircle, category: 'navigation', action: () => router.push('/comms') },
     { id: 'nav-settings', title: 'Go to Settings', icon: Settings, category: 'navigation', action: () => router.push('/settings'), shortcut: 'G S' },
 
     // Actions
@@ -148,6 +160,7 @@ export function CommandPalette() {
       'g j': () => router.push('/journal'),
       'g h': () => router.push('/habits'),
       'g s': () => router.push('/settings'),
+      'g e': () => router.push('/entertainment'),
       'n t': () => openModal('create-task'),
       'n e': () => openModal('create-event'),
       'n n': () => openModal('create-note'),

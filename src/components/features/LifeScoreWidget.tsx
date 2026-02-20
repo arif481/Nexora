@@ -69,7 +69,7 @@ export function LifeScoreWidget({
         const learning = clamp((focusMinutes / 300) * 5 + (habitDays / 30) * 5);
 
         const wellbeing = clamp(journalCount > 0 ? Math.min(journalCount * 1.5 + 3, 10) : 4);
-        const social = clamp(5); // placeholder until social features added
+        const social = clamp(Math.min(journalCount * 0.8 + habitDays * 0.15 + 2, 10)); // derived from journal + habit engagement
         const fun = clamp(4 + Math.min(habitDays / 10, 3));
         const purpose = clamp((productivity + wellbeing + learning) / 3);
 

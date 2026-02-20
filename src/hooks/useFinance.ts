@@ -960,3 +960,9 @@ export function useInbox() {
 
   return { items, loading, addItem: handleCreate, processItem: handleProcess, reclassifyItem: handleReclassify, deleteItem: handleDelete };
 }
+
+// ====== NEW FINANCE UPGRADES ======
+export * from './useAutoRules';
+export * from './useInvestments';
+export * from './useDebts';
+export * from './useReceipts';

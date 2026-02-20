@@ -48,9 +48,12 @@ import { EmptyState, LoadingSpinner } from '@/components/ui/Loading';
 import { useUIStore } from '@/stores/uiStore';
 import { useAuth } from '@/hooks/useAuth';
 import { useStudy, useUpcomingExams, useStudyStats } from '@/hooks/useStudy';
+import { useFlashcards } from '@/hooks/useFlashcards';
 import { extractSyllabusDraft } from '@/lib/services/gemini';
 import { cn } from '@/lib/utils';
 import type { Subject, Topic, Resource, ExamDate, Grade } from '@/types';
+import { FlashcardDeck } from '@/components/features/study/FlashcardDeck';
+import { StudyAnalytics } from '@/components/features/study/StudyAnalytics';
 
 const colorOptions = [
   '#f7df1e', '#ef4444', '#61dafb', '#10b981', '#8b5cf6', '#f97316', '#06b6d4', '#ec4899'
@@ -68,9 +71,9 @@ const resourceTypeIcons: Record<string, any> = {
 export default function StudyPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const { 
-    subjects, 
-    loading: studyLoading, 
+  const {
+    subjects,
+    loading: studyLoading,
     createSubject,
     updateSubject,
     deleteSubject,
@@ -86,7 +89,7 @@ export default function StudyPage() {
   } = useStudy();
   const { exams: upcomingExams } = useUpcomingExams();
   const studyStats = useStudyStats(subjects);
-  
+
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [isCreateSubjectOpen, setIsCreateSubjectOpen] = useState(false);
   const [isSyllabusImportOpen, setIsSyllabusImportOpen] = useState(false);
@@ -214,7 +217,7 @@ export default function StudyPage() {
             </div>
           </div>
 
-          <h3 
+          <h3
             className="font-semibold text-white mb-1 cursor-pointer hover:text-neon-cyan transition-colors"
             onClick={() => setSelectedSubject(subject)}
           >
@@ -313,9 +316,9 @@ export default function StudyPage() {
                   </div>
                 )}
 
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+                <Button
+                  variant="ghost"
+                  size="sm"
                   className="w-full mt-3"
                   onClick={() => setSelectedSubject(subject)}
                 >
@@ -453,12 +456,12 @@ export default function StudyPage() {
                     {upcomingExams.slice(0, 5).map(exam => {
                       const subject = subjects.find(s => s.examDates.some(e => e.id === exam.id));
                       const daysUntil = Math.ceil((new Date(exam.date).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-                      
+
                       return (
                         <div key={exam.id} className="p-3 rounded-lg bg-dark-800/50">
                           <div className="flex items-center justify-between mb-2">
                             <h4 className="text-sm font-medium text-white">{exam.name}</h4>
-                            <Badge 
+                            <Badge
                               variant={daysUntil <= 3 ? 'orange' : daysUntil <= 7 ? 'cyan' : 'default'}
                               size="sm"
                             >
@@ -528,8 +531,8 @@ export default function StudyPage() {
                 </h3>
               </CardHeader>
               <CardContent className="space-y-2">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="w-full justify-start"
                   leftIcon={<Plus className="w-4 h-4" />}
                   onClick={() => setIsCreateSubjectOpen(true)}
@@ -553,8 +556,8 @@ export default function StudyPage() {
                 >
                   Add Topic
                 </Button>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="w-full justify-start"
                   leftIcon={<Calendar className="w-4 h-4" />}
                   onClick={() => selectedSubject && setIsAddExamOpen(true)}
@@ -562,8 +565,8 @@ export default function StudyPage() {
                 >
                   Schedule Exam
                 </Button>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="w-full justify-start"
                   leftIcon={<Award className="w-4 h-4" />}
                   onClick={() => selectedSubject && setIsAddGradeOpen(true)}
@@ -571,6 +574,39 @@ export default function StudyPage() {
                 >
                   Record Grade
                 </Button>
+              </CardContent>
+            </Card>
+
+            {/* Study Analytics */}
+            <Card variant="glass">
+              <CardHeader>
+                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <BarChart3 className="w-5 h-5 text-neon-cyan" />
+                  Study Analytics
+                </h3>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-dark-400">Total Study Time</span>
+                    <span className="text-sm font-medium text-white">{formatStudyTime(studyStats.totalStudyTime)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-dark-400">Avg Mastery</span>
+                    <span className="text-sm font-medium text-neon-green">{studyStats.averageMastery}%</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-dark-400">Total Topics</span>
+                    <span className="text-sm font-medium text-white">{studyStats.totalTopics}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-dark-400">Resources Completed</span>
+                    <span className="text-sm font-medium text-white">
+                      {subjects.reduce((sum, s) => sum + s.resources.filter(r => r.completed).length, 0)}/
+                      {subjects.reduce((sum, s) => sum + s.resources.length, 0)}
+                    </span>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -582,7 +618,7 @@ export default function StudyPage() {
           onClose={() => setIsCreateSubjectOpen(false)}
           title="Create New Subject"
         >
-          <CreateSubjectForm 
+          <CreateSubjectForm
             onClose={() => setIsCreateSubjectOpen(false)}
             onSubmit={async (data) => {
               await createSubject(data);
@@ -706,11 +742,11 @@ export default function StudyPage() {
 }
 
 // Create Subject Form
-function CreateSubjectForm({ 
-  onClose, 
-  onSubmit 
-}: { 
-  onClose: () => void; 
+function CreateSubjectForm({
+  onClose,
+  onSubmit
+}: {
+  onClose: () => void;
   onSubmit: (data: { name: string; description?: string; color: string }) => Promise<void>;
 }) {
   const [name, setName] = useState('');
@@ -811,10 +847,10 @@ function SyllabusImportForm({
     try {
       const filePayload = selectedFile
         ? {
-            name: selectedFile.name,
-            mimeType: selectedFile.type || 'application/octet-stream',
-            base64: await fileToBase64(selectedFile),
-          }
+          name: selectedFile.name,
+          mimeType: selectedFile.type || 'application/octet-stream',
+          base64: await fileToBase64(selectedFile),
+        }
         : undefined;
 
       const draft = await extractSyllabusDraft({
@@ -1112,8 +1148,8 @@ function SubjectDetailView({
             {subject.resources.map(resource => {
               const Icon = resourceTypeIcons[resource.type] || Link;
               return (
-                <div 
-                  key={resource.id} 
+                <div
+                  key={resource.id}
                   className="flex items-center gap-3 p-2 rounded-lg bg-dark-800/30 cursor-pointer"
                   onClick={() => onToggleResource(resource.id, !resource.completed)}
                 >
@@ -1191,6 +1227,11 @@ function SubjectDetailView({
             })}
           </div>
         )}
+      </div>
+
+      {/* Flashcards */}
+      <div className="pt-6 border-t border-dark-700/50">
+        <SubjectFlashcards subjectId={subject.id} subjectColor={subject.color} />
       </div>
     </div>
   );
@@ -1385,9 +1426,9 @@ function AddGradeForm({ onClose, onSubmit }: { onClose: () => void; onSubmit: (d
     e.preventDefault();
     setSubmitting(true);
     try {
-      await onSubmit({ 
-        name, 
-        score: parseFloat(score), 
+      await onSubmit({
+        name,
+        score: parseFloat(score),
         maxScore: parseFloat(maxScore),
         type,
         date: new Date(),
@@ -1446,5 +1487,25 @@ function AddGradeForm({ onClose, onSubmit }: { onClose: () => void; onSubmit: (d
         </Button>
       </div>
     </form>
+  );
+}
+
+// Wrapper component to load flashcards for a specific subject
+function SubjectFlashcards({ subjectId, subjectColor }: { subjectId: string; subjectColor: string }) {
+  const { cards, loading, addCard, editCard, removeCard } = useFlashcards(subjectId);
+
+  if (loading) {
+    return <p className="text-dark-400 text-center py-4">Loading flashcards...</p>;
+  }
+
+  return (
+    <FlashcardDeck
+      cards={cards}
+      subjectId={subjectId}
+      subjectColor={subjectColor}
+      onAddCard={addCard}
+      onUpdateCard={editCard}
+      onDeleteCard={removeCard}
+    />
   );
 }

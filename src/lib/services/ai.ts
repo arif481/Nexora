@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // AI Chat Service - Real-time Firestore operations for AI conversations
 import {
   collection,
@@ -12,7 +13,6 @@ import {
   serverTimestamp,
   Timestamp,
   limit,
-  getDocs,
   getDoc,
   arrayUnion,
 } from 'firebase/firestore';
@@ -59,6 +59,7 @@ const convertTimestamp = (timestamp: Timestamp | Date | null | undefined): Date 
 };
 
 // Convert conversation from Firestore
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const convertConversationFromFirestore = (doc: any): AIConversation => {
   const data = doc.data();
   return {
@@ -74,6 +75,7 @@ const convertConversationFromFirestore = (doc: any): AIConversation => {
 };
 
 // Convert message from Firestore
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const convertMessageFromFirestore = (msg: any, index: number): AIMessage => {
   return {
     id: msg.id || `msg-${index}`,
@@ -99,7 +101,8 @@ export const subscribeToConversations = (
   );
 
   return onSnapshot(q, (snapshot) => {
-    const conversations = snapshot.docs.map(convertConversationFromFirestore);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const conversations = snapshot.docs.map((doc: any) => convertConversationFromFirestore(doc));
     callback(conversations);
   });
 };
@@ -108,15 +111,16 @@ export const subscribeToConversations = (
 export const getConversation = async (conversationId: string): Promise<AIConversationWithMessages | null> => {
   const conversationRef = doc(db, AI_CONVERSATIONS, conversationId);
   const snapshot = await getDoc(conversationRef);
-  
+
   if (!snapshot.exists()) {
     return null;
   }
-  
+
   const data = snapshot.data();
   const conversation = convertConversationFromFirestore(snapshot);
-  const messages = (data.messages || []).map(convertMessageFromFirestore);
-  
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const messages = (data.messages || []).map((msg: any, index: number) => convertMessageFromFirestore(msg, index));
+
   return {
     ...conversation,
     messages,
@@ -135,11 +139,12 @@ export const subscribeToConversation = (
       callback(null);
       return;
     }
-    
+
     const data = snapshot.data();
     const conversation = convertConversationFromFirestore(snapshot);
-    const messages = (data.messages || []).map(convertMessageFromFirestore);
-    
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const messages = (data.messages || []).map((msg: any, index: number) => convertMessageFromFirestore(msg, index));
+
     callback({
       ...conversation,
       messages,
@@ -153,9 +158,10 @@ export const createConversation = async (
   initialMessage?: string
 ): Promise<string> => {
   const conversationsRef = collection(db, AI_CONVERSATIONS);
-  
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const messages: any[] = [];
-  
+
   // Add welcome message
   messages.push({
     id: `msg-${Date.now()}`,
@@ -169,7 +175,7 @@ export const createConversation = async (
       'Check my goals',
     ],
   });
-  
+
   // Add user's initial message if provided
   if (initialMessage) {
     messages.push({
@@ -179,7 +185,7 @@ export const createConversation = async (
       timestamp: new Date(),
     });
   }
-  
+
   const newConversation = {
     userId,
     title: initialMessage ? generateTitle(initialMessage) : 'New Conversation',
@@ -207,15 +213,16 @@ export const addMessageToConversation = async (
   message: Omit<AIMessage, 'id' | 'timestamp'>
 ): Promise<void> => {
   const conversationRef = doc(db, AI_CONVERSATIONS, conversationId);
-  
+
   // Build message object without undefined values (Firestore doesn't accept undefined in arrayUnion)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const newMessage: Record<string, any> = {
     id: `msg-${Date.now()}`,
     role: message.role,
     content: message.content,
     timestamp: new Date(),
   };
-  
+
   // Only add optional fields if they have values
   if (message.suggestions && message.suggestions.length > 0) {
     newMessage.suggestions = message.suggestions;
@@ -223,10 +230,11 @@ export const addMessageToConversation = async (
   if (message.metadata) {
     newMessage.metadata = message.metadata;
   }
-  
+
   await updateDoc(conversationRef, {
     messages: arrayUnion(newMessage),
     lastMessage: message.content.substring(0, 100),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     messageCount: (await getDoc(conversationRef)).data()?.messageCount + 1 || 1,
     updatedAt: serverTimestamp(),
   });
@@ -273,7 +281,7 @@ export const saveAIFeedback = async (
 };
 
 // Import Gemini for real AI responses
-import { generateGeminiResponse, isAIConfigured, AIContext } from './gemini';
+import { generateGeminiResponse, AIContext } from './gemini';
 
 // Generate AI response - uses Gemini when configured, otherwise shows setup prompt
 export const generateAIResponse = async (
@@ -284,6 +292,7 @@ export const generateAIResponse = async (
     events?: any[];
     goals?: any[];
     transactions?: any[];
+    pathname?: string;
   },
   conversationHistory?: { role: string; content: string }[]
 ): Promise<{ content: string; suggestions: string[] }> => {

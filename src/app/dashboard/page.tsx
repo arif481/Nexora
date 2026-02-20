@@ -33,6 +33,11 @@ import { useTasks, useTaskStats } from '@/hooks/useTasks';
 import { useHabits, useHabitCompletions } from '@/hooks/useHabits';
 import { useCalendar, useTodayEvents } from '@/hooks/useCalendar';
 import { useRouter } from 'next/navigation';
+import { DashboardBentoGrid } from '@/components/features/dashboard/DashboardBentoGrid';
+import { LifeScoreWidget } from '@/components/features/LifeScoreWidget';
+import { AIDailyBrief } from '@/components/features/AIDailyBrief';
+import { generateAIResponse } from '@/lib/services/ai';
+
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -43,7 +48,7 @@ export default function DashboardPage() {
   const completionData = useHabitCompletions(habits as any, 1);
   const { events: todayEvents, loading: eventsLoading, error: eventsError } = useTodayEvents();
   const { openAIPanel } = useUIStore();
-  
+
   // Combine errors for display
   const dataError = tasksError || habitsError || eventsError;
 
@@ -56,7 +61,7 @@ export default function DashboardPage() {
     return tasks.filter(task => {
       if (!task.dueDate) return false;
       const taskDate = new Date(task.dueDate);
-      return taskDate.toDateString() === today.toDateString() && task.status !== 'completed';
+      return taskDate.toDateString() === today.toDateString() && task.status !== 'done';
     }).slice(0, 5);
   }, [tasks, today]);
 
@@ -98,11 +103,11 @@ export default function DashboardPage() {
           </div>
           <h2 className="text-xl font-semibold text-white">Unable to Load Dashboard</h2>
           <p className="text-dark-400 text-center max-w-md">
-            {dataError.includes('index') 
+            {dataError.includes('index')
               ? 'Database indexes are being built. This usually takes 2-5 minutes. Please try again shortly.'
               : dataError.includes('permission')
-              ? 'You don\'t have permission to access this data. Please sign out and sign in again.'
-              : dataError}
+                ? 'You don\'t have permission to access this data. Please sign out and sign in again.'
+                : dataError}
           </p>
           <div className="flex gap-3 mt-4">
             <Button variant="outline" onClick={() => window.location.reload()}>
@@ -150,6 +155,12 @@ export default function DashboardPage() {
     );
   }
 
+  const generateBriefHandler = async (prompt: string) => {
+    const res = await generateAIResponse(prompt);
+    return res.content;
+  };
+
+
   const greeting = getGreeting();
 
   return (
@@ -176,329 +187,251 @@ export default function DashboardPage() {
           </Button>
         </motion.div>
 
-        {/* Stats Row */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="grid grid-cols-2 lg:grid-cols-4 gap-4"
-        >
-          {/* Tasks */}
-          <Card variant="glass" className="p-4">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm text-dark-400">Tasks Today</span>
-              <ListTodo className="w-5 h-5 text-neon-cyan" />
-            </div>
-            <div className="flex items-end justify-between">
-              <div>
-                <p className="text-2xl font-bold text-white">{taskStats.dueToday}</p>
-                <p className="text-xs text-dark-500">{taskStats.overdue} overdue</p>
-              </div>
-              <CircularProgress value={taskStats.completionRate} size={40} strokeWidth={3} />
-            </div>
-          </Card>
-
-          {/* Habits */}
-          <Card variant="glass" className="p-4">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm text-dark-400">Habits</span>
-              <Target className="w-5 h-5 text-neon-purple" />
-            </div>
-            <div className="flex items-end justify-between">
-              <div>
-                <p className="text-2xl font-bold text-white">{habitStats.completed}/{habitStats.total}</p>
-                <p className="text-xs text-dark-500">completed today</p>
-              </div>
-              <CircularProgress value={habitStats.percentage} size={40} strokeWidth={3} variant="purple" />
-            </div>
-          </Card>
-
-          {/* Events */}
-          <Card variant="glass" className="p-4">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm text-dark-400">Events</span>
-              <CalendarDays className="w-5 h-5 text-neon-orange" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-white">{todayEvents.length}</p>
-              <p className="text-xs text-dark-500">{upcomingEvents.length} upcoming</p>
-            </div>
-          </Card>
-
-          {/* Focus Score */}
-          <Card variant="glass" className="p-4">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm text-dark-400">Focus Score</span>
-              <Activity className="w-5 h-5 text-neon-green" />
-            </div>
-            <div className="flex items-end justify-between">
-              <div>
-                <p className="text-2xl font-bold text-white">
-                  {Math.round((taskStats.completionRate + habitStats.percentage) / 2)}%
-                </p>
-                <p className="text-xs text-dark-500">productivity</p>
-              </div>
-              <TrendingUp className="w-6 h-6 text-neon-green" />
-            </div>
-          </Card>
-        </motion.div>
-
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Tasks Section */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="lg:col-span-2"
-          >
-            <Card variant="glass">
-              <CardHeader
-                title="Today's Tasks"
-                icon={<ListTodo className="w-5 h-5 text-neon-cyan" />}
-                action={
-                  <Button variant="ghost" size="sm" onClick={() => router.push('/tasks')}>
-                    View All
-                    <ChevronRight className="w-4 h-4 ml-1" />
-                  </Button>
-                }
-              />
-              <CardContent>
-                {todayTasks.length > 0 ? (
-                  <div className="space-y-3">
-                    {todayTasks.map((task, index) => (
-                      <motion.div
-                        key={task.id}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.1 * index }}
-                        className="flex items-center gap-3 p-3 rounded-lg bg-dark-800/50 hover:bg-dark-800 transition-colors"
-                      >
-                        <div className={cn(
-                          'w-2 h-2 rounded-full',
-                          task.priority === 'critical' || task.priority === 'high' 
-                            ? 'bg-neon-orange' 
-                            : task.priority === 'medium' 
-                            ? 'bg-neon-purple' 
-                            : 'bg-neon-cyan'
-                        )} />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-white truncate">{task.title}</p>
-                          {task.dueDate && (
-                            <p className="text-xs text-dark-500">
-                              <Clock className="w-3 h-3 inline mr-1" />
-                              {formatTime(new Date(task.dueDate))}
-                            </p>
-                          )}
-                        </div>
-                        <PriorityBadge priority={task.priority} />
-                      </motion.div>
-                    ))}
+        {/* Bento Grid */}
+        <DashboardBentoGrid
+          storageKey="nexora_dashboard_layout"
+          widgets={[
+            {
+              id: 'daily-brief',
+              className: 'md:col-span-2 lg:col-span-2',
+              content: (
+                <AIDailyBrief
+                  generateBrief={generateBriefHandler}
+                  userName={user.displayName?.split(' ')[0]}
+                  taskCount={taskStats.dueToday}
+                  habitsDueToday={habitStats.total}
+                />
+              )
+            },
+            {
+              id: 'focus-score',
+              className: 'md:col-span-1 lg:col-span-1',
+              content: (
+                <Card variant="glass" className="p-5 h-full flex flex-col justify-center">
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-sm text-dark-400">Focus Score</span>
+                    <Activity className="w-5 h-5 text-neon-green" />
                   </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <CheckCircle2 className="w-12 h-12 text-neon-green mx-auto mb-3" />
-                    <p className="text-dark-400">No tasks due today</p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-3"
-                      onClick={() => router.push('/tasks')}
-                    >
-                      <Plus className="w-4 h-4 mr-1" />
-                      Add Task
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          {/* Habits Section */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-          >
-            <Card variant="glass">
-              <CardHeader
-                title="Habits"
-                icon={<Target className="w-5 h-5 text-neon-purple" />}
-                action={
-                  <Button variant="ghost" size="sm" onClick={() => router.push('/habits')}>
-                    View All
-                    <ChevronRight className="w-4 h-4 ml-1" />
-                  </Button>
-                }
-              />
-              <CardContent>
-                {todayHabits.length > 0 ? (
-                  <div className="space-y-3">
-                    {todayHabits.map((habit: any, index: number) => {
-                      const isCompleted = completionData[habit.id]?.[todayKey];
-                      return (
-                        <motion.div
-                          key={habit.id}
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 0.1 * index }}
-                          className="flex items-center gap-3 p-3 rounded-lg bg-dark-800/50"
-                        >
-                          <div className={cn(
-                            'w-8 h-8 rounded-lg flex items-center justify-center',
-                            isCompleted ? 'bg-neon-green text-dark-900' : 'bg-dark-700'
-                          )}>
-                            {isCompleted ? (
-                              <CheckCircle2 className="w-4 h-4" />
-                            ) : (
-                              <Target className="w-4 h-4 text-dark-400" />
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className={cn(
-                              'text-sm font-medium truncate',
-                              isCompleted ? 'text-neon-green' : 'text-white'
-                            )}>
-                              {habit.name}
-                            </p>
-                            {habit.streak > 0 && (
-                              <p className="text-xs text-dark-500 flex items-center gap-1">
-                                <Flame className="w-3 h-3 text-neon-orange" />
-                                {habit.streak} day streak
-                              </p>
-                            )}
-                          </div>
-                        </motion.div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <Target className="w-12 h-12 text-dark-600 mx-auto mb-3" />
-                    <p className="text-dark-400">No habits for today</p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-3"
-                      onClick={() => router.push('/habits')}
-                    >
-                      <Plus className="w-4 h-4 mr-1" />
-                      Add Habit
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </motion.div>
-        </div>
-
-        {/* Calendar Section */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-        >
-          <Card variant="glass">
-            <CardHeader
-              title="Upcoming Events"
-              icon={<CalendarDays className="w-5 h-5 text-neon-orange" />}
-              action={
-                <Button variant="ghost" size="sm" onClick={() => router.push('/calendar')}>
-                  View Calendar
-                  <ChevronRight className="w-4 h-4 ml-1" />
-                </Button>
-              }
-            />
-            <CardContent>
-              {upcomingEvents.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {upcomingEvents.map((event, index) => (
-                    <motion.div
-                      key={event.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.1 * index }}
-                      className="p-4 rounded-lg bg-dark-800/50 border border-dark-700/50"
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <Badge
-                          variant={
-                            event.category === 'work' ? 'cyan' :
-                            event.category === 'health' ? 'green' :
-                            event.category === 'personal' ? 'orange' : 
-                            event.category === 'social' ? 'purple' : 'default'
-                          }
-                          size="sm"
-                        >
-                          {event.category}
-                        </Badge>
-                      </div>
-                      <h4 className="font-medium text-white mb-1 truncate">{event.title}</h4>
-                      <p className="text-sm text-dark-400">
-                        {formatTime(new Date(event.startTime))} - {formatTime(new Date(event.endTime))}
+                  <div className="flex items-end justify-between mt-auto">
+                    <div>
+                      <p className="text-3xl font-bold text-white">
+                        {Math.round((taskStats.completionRate + habitStats.percentage) / 2)}%
                       </p>
-                      {event.location && (
-                        <p className="text-xs text-dark-500 mt-1 truncate">{event.location}</p>
-                      )}
-                    </motion.div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <CalendarDays className="w-12 h-12 text-dark-600 mx-auto mb-3" />
-                  <p className="text-dark-400">No upcoming events today</p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-3"
-                    onClick={() => router.push('/calendar')}
-                  >
-                    <Plus className="w-4 h-4 mr-1" />
-                    Add Event
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
+                      <p className="text-sm text-dark-500">productivity</p>
+                    </div>
+                    <TrendingUp className="w-8 h-8 text-neon-green" />
+                  </div>
+                </Card>
+              )
+            },
+            {
+              id: 'life-score',
+              className: 'md:col-span-1 lg:col-span-1',
+              content: <LifeScoreWidget tasks={tasks as any} habits={habits as any} transactions={[]} focusMinutes={0} journalCount={0} wellnessEntries={[]} />
+            },
+            {
+              id: 'tasks',
+              className: 'md:col-span-2 lg:col-span-2',
+              content: (
+                <Card variant="glass" className="h-full">
+                  <CardHeader
+                    title="Today's Tasks"
+                    icon={<ListTodo className="w-5 h-5 text-neon-cyan" />}
+                    action={
+                      <Button variant="ghost" size="sm" onClick={() => router.push('/tasks')}>
+                        View All
+                        <ChevronRight className="w-4 h-4 ml-1" />
+                      </Button>
+                    }
+                  />
+                  <CardContent>
+                    {todayTasks.length > 0 ? (
+                      <div className="space-y-3">
+                        {todayTasks.map((task, index) => (
+                          <div
+                            key={task.id}
+                            className="flex items-center gap-3 p-3 rounded-xl bg-dark-800/40 hover:bg-dark-800/60 transition-colors"
+                          >
+                            <div className={cn(
+                              'w-2 h-2 rounded-full',
+                              task.priority === 'critical' || task.priority === 'high'
+                                ? 'bg-neon-orange'
+                                : task.priority === 'medium'
+                                  ? 'bg-neon-purple'
+                                  : 'bg-neon-cyan'
+                            )} />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-white truncate">{task.title}</p>
+                              {task.dueDate && (
+                                <p className="text-xs text-dark-500">
+                                  <Clock className="w-3 h-3 inline mr-1" />
+                                  {formatTime(new Date(task.dueDate))}
+                                </p>
+                              )}
+                            </div>
+                            <PriorityBadge priority={task.priority} />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-6">
+                        <CheckCircle2 className="w-10 h-10 text-neon-green mx-auto mb-3 opacity-80" />
+                        <p className="text-dark-400 text-sm">No tasks due today</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )
+            },
+            {
+              id: 'habits',
+              className: 'md:col-span-1 lg:col-span-1',
+              content: (
+                <Card variant="glass" className="h-full">
+                  <CardHeader
+                    title="Habits"
+                    icon={<Target className="w-5 h-5 text-neon-purple" />}
+                    action={
+                      <Button variant="ghost" size="sm" onClick={() => router.push('/habits')}>
+                        View
+                      </Button>
+                    }
+                  />
+                  <CardContent>
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <p className="text-2xl font-bold text-white">{habitStats.completed}<span className="text-sm font-normal text-dark-400">/{habitStats.total}</span></p>
+                      </div>
+                      <CircularProgress value={habitStats.percentage} size={48} strokeWidth={4} variant="purple" />
+                    </div>
+                    {todayHabits.length > 0 ? (
+                      <div className="space-y-2">
+                        {todayHabits.map((habit: any) => {
+                          const isCompleted = completionData[habit.id]?.[todayKey];
+                          return (
+                            <div
+                              key={habit.id}
+                              className="flex items-center gap-3 p-2.5 rounded-lg bg-dark-800/30"
+                            >
+                              <div className={cn(
+                                'w-6 h-6 rounded flex items-center justify-center',
+                                isCompleted ? 'bg-neon-green/20' : 'bg-dark-700/50'
+                              )}>
+                                {isCompleted ? (
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-neon-green" />
+                                ) : (
+                                  <Target className="w-3.5 h-3.5 text-dark-500" />
+                                )}
+                              </div>
+                              <p className={cn(
+                                'text-sm flex-1 truncate',
+                                isCompleted ? 'text-dark-300' : 'text-white'
+                              )}>
+                                {habit.name}
+                              </p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-dark-400 text-center py-4">No habits today</p>
+                    )}
+                  </CardContent>
+                </Card>
+              )
+            },
+            {
+              id: 'events',
+              className: 'md:col-span-2 lg:col-span-2 xl:col-span-2',
+              content: (
+                <Card variant="glass" className="h-full">
+                  <CardHeader
+                    title="Upcoming Events"
+                    icon={<CalendarDays className="w-5 h-5 text-neon-orange" />}
+                    action={
+                      <Button variant="ghost" size="sm" onClick={() => router.push('/calendar')}>
+                        Calendar
+                        <ChevronRight className="w-4 h-4 ml-1" />
+                      </Button>
+                    }
+                  />
+                  <CardContent>
+                    {upcomingEvents.length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {upcomingEvents.map((event, index) => (
+                          <div
+                            key={event.id}
+                            className="p-4 rounded-xl bg-dark-800/40 border border-dark-700/50"
+                          >
+                            <div className="flex items-start justify-between mb-2">
+                              <Badge
+                                variant={
+                                  event.category === 'work' ? 'cyan' :
+                                    event.category === 'health' ? 'green' :
+                                      event.category === 'personal' ? 'orange' :
+                                        event.category === 'social' ? 'purple' : 'default'
+                                }
+                                size="sm"
+                              >
+                                {event.category}
+                              </Badge>
+                            </div>
+                            <h4 className="font-medium text-white mb-1 truncate">{event.title}</h4>
+                            <p className="text-sm text-dark-400">
+                              {formatTime(new Date(event.startTime))} - {formatTime(new Date(event.endTime))}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-6">
+                        <CalendarDays className="w-10 h-10 text-dark-600 mx-auto mb-3" />
+                        <p className="text-sm text-dark-400">No upcoming events today</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )
+            },
+            {
+              id: 'insights',
+              className: 'md:col-span-3 lg:col-span-3 xl:col-span-4',
+              content: (
+                <Card variant="glass" className="p-6">
+                  <div className="flex items-start gap-4">
+                    <div className="p-3 rounded-xl bg-neon-purple/10">
+                      <Brain className="w-6 h-6 text-neon-purple" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-white mb-2">AI Insights</h3>
+                      <p className="text-dark-300 text-sm">
+                        {taskStats.overdue > 0
+                          ? `⚠️ You have ${taskStats.overdue} overdue task${taskStats.overdue > 1 ? 's' : ''}. Would you like me to help prioritize your workload?`
+                          : habitStats.percentage >= 80
+                            ? "🎉 Great job on your habits today! You're building excellent consistency."
+                            : habitStats.total > 0 && habitStats.completed === 0
+                              ? "🌅 Good morning! Start your day by completing one small habit to build momentum."
+                              : taskStats.dueToday === 0 && todayEvents.length === 0
+                                ? "📅 You have a clear day ahead. Perfect time for deep work or planning ahead!"
+                                : "💪 You're making progress! Keep up the momentum."}
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-4"
+                        onClick={openAIPanel}
+                      >
+                        <Sparkles className="w-4 h-4 mr-1" />
+                        Get Personalized Advice
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              )
+            }
+          ]}
+        />
 
-        {/* AI Insights */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-        >
-          <Card variant="glass" className="p-6">
-            <div className="flex items-start gap-4">
-              <div className="p-3 rounded-xl bg-neon-purple/10">
-                <Brain className="w-6 h-6 text-neon-purple" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-semibold text-white mb-2">AI Insights</h3>
-                <p className="text-dark-300 text-sm">
-                  {taskStats.overdue > 0
-                    ? `⚠️ You have ${taskStats.overdue} overdue task${taskStats.overdue > 1 ? 's' : ''}. Would you like me to help prioritize your workload?`
-                    : habitStats.percentage >= 80
-                    ? "🎉 Great job on your habits today! You're building excellent consistency."
-                    : habitStats.total > 0 && habitStats.completed === 0
-                    ? "🌅 Good morning! Start your day by completing one small habit to build momentum."
-                    : taskStats.dueToday === 0 && todayEvents.length === 0
-                    ? "📅 You have a clear day ahead. Perfect time for deep work or planning ahead!"
-                    : "💪 You're making progress! Keep up the momentum."}
-                </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-4"
-                  onClick={openAIPanel}
-                >
-                  <Sparkles className="w-4 h-4 mr-1" />
-                  Get Personalized Advice
-                </Button>
-              </div>
-            </div>
-          </Card>
-        </motion.div>
       </div>
     </MainLayout>
   );

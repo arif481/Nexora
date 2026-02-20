@@ -60,9 +60,9 @@ export function useTasks(pendingOnly: boolean = false): UseTasksReturn {
 
     setLoading(true);
     setError(null);
-    
+
     const subscribeFn = pendingOnly ? subscribeToPendingTasks : subscribeToTasks;
-    
+
     const unsubscribe = subscribeFn(
       user.uid,
       (fetchedTasks) => {
@@ -84,7 +84,7 @@ export function useTasks(pendingOnly: boolean = false): UseTasksReturn {
   const handleCreateTask = useCallback(
     async (data: CreateTaskData): Promise<string> => {
       if (!user) throw new Error('User not authenticated');
-      
+
       try {
         const taskId = await createTask(user.uid, data);
         return taskId;
@@ -125,7 +125,7 @@ export function useTasks(pendingOnly: boolean = false): UseTasksReturn {
       if (!user) throw new Error('User not authenticated');
       try {
         await completeTask(taskId);
-        
+
         // Count completed tasks for today
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -133,7 +133,7 @@ export function useTasks(pendingOnly: boolean = false): UseTasksReturn {
           const completedAt = t.completedAt ? new Date(t.completedAt) : null;
           return completedAt && completedAt >= today;
         }).length + 1; // +1 for the one we just completed
-        
+
         // Create achievement notification at milestones
         if (completedToday === 5) {
           await createAchievementNotification(
@@ -287,14 +287,14 @@ export function useTaskStats(providedTasks?: Task[]) {
   const { user } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(!providedTasks);
-  
+
   // Subscribe to tasks if not provided
   useEffect(() => {
     if (providedTasks) {
       setTasks(providedTasks);
       return;
     }
-    
+
     if (!user) {
       setTasks([]);
       setLoading(false);
@@ -334,11 +334,11 @@ export function useTaskStats(providedTasks?: Task[]) {
   tomorrow.setDate(tomorrow.getDate() + 1);
 
   stats.total = taskList.length;
-  stats.completed = taskList.filter((t) => t.status === 'completed').length;
-  stats.pending = taskList.filter((t) => t.status === 'pending').length;
+  stats.completed = taskList.filter((t) => t.status === 'done').length;
+  stats.pending = taskList.filter((t) => t.status === 'todo').length;
   stats.inProgress = taskList.filter((t) => t.status === 'in-progress').length;
   stats.overdue = taskList.filter((t) => {
-    if (!t.dueDate || t.status === 'completed') return false;
+    if (!t.dueDate || t.status === 'done') return false;
     return new Date(t.dueDate) < today;
   }).length;
   stats.dueToday = taskList.filter((t) => {
@@ -347,7 +347,7 @@ export function useTaskStats(providedTasks?: Task[]) {
     return dueDate >= today && dueDate < tomorrow;
   }).length;
   stats.highPriority = taskList.filter(
-    (t) => (t.priority === 'high' || t.priority === 'critical') && t.status !== 'completed'
+    (t) => (t.priority === 'high' || t.priority === 'critical') && t.status !== 'done'
   ).length;
   stats.completionRate = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
 

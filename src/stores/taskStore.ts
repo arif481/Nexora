@@ -22,7 +22,7 @@ interface TaskState {
   setError: (error: string | null) => void;
   completeTask: (taskId: string) => void;
   toggleSubtask: (taskId: string, subtaskId: string) => void;
-  
+
   // Computed
   getFilteredTasks: () => Task[];
   getPendingTasks: () => Task[];
@@ -46,7 +46,7 @@ interface TaskSort {
 }
 
 const defaultFilter: TaskFilter = {
-  status: ['pending', 'in-progress'],
+  status: ['todo', 'in-progress'],
   priority: [],
   tags: [],
   category: null,
@@ -121,11 +121,11 @@ export const useTaskStore = create<TaskState>()(
           tasks: state.tasks.map((task) =>
             task.id === taskId
               ? {
-                  ...task,
-                  status: 'completed' as TaskStatus,
-                  completedAt: new Date(),
-                  updatedAt: new Date(),
-                }
+                ...task,
+                status: 'done' as TaskStatus,
+                completedAt: new Date(),
+                updatedAt: new Date(),
+              }
               : task
           ),
         })),
@@ -135,18 +135,18 @@ export const useTaskStore = create<TaskState>()(
           tasks: state.tasks.map((task) =>
             task.id === taskId
               ? {
-                  ...task,
-                  subtasks: task.subtasks.map((subtask) =>
-                    subtask.id === subtaskId
-                      ? {
-                          ...subtask,
-                          completed: !subtask.completed,
-                          completedAt: !subtask.completed ? new Date() : undefined,
-                        }
-                      : subtask
-                  ),
-                  updatedAt: new Date(),
-                }
+                ...task,
+                subtasks: task.subtasks.map((subtask) =>
+                  subtask.id === subtaskId
+                    ? {
+                      ...subtask,
+                      completed: !subtask.completed,
+                      completedAt: !subtask.completed ? new Date() : undefined,
+                    }
+                    : subtask
+                ),
+                updatedAt: new Date(),
+              }
               : task
           ),
         })),
@@ -236,7 +236,7 @@ export const useTaskStore = create<TaskState>()(
       getPendingTasks: () => {
         const { tasks } = get();
         return tasks.filter(
-          (task) => task.status === 'pending' || task.status === 'in-progress'
+          (task) => task.status === 'todo' || task.status === 'in-progress'
         );
       },
 
@@ -247,8 +247,7 @@ export const useTaskStore = create<TaskState>()(
           (task) =>
             task.dueDate &&
             task.dueDate < now &&
-            task.status !== 'completed' &&
-            task.status !== 'cancelled'
+            task.status !== 'done'
         );
       },
 
@@ -264,8 +263,7 @@ export const useTaskStore = create<TaskState>()(
             task.dueDate &&
             task.dueDate >= today &&
             task.dueDate < tomorrow &&
-            task.status !== 'completed' &&
-            task.status !== 'cancelled'
+            task.status !== 'done'
         );
       },
 
@@ -274,8 +272,7 @@ export const useTaskStore = create<TaskState>()(
         return tasks.filter(
           (task) =>
             task.priority === priority &&
-            task.status !== 'completed' &&
-            task.status !== 'cancelled'
+            task.status !== 'done'
         );
       },
     }),

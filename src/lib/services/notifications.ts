@@ -26,7 +26,7 @@ export interface Notification {
   timestamp: Date;
   read: boolean;
   actionUrl?: string;
-  data?: Record<string, any>;
+  data?: Record<string, any>; // eslint-disable-next-line @typescript-eslint/no-explicit-any
 }
 
 // Convert Firestore timestamp to Date
@@ -39,6 +39,7 @@ const convertTimestamp = (timestamp: Timestamp | Date | null | undefined): Date 
 };
 
 // Convert notification from Firestore
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const convertNotificationFromFirestore = (doc: any): Notification => {
   const data = doc.data();
   return {
@@ -88,7 +89,7 @@ export const createNotification = async (
   notification: Omit<Notification, 'id' | 'userId' | 'timestamp' | 'read'>
 ): Promise<string> => {
   const notificationsRef = collection(db, COLLECTIONS.NOTIFICATIONS);
-  
+
   const newNotification = {
     userId,
     type: notification.type,
@@ -118,14 +119,14 @@ export const markAllNotificationsAsRead = async (userId: string): Promise<void> 
     where('userId', '==', userId),
     where('read', '==', false)
   );
-  
+
   const snapshot = await getDocs(q);
   const batch = writeBatch(db);
-  
+
   snapshot.docs.forEach((doc) => {
     batch.update(doc.ref, { read: true });
   });
-  
+
   await batch.commit();
 };
 
@@ -139,14 +140,14 @@ export const deleteNotification = async (notificationId: string): Promise<void> 
 export const clearAllNotifications = async (userId: string): Promise<void> => {
   const notificationsRef = collection(db, COLLECTIONS.NOTIFICATIONS);
   const q = query(notificationsRef, where('userId', '==', userId));
-  
+
   const snapshot = await getDocs(q);
   const batch = writeBatch(db);
-  
+
   snapshot.docs.forEach((doc) => {
     batch.delete(doc.ref);
   });
-  
+
   await batch.commit();
 };
 

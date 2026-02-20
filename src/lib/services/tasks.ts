@@ -1,8 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // Tasks Service - Real-time Firestore operations
 import {
   collection,
-  doc,
   addDoc,
+  doc,
   updateDoc,
   deleteDoc,
   query,
@@ -12,10 +13,9 @@ import {
   serverTimestamp,
   Timestamp,
   writeBatch,
-  getDocs,
 } from 'firebase/firestore';
 import { db, COLLECTIONS } from '../firebase';
-import type { Task, TaskStatus, TaskPriority, Subtask, EnergyLevel } from '@/types';
+import type { Task, Subtask } from '@/types';
 
 // Convert Firestore timestamp to Date
 const convertTimestamp = (timestamp: Timestamp | Date | null | undefined): Date | undefined => {
@@ -27,6 +27,7 @@ const convertTimestamp = (timestamp: Timestamp | Date | null | undefined): Date 
 };
 
 // Convert Task from Firestore
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const convertTaskFromFirestore = (doc: any): Task => {
   const data = doc.data();
   return {
@@ -34,7 +35,8 @@ const convertTaskFromFirestore = (doc: any): Task => {
     userId: data.userId,
     title: data.title,
     description: data.description,
-    status: data.status || 'pending',
+    projectId: data.projectId,
+    status: data.status || 'todo',
     priority: data.priority || 'medium',
     energyLevel: data.energyLevel || 'medium',
     dueDate: convertTimestamp(data.dueDate),
@@ -43,6 +45,7 @@ const convertTaskFromFirestore = (doc: any): Task => {
     actualDuration: data.actualDuration,
     tags: data.tags || [],
     category: data.category,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     subtasks: (data.subtasks || []).map((s: any) => ({
       ...s,
       completedAt: convertTimestamp(s.completedAt),
@@ -66,12 +69,13 @@ export const createTask = async (
   taskData: Partial<Omit<Task, 'id' | 'userId' | 'createdAt' | 'updatedAt'>>
 ): Promise<string> => {
   const tasksRef = collection(db, COLLECTIONS.TASKS);
-  
+
   const newTask = {
     userId,
     title: taskData.title || 'New Task',
     description: taskData.description || '',
-    status: taskData.status || 'pending',
+    projectId: taskData.projectId || null,
+    status: taskData.status || 'todo',
     priority: taskData.priority || 'medium',
     energyLevel: taskData.energyLevel || 'medium',
     dueDate: taskData.dueDate || null,
@@ -102,15 +106,16 @@ export const updateTask = async (
   updates: Partial<Task>
 ): Promise<void> => {
   const taskRef = doc(db, COLLECTIONS.TASKS, taskId);
-  
+
   // Remove undefined values and convert dates
   const cleanUpdates: Record<string, any> = {};
-  Object.entries(updates).forEach(([key, value]) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  Object.entries(updates).forEach(([key, value]: [string, any]) => {
     if (value !== undefined) {
       cleanUpdates[key] = value;
     }
   });
-  
+
   await updateDoc(taskRef, {
     ...cleanUpdates,
     updatedAt: serverTimestamp(),
@@ -127,7 +132,7 @@ export const deleteTask = async (taskId: string): Promise<void> => {
 export const completeTask = async (taskId: string): Promise<void> => {
   const taskRef = doc(db, COLLECTIONS.TASKS, taskId);
   await updateDoc(taskRef, {
-    status: 'completed',
+    status: 'done',
     completedAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
@@ -137,7 +142,7 @@ export const completeTask = async (taskId: string): Promise<void> => {
 export const reopenTask = async (taskId: string): Promise<void> => {
   const taskRef = doc(db, COLLECTIONS.TASKS, taskId);
   await updateDoc(taskRef, {
-    status: 'pending',
+    status: 'todo',
     completedAt: null,
     updatedAt: serverTimestamp(),
   });
@@ -220,7 +225,7 @@ export const subscribeToPendingTasks = (
   const q = query(
     tasksRef,
     where('userId', '==', userId),
-    where('status', 'in', ['pending', 'in-progress']),
+    where('status', 'in', ['todo', 'in-progress', 'review']),
     orderBy('createdAt', 'desc')
   );
 
@@ -247,7 +252,7 @@ export const subscribeToTasksDueToday = (
 ): (() => void) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  
+
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
 

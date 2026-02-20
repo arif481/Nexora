@@ -5,30 +5,30 @@ interface UIState {
   // Sidebar
   sidebarOpen: boolean;
   sidebarCollapsed: boolean;
-  
+
   // Modals
   activeModal: ModalType | null;
   modalData: Record<string, unknown>;
-  
+
   // Command palette
   commandPaletteOpen: boolean;
-  
+
   // Quick actions
   quickActionsOpen: boolean;
-  
+
   // Notifications
   notificationPanelOpen: boolean;
-  
+
   // AI Assistant
   aiPanelOpen: boolean;
   aiMinimized: boolean;
-  
+
   // Theme
   theme: 'dark' | 'light' | 'system';
-  
+
   // Focus mode
   focusModeActive: boolean;
-  
+
   // Loading states
   globalLoading: boolean;
   loadingMessage: string;
@@ -51,7 +51,7 @@ interface UIState {
   setGlobalLoading: (loading: boolean, message?: string) => void;
 }
 
-type ModalType = 
+type ModalType =
   | 'create-task'
   | 'edit-task'
   | 'create-event'
@@ -70,7 +70,7 @@ type ModalType =
 
 export const useUIStore = create<UIState>()(
   persist(
-    (set, get) => ({
+    (set, _get) => ({
       sidebarOpen: true,
       sidebarCollapsed: false,
       activeModal: null,

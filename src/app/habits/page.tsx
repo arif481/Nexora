@@ -41,6 +41,8 @@ import { cn } from '@/lib/utils';
 import { useHabits, useHabitCompletions } from '@/hooks/useHabits';
 import { useAuth } from '@/hooks/useAuth';
 import type { Habit, HabitCategory } from '@/types';
+import { HabitHeatmap } from '@/components/features/habits/HabitHeatmap';
+import { HabitStacking } from '@/components/features/habits/HabitStacking';
 
 // Habit icons
 const habitIcons: Record<string, any> = {
@@ -92,14 +94,14 @@ export default function HabitsPage() {
   const { user, loading: authLoading } = useAuth();
   const { habits, loading, createHabit, updateHabit, deleteHabit, toggleCompletion } = useHabits();
   const completionData = useHabitCompletions(habits as any, 7);
-  
+
   const [selectedHabit, setSelectedHabit] = useState<(Habit & { icon?: string; color?: string }) | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isActualEditMode, setIsActualEditMode] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  
+
   // Edit form state
   const [editForm, setEditForm] = useState({
     name: '',
@@ -166,7 +168,7 @@ export default function HabitsPage() {
   // Create new habit
   const handleCreateHabit = async () => {
     if (!newHabit.name.trim()) return;
-    
+
     setIsSaving(true);
     try {
       await createHabit({
@@ -179,7 +181,7 @@ export default function HabitsPage() {
         icon: newHabit.icon,
         color: newHabit.color,
       } as any);
-      
+
       setIsCreateModalOpen(false);
       setNewHabit({
         name: '',
@@ -201,7 +203,7 @@ export default function HabitsPage() {
   // Delete habit
   const handleDeleteHabit = async () => {
     if (!selectedHabit) return;
-    
+
     setIsSaving(true);
     try {
       await deleteHabit(selectedHabit.id);
@@ -231,7 +233,7 @@ export default function HabitsPage() {
   // Save edited habit
   const handleSaveEdit = async () => {
     if (!selectedHabit || !editForm.name.trim()) return;
-    
+
     setIsSaving(true);
     try {
       await updateHabit(selectedHabit.id, {
@@ -399,8 +401,8 @@ export default function HabitsPage() {
                       isCompleted
                         ? 'bg-opacity-100'
                         : isTargetDay
-                        ? 'bg-dark-800/50 border border-dashed border-dark-600'
-                        : 'bg-dark-800/30',
+                          ? 'bg-dark-800/50 border border-dashed border-dark-600'
+                          : 'bg-dark-800/30',
                       isToday && !isCompleted && isTargetDay && 'border-neon-cyan/50'
                     )}
                     style={{
@@ -439,7 +441,7 @@ export default function HabitsPage() {
       </motion.div>
     );
   });
-  
+
   HabitCard.displayName = 'HabitCard';
 
   return (
@@ -564,6 +566,11 @@ export default function HabitsPage() {
                 ))}
               </div>
             )}
+
+            {/* Habit Stacking */}
+            <div className="mt-8 pt-8 border-t border-dark-700/50">
+              <HabitStacking habits={habitsWithExtras} />
+            </div>
           </motion.div>
 
           {/* Sidebar */}
@@ -585,10 +592,10 @@ export default function HabitsPage() {
                     {stats.completionRate >= 80
                       ? "🎉 Amazing consistency! You're crushing your habits today."
                       : stats.completionRate >= 50
-                      ? "💪 Good progress! A few more habits to complete today."
-                      : stats.dueToday === 0
-                      ? "🌟 No habits scheduled today. Enjoy your rest!"
-                      : "🌟 New day, fresh start! Begin with your easiest habit."}
+                        ? "💪 Good progress! A few more habits to complete today."
+                        : stats.dueToday === 0
+                          ? "🌟 No habits scheduled today. Enjoy your rest!"
+                          : "🌟 New day, fresh start! Begin with your easiest habit."}
                   </p>
                 </div>
                 <Button
@@ -612,7 +619,7 @@ export default function HabitsPage() {
                   <span className="text-sm font-medium text-neon-cyan">{stats.completionRate}%</span>
                 </div>
                 <Progress value={stats.completionRate} variant="cyan" size="sm" />
-                
+
                 <div className="flex items-center justify-between pt-2">
                   <span className="text-sm text-dark-400">Total Streaks</span>
                   <span className="text-sm text-white">{stats.currentStreaks} days</span>
@@ -639,7 +646,7 @@ export default function HabitsPage() {
               value={newHabit.name}
               onChange={(e) => setNewHabit(prev => ({ ...prev, name: e.target.value }))}
             />
-            
+
             <Input
               label="Description (optional)"
               placeholder="e.g., 15 minutes of mindfulness"
@@ -777,6 +784,11 @@ export default function HabitsPage() {
                 </div>
               </div>
 
+              {/* Heatmap */}
+              <div className="pt-2">
+                <HabitHeatmap habit={selectedHabit} />
+              </div>
+
               <div className="flex gap-3 pt-4">
                 <Button
                   variant="outline"
@@ -799,7 +811,7 @@ export default function HabitsPage() {
               </div>
             </div>
           )}
-          
+
           {selectedHabit && isActualEditMode && (
             <div className="space-y-4">
               <Input
