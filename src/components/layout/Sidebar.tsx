@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -91,7 +91,6 @@ export function Sidebar() {
   const pathname = usePathname();
   const { sidebarCollapsed, toggleSidebarCollapsed, sidebarOpen, setSidebarOpen } = useUIStore();
   const taskStats = useTaskStats();
-  const [hoveredItem, setHoveredItem] = useState<string | null>(null);
 
   // Dynamic badge values
   const badgeValues = useMemo(() => ({
@@ -106,8 +105,6 @@ export function Sidebar() {
     const content = (
       <Link
         href={item.href}
-        onMouseEnter={() => setHoveredItem(item.name)}
-        onMouseLeave={() => setHoveredItem(null)}
         className={cn(
           'relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200',
           'group',
@@ -118,10 +115,8 @@ export function Sidebar() {
       >
         {/* Active indicator */}
         {isActive && (
-          <motion.div
-            layoutId="activeNav"
+          <div
             className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-neon-cyan rounded-r-full"
-            transition={{ type: 'spring', bounce: 0.2, duration: 0.4 }}
           />
         )}
 
@@ -136,19 +131,6 @@ export function Sidebar() {
             {badgeCount !== undefined && badgeCount > 0 && <CountBadge count={badgeCount} />}
             {item.isNew && <Badge variant="purple" size="sm">New</Badge>}
           </>
-        )}
-
-        {/* Glow effect on hover */}
-        {hoveredItem === item.name && !isActive && (
-          <motion.div
-            layoutId="hoverGlow"
-            className="absolute inset-0 bg-glass-medium rounded-xl"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            style={{ zIndex: -1 }}
-          />
         )}
       </Link>
     );
