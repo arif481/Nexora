@@ -32,6 +32,12 @@ import {
   X,
   Inbox,
   CalendarCheck,
+  Film,
+  Users,
+  Utensils,
+  PlaneTakeoff,
+  Building2,
+  MessageCircle,
 } from 'lucide-react';
 
 import { Badge, CountBadge } from '../ui/Badge';
@@ -70,6 +76,13 @@ const wellnessItems: NavItem[] = [
 
 const otherItems: NavItem[] = [
   { name: 'Finance', href: '/finance', icon: Wallet },
+  { name: 'Entertainment', href: '/entertainment', icon: Film, isNew: true },
+  { name: 'Contacts CRM', href: '/contacts', icon: Users, isNew: true },
+  { name: 'Meal Planner', href: '/meals', icon: Utensils, isNew: true },
+  { name: 'Travel Planner', href: '/travel', icon: PlaneTakeoff, isNew: true },
+  { name: 'Life Admin', href: '/admin', icon: Building2, isNew: true },
+  { name: 'Comms Hub', href: '/comms', icon: MessageCircle, isNew: true },
+  { name: 'NOVA Intelligence', href: '/nova', icon: Zap, isNew: true },
   { name: 'AI Assistant', href: '/ai', icon: Sparkles },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];

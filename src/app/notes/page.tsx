@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, memo } from 'react';
+import { useState, useMemo, memo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -32,6 +32,8 @@ import { useUIStore } from '@/stores/uiStore';
 import { cn, formatDate, formatRelativeDate } from '@/lib/utils';
 import { useNotes, useNotesByCategory } from '@/hooks/useNotes';
 import { useAuth } from '@/hooks/useAuth';
+import { RichTextEditor } from '@/components/ui/RichTextEditor';
+import { generateGeminiResponse } from '@/lib/services/gemini';
 import type { Note } from '@/types';
 
 const categoryOptions = [
@@ -47,7 +49,7 @@ export default function NotesPage() {
   const { user, loading: authLoading } = useAuth();
   const { notes, loading, createNote, updateNote, deleteNote, togglePin, toggleFavorite, archiveNote } = useNotes();
   const notesByCategory = useNotesByCategory(notes);
-  
+
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -56,6 +58,12 @@ export default function NotesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+  const [aiSummary, setAiSummary] = useState<string | null>(null);
+  const [aiQuestion, setAiQuestion] = useState('');
+  const [aiAnswer, setAiAnswer] = useState<string | null>(null);
+  const [isAskingAI, setIsAskingAI] = useState(false);
+  const [editContent, setEditContent] = useState('');
   const { openAIPanel } = useUIStore();
 
   // Form state for new note
@@ -69,7 +77,7 @@ export default function NotesPage() {
   // Filter and sort notes
   const filteredNotes = useMemo(() => {
     let result = notes.filter(note => !note.isArchived);
-    
+
     // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
@@ -80,19 +88,19 @@ export default function NotesPage() {
           note.tags?.some(tag => tag.toLowerCase().includes(query))
       );
     }
-    
+
     // Category filter
     if (filterCategory !== 'all') {
       result = result.filter(note => note.category === filterCategory);
     }
-    
+
     // Sort: pinned first, then by updated date
     result.sort((a, b) => {
       if (a.isPinned && !b.isPinned) return -1;
       if (!a.isPinned && b.isPinned) return 1;
       return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
     });
-    
+
     return result;
   }, [notes, searchQuery, filterCategory]);
 
@@ -103,16 +111,17 @@ export default function NotesPage() {
   // Create new note
   const handleCreateNote = async () => {
     if (!newNote.title.trim()) return;
-    
+
     setIsSaving(true);
     try {
       await createNote({
         title: newNote.title,
         content: newNote.content,
+        contentType: 'rich-text',
         category: newNote.category as any,
         tags: newNote.tags ? newNote.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
       });
-      
+
       setIsCreateModalOpen(false);
       setNewNote({
         title: '',
@@ -130,7 +139,7 @@ export default function NotesPage() {
   // Delete note
   const handleDeleteNote = async () => {
     if (!selectedNote) return;
-    
+
     setIsSaving(true);
     try {
       await deleteNote(selectedNote.id);
@@ -161,6 +170,63 @@ export default function NotesPage() {
       console.error('Failed to toggle favorite:', err);
     }
   };
+
+  const handleSummarizeNote = async () => {
+    if (!selectedNote) return;
+    setIsGeneratingAI(true);
+    try {
+      // Strip HTML simply for the prompt
+      const plainText = selectedNote.content.replace(/<[^>]*>?/gm, '');
+      const response = await generateGeminiResponse(
+        `Please summarize this note in roughly one paragraph:\n\nTitle: ${selectedNote.title}\nContent: ${plainText}`
+      );
+      setAiSummary(response.content);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsGeneratingAI(false);
+    }
+  };
+
+  const handleSaveEdit = async () => {
+    if (!selectedNote || isSaving) return;
+    setIsSaving(true);
+    try {
+      await updateNote(selectedNote.id, { content: editContent });
+      setSelectedNote({ ...selectedNote, content: editContent } as Note);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleAskAI = async () => {
+    if (!selectedNote || !aiQuestion.trim()) return;
+    setIsAskingAI(true);
+    try {
+      const plainText = selectedNote.content.replace(/<[^>]*>?/gm, '');
+      const response = await generateGeminiResponse(
+        `Based ONLY on the following note, please answer this question: "${aiQuestion}"\n\nNote Title: ${selectedNote.title}\nNote Content: ${plainText}`
+      );
+      setAiAnswer(response.content);
+      setAiQuestion(''); // Clear input after asking
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsAskingAI(false);
+    }
+  };
+
+  // Sync edit mode content
+  useEffect(() => {
+    if (selectedNote) {
+      setEditContent(selectedNote.content);
+      setAiSummary(null);
+      setAiAnswer(null);
+      setAiQuestion('');
+    }
+  }, [selectedNote]);
 
   // Show loading state
   if (authLoading || loading) {
@@ -198,7 +264,7 @@ export default function NotesPage() {
 
   const NoteCard = memo(({ note }: { note: Note }) => {
     const categoryColor = categoryOptions.find(c => c.value === note.category)?.color || 'neon-cyan';
-    
+
     return (
       <motion.div
         layout
@@ -232,14 +298,15 @@ export default function NotesPage() {
         </div>
 
         <h3 className="font-medium text-white mb-2 line-clamp-1">{note.title}</h3>
-        
+
         {note.content && (
-          <p className={cn(
-            'text-sm text-dark-400 mb-3',
+          <div className={cn(
+            'text-sm text-dark-400 mb-3 overflow-hidden text-ellipsis',
             viewMode === 'grid' ? 'line-clamp-3' : 'line-clamp-1'
           )}>
-            {note.content}
-          </p>
+            {/* Strip HTML tags for preview */}
+            {note.content.replace(/<[^>]*>?/gm, '')}
+          </div>
         )}
 
         <div className="flex items-center justify-between">
@@ -253,7 +320,7 @@ export default function NotesPage() {
       </motion.div>
     );
   });
-  
+
   NoteCard.displayName = 'NoteCard';
 
   return (
@@ -331,7 +398,7 @@ export default function NotesPage() {
                       Pinned
                     </h3>
                     <div className={cn(
-                      viewMode === 'grid' 
+                      viewMode === 'grid'
                         ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'
                         : 'space-y-2'
                     )}>
@@ -351,7 +418,7 @@ export default function NotesPage() {
                       <h3 className="text-sm font-medium text-dark-400 mb-3">Other Notes</h3>
                     )}
                     <div className={cn(
-                      viewMode === 'grid' 
+                      viewMode === 'grid'
                         ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'
                         : 'space-y-2'
                     )}>
@@ -472,12 +539,11 @@ export default function NotesPage() {
 
             <div>
               <label className="block text-sm font-medium text-dark-300 mb-2">Content</label>
-              <textarea
-                placeholder="Write your note..."
-                value={newNote.content}
-                onChange={(e) => setNewNote(prev => ({ ...prev, content: e.target.value }))}
-                className="w-full bg-dark-800 border border-dark-700 rounded-lg px-3 py-2 text-white placeholder-dark-500 focus:border-neon-cyan outline-none resize-none"
-                rows={8}
+              <RichTextEditor
+                content={newNote.content}
+                onChange={(html) => setNewNote(prev => ({ ...prev, content: html }))}
+                placeholder="Write your note... Type [[ to link references"
+                notes={notes}
               />
             </div>
 
@@ -575,8 +641,61 @@ export default function NotesPage() {
                 </div>
               </div>
 
-              <div className="p-4 rounded-lg bg-dark-800/50 min-h-[200px]">
-                <p className="text-white whitespace-pre-wrap">{selectedNote.content || 'No content'}</p>
+              <div className="space-y-4">
+                <RichTextEditor
+                  content={editContent}
+                  onChange={setEditContent}
+                  notes={notes}
+                  placeholder="Note content..."
+                />
+
+                {editContent !== selectedNote.content && (
+                  <div className="flex justify-end">
+                    <Button variant="glow" size="sm" onClick={handleSaveEdit} disabled={isSaving}>
+                      {isSaving ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : 'Save Changes'}
+                    </Button>
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={handleSummarizeNote} disabled={isGeneratingAI}>
+                    {isGeneratingAI ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Sparkles className="w-4 h-4 mr-1" />}
+                    Summarize Note
+                  </Button>
+                </div>
+
+                <div className="flex items-center gap-2 mt-2 border-t border-dark-700/50 pt-4">
+                  <Input
+                    placeholder="Ask NOVA a question about this note..."
+                    value={aiQuestion}
+                    onChange={(e) => setAiQuestion(e.target.value)}
+                    className="flex-1"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleAskAI();
+                    }}
+                  />
+                  <Button variant="glow" onClick={handleAskAI} disabled={!aiQuestion.trim() || isAskingAI}>
+                    {isAskingAI ? <Loader2 className="w-4 h-4 animate-spin" /> : <Brain className="w-4 h-4" />}
+                  </Button>
+                </div>
+
+                {aiSummary && (
+                  <div className="p-4 bg-neon-purple/10 border border-neon-purple/20 rounded-lg text-sm text-neon-purple/90 whitespace-pre-wrap mt-4">
+                    <div className="flex items-center gap-2 font-semibold mb-2 text-neon-purple">
+                      <Sparkles className="w-4 h-4" /> AI Summary
+                    </div>
+                    {aiSummary}
+                  </div>
+                )}
+
+                {aiAnswer && (
+                  <div className="p-4 bg-neon-cyan/10 border border-neon-cyan/20 rounded-lg text-sm text-neon-cyan/90 whitespace-pre-wrap mt-2">
+                    <div className="flex items-center gap-2 font-semibold mb-2 text-neon-cyan">
+                      <Brain className="w-4 h-4" /> NOVA's Answer
+                    </div>
+                    {aiAnswer}
+                  </div>
+                )}
               </div>
 
               {selectedNote.tags && selectedNote.tags.length > 0 && (

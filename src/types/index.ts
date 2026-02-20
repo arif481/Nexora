@@ -78,9 +78,20 @@ export interface UserStats {
 }
 
 // ===== Task Types =====
+export interface Project {
+  id: string;
+  userId: string;
+  name: string;
+  description?: string;
+  color?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface Task {
   id: string;
   userId: string;
+  projectId?: string;
   title: string;
   description?: string;
   status: TaskStatus;
@@ -105,7 +116,7 @@ export interface Task {
   aiSuggestions?: AISuggestion[];
 }
 
-export type TaskStatus = 'pending' | 'in-progress' | 'completed' | 'cancelled' | 'snoozed';
+export type TaskStatus = 'todo' | 'in-progress' | 'review' | 'done';
 export type TaskPriority = 'critical' | 'high' | 'medium' | 'low';
 export type EnergyLevel = 'high' | 'medium' | 'low';
 
@@ -389,6 +400,36 @@ export interface Grade {
   type: string;
 }
 
+export interface Flashcard {
+  id: string;
+  subjectId: string;
+  topicId?: string;
+  front: string;
+  back: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  interval: number; // days until next review
+  easeFactor: number; // SM-2 ease factor
+  repetitions: number;
+  nextReview: Date;
+  lastReview?: Date;
+  createdAt: Date;
+}
+
+export interface StudySession {
+  id: string;
+  userId: string;
+  subjectId: string;
+  topicId?: string;
+  startTime: Date;
+  endTime: Date;
+  duration: number; // minutes
+  type: 'flashcard' | 'reading' | 'practice' | 'review';
+  cardsReviewed?: number;
+  correctAnswers?: number;
+  notes?: string;
+  createdAt: Date;
+}
+
 // ===== Wellness Types =====
 export interface WellnessEntry {
   id: string;
@@ -418,10 +459,18 @@ export interface ActivityData {
   exercises: Exercise[];
 }
 
+export interface ExerciseSet {
+  reps?: number;
+  weight?: number;
+  duration?: number; // seconds
+}
+
 export interface Exercise {
+  id?: string;
   type: string;
   duration: number;
   intensity: 'low' | 'medium' | 'high';
+  sets?: ExerciseSet[];
   notes?: string;
 }
 
@@ -557,6 +606,224 @@ export interface PersonAccountType {
   name: string;
   balanceEffect: PersonAccountBalanceEffect;
   createdAt: Date;
+}
+
+// ===== Entertainment Tracker Types =====
+export type EntertainmentType = 'movie' | 'tv' | 'book' | 'game';
+export type EntertainmentStatus = 'planned' | 'in_progress' | 'completed' | 'dropped';
+
+export interface EntertainmentItem {
+  id: string;
+  userId: string;
+  type: EntertainmentType;
+  title: string;
+  creator?: string; // Author, Director, Studio
+  status: EntertainmentStatus;
+  rating?: number; // 1-10 or 1-5
+  review?: string;
+  coverImage?: string;
+  progress?: number; // pages, episodes, hours
+  totalProgress?: number;
+  tags?: string[];
+  startedAt?: Date | null;
+  completedAt?: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ===== Contacts CRM Types =====
+export interface Contact {
+  id: string;
+  userId: string;
+  name: string;
+  relationship: 'family' | 'friend' | 'colleague' | 'acquaintance' | 'other';
+  email?: string;
+  phone?: string;
+  address?: string;
+  birthday?: Date | null;
+  anniversary?: Date | null;
+  notes?: string;
+  tags?: string[];
+  giftIdeas?: string[];
+  frequency?: 'weekly' | 'monthly' | 'quarterly' | 'yearly'; // Reminder frequency
+  lastContactAt?: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ContactInteraction {
+  id: string;
+  userId: string;
+  contactId: string;
+  type: 'meetup' | 'call' | 'message' | 'email' | 'other';
+  date: Date;
+  notes?: string;
+  createdAt: Date;
+}
+
+// ===== Meal Planner Types =====
+export interface Recipe {
+  id: string;
+  userId: string;
+  title: string;
+  sourceUrl?: string;
+  prepTime?: number; // minutes
+  cookTime?: number; // minutes
+  servings?: number;
+  ingredients: string[];
+  instructions: string[];
+  tags?: string[];
+  imageUrl?: string;
+  notes?: string;
+  isFavorite?: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
+
+export interface MealPlan {
+  id: string; // usually YYYY-MM-DD format
+  userId: string;
+  date: Date;
+  meals: {
+    type: MealType;
+    recipeId?: string;
+    customName?: string;
+    completed: boolean;
+  }[];
+  notes?: string;
+  updatedAt: Date;
+}
+
+export interface GroceryItem {
+  id: string;
+  userId: string;
+  name: string;
+  category: 'produce' | 'meat' | 'dairy' | 'pantry' | 'frozen' | 'other';
+  quantity: string;
+  checked: boolean;
+  createdAt: Date;
+}
+
+// ===== Travel Planner Types =====
+export interface Trip {
+  id: string;
+  userId: string;
+  title: string;
+  destination: string;
+  startDate: Date;
+  endDate: Date;
+  status: 'planned' | 'upcoming' | 'ongoing' | 'completed';
+  coverImage?: string;
+  budget?: number;
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ItineraryItem {
+  id: string;
+  tripId: string;
+  userId: string;
+  title: string;
+  type: 'flight' | 'hotel' | 'transit' | 'activity' | 'food' | 'other';
+  startTime: Date;
+  endTime?: Date;
+  location?: string;
+  cost?: number;
+  confirmationNo?: string;
+  notes?: string;
+  createdAt: Date;
+}
+
+export interface PackingItem {
+  id: string;
+  tripId: string;
+  userId: string;
+  name: string;
+  category: 'clothing' | 'toiletries' | 'electronics' | 'documents' | 'other';
+  quantity: number;
+  isPacked: boolean;
+  createdAt: Date;
+}
+
+// ===== Life Admin Types =====
+export interface AdminSubscription {
+  id: string;
+  userId: string;
+  name: string;
+  cost: number;
+  billingCycle: 'monthly' | 'yearly' | 'quarterly' | 'weekly';
+  nextPaymentDate: Date;
+  category: 'entertainment' | 'software' | 'utilities' | 'other';
+  url?: string;
+  notes?: string;
+  createdAt: Date;
+}
+
+export interface Vehicle {
+  id: string;
+  userId: string;
+  make: string;
+  model: string;
+  year: number;
+  licensePlate?: string;
+  vin?: string;
+  nextServiceDate?: Date;
+  insuranceExpiry?: Date;
+  notes?: string;
+  createdAt: Date;
+}
+
+export interface Medication {
+  id: string;
+  userId: string;
+  name: string;
+  dosage: string;
+  frequency: string;
+  refillDate?: Date;
+  notes?: string;
+  createdAt: Date;
+}
+
+export interface Pet {
+  id: string;
+  userId: string;
+  name: string;
+  species: string;
+  breed?: string;
+  birthDate?: Date;
+  nextVetVisit?: Date;
+  notes?: string;
+  createdAt: Date;
+}
+
+// ===== Communications Hub Types =====
+export interface MessageTemplate {
+  id: string;
+  userId: string;
+  name: string;
+  subject?: string;
+  body: string;
+  category: 'work' | 'personal' | 'networking' | 'other';
+  tags?: string[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface FollowUp {
+  id: string;
+  userId: string;
+  contactName: string;
+  contactId?: string; // Optional link to Contacts CRM
+  context: string;
+  method: 'email' | 'call' | 'message' | 'in-person';
+  dueDate: Date;
+  status: 'pending' | 'completed' | 'snoozed';
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 // ===== AI Context Types =====
@@ -794,6 +1061,32 @@ export interface GoalMilestone {
   createdAt: Date;
 }
 
+// ===== OKR Framework =====
+export interface Objective {
+  id: string;
+  userId: string;
+  title: string;
+  description?: string;
+  timeframe: 'quarterly' | 'monthly' | 'yearly';
+  startDate: Date;
+  endDate: Date;
+  status: 'on_track' | 'at_risk' | 'behind' | 'achieved';
+  keyResults: KeyResult[];
+  color: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface KeyResult {
+  id: string;
+  title: string;
+  targetValue: number;
+  currentValue: number;
+  unit: string;
+  progress: number; // 0-100, auto-calculated
+  status: 'not_started' | 'in_progress' | 'completed';
+}
+
 // ===== Smart Inbox =====
 export type InboxItemType = 'task' | 'note' | 'event' | 'habit' | 'unclassified';
 
@@ -824,3 +1117,4 @@ export interface XPEvent {
   createdAt: Date;
 }
 
+export * from './finance-upgrades';

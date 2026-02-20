@@ -64,6 +64,10 @@ import {
   usePersonAccountTypes,
   useNetWorth,
   useSavingsGoals,
+  useDebts,
+  useInvestments,
+  useAutoRules,
+  useReceipts,
 } from '@/hooks/useFinance';
 import {
   PieChart as RechartsPieChart, Pie, Cell, Tooltip as RechartsTooltip,
@@ -72,6 +76,10 @@ import {
 } from 'recharts';
 import { exportTransactionsToCSV, parseCSV, mapRowsToTransactions } from '@/lib/financeImport';
 import { generateAIResponse } from '@/lib/services/ai';
+import { DebtTracker } from '@/components/features/finance/DebtTracker';
+import { InvestmentTracker } from '@/components/features/finance/InvestmentTracker';
+import { AutoRulesManager } from '@/components/features/finance/AutoRulesManager';
+import { ReceiptScanner } from '@/components/features/finance/ReceiptScanner';
 
 import type {
   Transaction,
@@ -141,6 +149,18 @@ export default function FinancePage() {
   const [selectedBudget, setSelectedBudget] = useState<Budget | null>(null);
   const [isAddSubscriptionOpen, setIsAddSubscriptionOpen] = useState(false);
   const [selectedSubscription, setSelectedSubscription] = useState<any>(null);
+
+  // New Upgrades State
+  const { debts, addDebt, editDebt, deleteDebt } = useDebts();
+  const { portfolios, addPortfolio, editPortfolio, deletePortfolio } = useInvestments();
+  const { rules, addRule, editRule, deleteRule } = useAutoRules();
+  const { receipts, isProcessing: receiptProcessing, processReceiptImage, deleteReceipt } = useReceipts();
+
+  const [isAddDebtOpen, setIsAddDebtOpen] = useState(false);
+  const [isAddPortfolioOpen, setIsAddPortfolioOpen] = useState(false);
+  const [isAddRuleOpen, setIsAddRuleOpen] = useState(false);
+  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
+
   const [isAddPersonAccountOpen, setIsAddPersonAccountOpen] = useState(false);
   const [selectedPersonAccount, setSelectedPersonAccount] = useState<PersonAccount | null>(null);
   const [filter, setFilter] = useState<'all' | 'income' | 'expense'>('all');
@@ -161,7 +181,7 @@ export default function FinancePage() {
   const { goals: savingsGoals, loading: goalsLoading, createGoal, updateGoal, deleteGoal } = useSavingsGoals();
 
   // Tab state
-  type FinanceTab = 'overview' | 'transactions' | 'budgets' | 'subscriptions' | 'people' | 'networth' | 'goals' | 'analytics' | 'forecast' | 'nova';
+  type FinanceTab = 'overview' | 'transactions' | 'budgets' | 'subscriptions' | 'debts' | 'investments' | 'receipts' | 'rules' | 'people' | 'networth' | 'goals' | 'analytics' | 'forecast' | 'nova';
   const [activeTab, setActiveTab] = useState<FinanceTab>('overview');
 
   // NetWorth form
@@ -262,6 +282,10 @@ export default function FinancePage() {
     { id: 'transactions', label: '💳 Transactions' },
     { id: 'budgets', label: '🎯 Budgets' },
     { id: 'subscriptions', label: '🔄 Subscriptions' },
+    { id: 'debts', label: '💸 Debts' },
+    { id: 'investments', label: '📈 Investments' },
+    { id: 'receipts', label: '🧾 Receipts' },
+    { id: 'rules', label: '⚡ Auto-Rules' },
     { id: 'people', label: '👥 People' },
     { id: 'networth', label: '🏦 Net Worth' },
     { id: 'goals', label: '🪙 Goals' },
@@ -764,6 +788,34 @@ export default function FinancePage() {
                 </CardContent>
               </Card>
             )}
+          </div>
+        )}
+
+        {/* ── DEBTS TAB ── */}
+        {activeTab === 'debts' && (
+          <div className="max-w-4xl mx-auto">
+            <DebtTracker />
+          </div>
+        )}
+
+        {/* ── INVESTMENTS TAB ── */}
+        {activeTab === 'investments' && (
+          <div className="max-w-4xl mx-auto">
+            <InvestmentTracker />
+          </div>
+        )}
+
+        {/* ── RECEIPTS TAB ── */}
+        {activeTab === 'receipts' && (
+          <div className="max-w-4xl mx-auto">
+            <ReceiptScanner />
+          </div>
+        )}
+
+        {/* ── AUTO-RULES TAB ── */}
+        {activeTab === 'rules' && (
+          <div className="max-w-4xl mx-auto">
+            <AutoRulesManager />
           </div>
         )}
 

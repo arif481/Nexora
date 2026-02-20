@@ -29,6 +29,8 @@ import { Modal } from '@/components/ui/Modal';
 import { EmptyState, LoadingSpinner } from '@/components/ui/Loading';
 import { useUIStore } from '@/stores/uiStore';
 import { cn, formatTime } from '@/lib/utils';
+import { WeekView } from '@/components/features/calendar/WeekView';
+import { SmartEventInput } from '@/components/features/calendar/SmartEventInput';
 import { useCalendar, useEventsInRange } from '@/hooks/useCalendar';
 import { useAuth } from '@/hooks/useAuth';
 import { useTasks } from '@/hooks/useTasks';
@@ -39,6 +41,7 @@ import { useUser } from '@/hooks/useUser';
 import { getCountryHolidaysInRange, supportsLocalHolidays, type HolidayItem } from '@/lib/holidays';
 import { createNotification } from '@/lib/services/notifications';
 import { downloadAppleCalendarEvent, getGoogleCalendarAddLink } from '@/lib/externalCalendar';
+import { createNote } from '@/lib/services/notes';
 import type { CalendarEvent, EventCategory } from '@/types';
 
 const categoryOptions: { label: string; value: EventCategory; color: string; hex: string }[] = [
@@ -133,7 +136,7 @@ export default function CalendarPage() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [viewMode, setViewMode] = useState<'month' | 'week'>('month');
   const reminderCacheRef = useRef<Set<string>>(new Set());
-  
+
   // Get a stable month range for fetching events and derived data.
   const { monthStart, monthEnd, monthStartTime, monthEndTime } = useMemo(() => {
     const start = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
@@ -145,10 +148,10 @@ export default function CalendarPage() {
       monthEndTime: end.getTime(),
     };
   }, [currentDate]);
-  
+
   const { events, loading } = useEventsInRange(monthStart, monthEnd);
   const { createEvent, updateEvent, deleteEvent } = useCalendar();
-  
+
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
@@ -183,7 +186,7 @@ export default function CalendarPage() {
 
   const linkedDateItems = useMemo<LinkedDateItem[]>(() => {
     const taskItems: LinkedDateItem[] = tasks
-      .filter(task => task.dueDate && task.status !== 'completed')
+      .filter(task => task.dueDate && task.status !== 'done')
       .map<LinkedDateItem>(task => ({
         id: `task_${task.id}`,
         title: task.title,
@@ -268,25 +271,25 @@ export default function CalendarPage() {
   const calendarDays = useMemo(() => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
-    
+
     const firstDayOfMonth = new Date(year, month, 1);
     const lastDayOfMonth = new Date(year, month + 1, 0);
-    
+
     const startDay = firstDayOfMonth.getDay();
     const daysInMonth = lastDayOfMonth.getDate();
-    
+
     const days: (Date | null)[] = [];
-    
+
     // Add empty slots for days before the first day of the month
     for (let i = 0; i < startDay; i++) {
       days.push(null);
     }
-    
+
     // Add days of the month
     for (let i = 1; i <= daysInMonth; i++) {
       days.push(new Date(year, month, i));
     }
-    
+
     return days;
   }, [currentDate]);
 
@@ -296,6 +299,34 @@ export default function CalendarPage() {
       const eventDate = new Date(event.startTime);
       return eventDate.toDateString() === date.toDateString();
     });
+  };
+
+  const handleTimeSlotClick = (date: Date, hour: number) => {
+    setSelectedDate(date);
+    setNewEvent(prev => ({
+      ...prev,
+      date: date.toISOString().split('T')[0],
+      startTime: `${String(hour).padStart(2, '0')}:00`,
+      endTime: `${String((hour + 1) % 24).padStart(2, '0')}:00`,
+      allDay: false,
+    }));
+    setIsCreateModalOpen(true);
+  };
+
+  const handleTakeNotes = async (event: CalendarEvent) => {
+    if (!user) return;
+    try {
+      await createNote(user.uid, {
+        title: `Meeting Notes: ${event.title}`,
+        content: `<h1>Meeting Notes: ${event.title}</h1><p><strong>Date:</strong> ${new Date(event.startTime).toLocaleDateString()}</p><p><strong>Attendees:</strong></p><ul><li></li></ul><p><strong>Notes:</strong></p><p></p><p><strong>Action Items:</strong></p><ul data-type="taskList"><li data-type="taskItem" data-checked="false"></li></ul>`,
+        contentType: 'rich-text',
+        category: 'work',
+        linkedEvents: [event.id]
+      });
+      router.push('/notes');
+    } catch (err) {
+      console.error('Failed to create meeting notes:', err);
+    }
   };
 
   const getLinkedItemsForDay = (date: Date) => {
@@ -424,17 +455,17 @@ export default function CalendarPage() {
   // Create event
   const handleCreateEvent = async () => {
     if (!newEvent.title.trim() || !newEvent.date) return;
-    
+
     setIsSaving(true);
     try {
       const startTime = newEvent.allDay
         ? new Date(newEvent.date)
         : new Date(`${newEvent.date}T${newEvent.startTime || '09:00'}`);
-      
+
       const endTime = newEvent.allDay
         ? new Date(new Date(newEvent.date).setHours(23, 59, 59))
         : new Date(`${newEvent.date}T${newEvent.endTime || '10:00'}`);
-      
+
       await createEvent({
         title: newEvent.title,
         description: newEvent.description,
@@ -446,7 +477,7 @@ export default function CalendarPage() {
         energyRequired: 'medium',
         isFlexible: false,
       });
-      
+
       setIsCreateModalOpen(false);
       setNewEvent({
         title: '',
@@ -485,17 +516,17 @@ export default function CalendarPage() {
   // Save edited event
   const handleSaveEdit = async () => {
     if (!selectedEvent || !newEvent.title.trim() || !newEvent.date) return;
-    
+
     setIsSaving(true);
     try {
       const startTime = newEvent.allDay
         ? new Date(newEvent.date)
         : new Date(`${newEvent.date}T${newEvent.startTime || '09:00'}`);
-      
+
       const endTime = newEvent.allDay
         ? new Date(new Date(newEvent.date).setHours(23, 59, 59))
         : new Date(`${newEvent.date}T${newEvent.endTime || '10:00'}`);
-      
+
       await updateEvent(selectedEvent.id, {
         title: newEvent.title,
         description: newEvent.description,
@@ -505,7 +536,7 @@ export default function CalendarPage() {
         location: newEvent.location,
         category: newEvent.category,
       });
-      
+
       setIsEditModalOpen(false);
       setSelectedEvent(null);
       setNewEvent({
@@ -528,7 +559,7 @@ export default function CalendarPage() {
   // Delete event
   const handleDeleteEvent = async (eventId: string) => {
     if (!confirm('Are you sure you want to delete this event?')) return;
-    
+
     setIsDeleting(true);
     try {
       await deleteEvent(eventId);
@@ -648,6 +679,29 @@ export default function CalendarPage() {
           </div>
         </motion.div>
 
+        {/* AI NLP Event Input */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+        >
+          <SmartEventInput
+            onEventParsed={(parsedEvent) => {
+              setNewEvent({
+                title: parsedEvent.title,
+                description: parsedEvent.description,
+                date: parsedEvent.date,
+                startTime: parsedEvent.startTime,
+                endTime: parsedEvent.endTime,
+                allDay: parsedEvent.allDay,
+                location: parsedEvent.location,
+                category: parsedEvent.category,
+              });
+              setIsCreateModalOpen(true);
+            }}
+          />
+        </motion.div>
+
         {/* Main Content */}
         <div
           className={cn(
@@ -655,82 +709,91 @@ export default function CalendarPage() {
             (tasksLoading || goalsLoading || examsLoading || wellnessLoading) && 'opacity-90'
           )}
         >
-          {/* Calendar Grid */}
+          {/* Calendar Grid / Week View */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
             className="lg:col-span-3"
           >
-            <Card variant="glass" className="p-4">
-              {/* Day Headers */}
-              <div className="grid grid-cols-7 gap-1 mb-2">
-                {DAYS.map(day => (
-                  <div key={day} className="text-center py-2 text-sm font-medium text-dark-400">
-                    {day}
-                  </div>
-                ))}
-              </div>
+            {viewMode === 'month' ? (
+              <Card variant="glass" className="p-4 min-h-[500px]">
+                {/* Day Headers */}
+                <div className="grid grid-cols-7 gap-1 mb-2">
+                  {DAYS.map(day => (
+                    <div key={day} className="text-center py-2 text-sm font-medium text-dark-400">
+                      {day}
+                    </div>
+                  ))}
+                </div>
 
-              {/* Calendar Days */}
-              <div className="grid grid-cols-7 gap-1">
-                {calendarDays.map((date, index) => {
-                  if (!date) {
-                    return <div key={index} className="aspect-square p-1" />;
-                  }
-                  
-                  const isToday = date.toDateString() === new Date().toDateString();
-                  const isSelected = selectedDate?.toDateString() === date.toDateString();
-                  const dayEvents = getEventsForDay(date);
-                  const dayLinkedItems = getLinkedItemsForDay(date);
-                  const holidayForDay = dayLinkedItems.find(item => item.type === 'holiday');
-                  const linkedCount = dayLinkedItems.filter(item => item.type !== 'holiday').length;
-                  
-                  return (
-                    <button
-                      key={index}
-                      onClick={() => setSelectedDate(date)}
-                      className={cn(
-                        'aspect-square p-1 rounded-lg transition-all text-left',
-                        'hover:bg-dark-800/50',
-                        isToday && 'ring-2 ring-neon-cyan',
-                        isSelected && 'bg-neon-cyan/20'
-                      )}
-                    >
-                      <div className={cn(
-                        'text-sm font-medium mb-1',
-                        isToday ? 'text-neon-cyan' : 'text-white'
-                      )}>
-                        {date.getDate()}
-                      </div>
-                      {holidayForDay && (
-                        <div className="text-[10px] px-1 py-0.5 rounded bg-neon-orange/20 text-neon-orange truncate mb-0.5">
-                          {holidayForDay.title}
+                {/* Calendar Days */}
+                <div className="grid grid-cols-7 gap-1">
+                  {calendarDays.map((date, index) => {
+                    if (!date) {
+                      return <div key={index} className="aspect-square p-1" />;
+                    }
+
+                    const isToday = date.toDateString() === new Date().toDateString();
+                    const isSelected = selectedDate?.toDateString() === date.toDateString();
+                    const dayEvents = getEventsForDay(date);
+                    const dayLinkedItems = getLinkedItemsForDay(date);
+                    const holidayForDay = dayLinkedItems.find(item => item.type === 'holiday');
+                    const linkedCount = dayLinkedItems.filter(item => item.type !== 'holiday').length;
+
+                    return (
+                      <button
+                        key={index}
+                        onClick={() => setSelectedDate(date)}
+                        className={cn(
+                          'aspect-square p-1 rounded-lg transition-all text-left',
+                          'hover:bg-dark-800/50',
+                          isToday && 'ring-2 ring-neon-cyan',
+                          isSelected && 'bg-neon-cyan/20'
+                        )}
+                      >
+                        <div className={cn(
+                          'text-sm font-medium mb-1',
+                          isToday ? 'text-neon-cyan' : 'text-white'
+                        )}>
+                          {date.getDate()}
                         </div>
-                      )}
-                      <div className="space-y-0.5">
-                        {dayEvents.slice(0, 2).map(event => (
-                          <div
-                            key={event.id}
-                            className={cn(
-                              'text-[10px] px-1 py-0.5 rounded truncate text-white',
-                              getCategoryColor(event.category)
-                            )}
-                          >
-                            {event.title}
-                          </div>
-                        ))}
-                        {(dayEvents.length > 2 || linkedCount > 0) && (
-                          <div className="text-[10px] text-dark-400 px-1">
-                            +{Math.max(0, dayEvents.length - 2) + linkedCount} linked
+                        {holidayForDay && (
+                          <div className="text-[10px] px-1 py-0.5 rounded bg-neon-orange/20 text-neon-orange truncate mb-0.5">
+                            {holidayForDay.title}
                           </div>
                         )}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </Card>
+                        <div className="space-y-0.5">
+                          {dayEvents.slice(0, 2).map(event => (
+                            <div
+                              key={event.id}
+                              className={cn(
+                                'text-[10px] px-1 py-0.5 rounded truncate text-white',
+                                getCategoryColor(event.category)
+                              )}
+                            >
+                              {event.title}
+                            </div>
+                          ))}
+                          {(dayEvents.length > 2 || linkedCount > 0) && (
+                            <div className="text-[10px] text-dark-400 px-1">
+                              +{Math.max(0, dayEvents.length - 2) + linkedCount} linked
+                            </div>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </Card>
+            ) : (
+              <WeekView
+                currentDate={currentDate}
+                events={events}
+                onEventClick={handleEditEvent}
+                onTimeSlotClick={handleTimeSlotClick}
+              />
+            )}
           </motion.div>
 
           {/* Sidebar */}
@@ -747,7 +810,7 @@ export default function CalendarPage() {
                   ? selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
                   : 'Select a date'}
               </h3>
-              
+
               {selectedDate && (
                 <div className="space-y-4">
                   <div>
@@ -791,6 +854,12 @@ export default function CalendarPage() {
                               </div>
                             )}
                             <div className="flex gap-2 mt-2">
+                              <button
+                                onClick={() => handleTakeNotes(event)}
+                                className="text-[10px] px-2 py-1 rounded-md bg-neon-cyan/20 text-neon-cyan hover:bg-neon-cyan/30 transition-colors border border-neon-cyan/20 font-medium"
+                              >
+                                Take Notes
+                              </button>
                               <button
                                 onClick={() => handleAddToGoogle(event)}
                                 className="text-[10px] px-2 py-1 rounded-md bg-dark-700/60 text-dark-300 hover:text-white transition-colors"
@@ -850,12 +919,12 @@ export default function CalendarPage() {
                                   item.type === 'task'
                                     ? 'orange'
                                     : item.type === 'goal'
-                                    ? 'cyan'
-                                    : item.type === 'exam'
-                                    ? 'purple'
-                                    : item.type === 'period'
-                                    ? 'pink'
-                                    : 'green'
+                                      ? 'cyan'
+                                      : item.type === 'exam'
+                                        ? 'purple'
+                                        : item.type === 'period'
+                                          ? 'pink'
+                                          : 'green'
                                 }
                                 size="sm"
                               >

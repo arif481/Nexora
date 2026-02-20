@@ -10,6 +10,7 @@ import { useTransactions } from './useFinance';
 import { useUser } from './useUser';
 import { useStudy } from './useStudy';
 import { useRecentWellness } from './useWellness';
+import { usePathname } from 'next/navigation';
 import {
   subscribeToConversations,
   subscribeToConversation,
@@ -89,8 +90,9 @@ export function useAIChat(conversationId: string | null) {
   const { profile } = useUser();
   const { subjects } = useStudy();
   const { entries: wellnessEntries } = useRecentWellness(21);
+  const pathname = usePathname();
   const allowAIExternalDataAccess = profile?.preferences?.dataPermissions?.allowAIExternalDataAccess !== false;
-  
+
   const [conversation, setConversation] = useState<AIConversationWithMessages | null>(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -132,8 +134,9 @@ export function useAIChat(conversationId: string | null) {
         profile,
         subjects: allowAIExternalDataAccess ? subjects : [],
         wellness: allowAIExternalDataAccess ? wellnessEntries : [],
+        pathname,
       };
-      
+
       const aiResponse = await generateAIResponse(content, context);
 
       // Add AI response
@@ -147,7 +150,7 @@ export function useAIChat(conversationId: string | null) {
     } finally {
       setSending(false);
     }
-  }, [conversationId, sending, tasks, habits, events, goals, transactions, profile, subjects, wellnessEntries, allowAIExternalDataAccess]);
+  }, [conversationId, sending, tasks, habits, events, goals, transactions, profile, subjects, wellnessEntries, pathname, allowAIExternalDataAccess]);
 
   return {
     conversation,
@@ -168,8 +171,9 @@ export function useSimpleAI() {
   const { profile } = useUser();
   const { subjects } = useStudy();
   const { entries: wellnessEntries } = useRecentWellness(21);
+  const pathname = usePathname();
   const allowAIExternalDataAccess = profile?.preferences?.dataPermissions?.allowAIExternalDataAccess !== false;
-  
+
   const [messages, setMessages] = useState<AIMessage[]>([
     {
       id: '1',
@@ -207,14 +211,15 @@ export function useSimpleAI() {
         profile,
         subjects: allowAIExternalDataAccess ? subjects : [],
         wellness: allowAIExternalDataAccess ? wellnessEntries : [],
+        pathname,
       };
-      
+
       // Build conversation history for context
       const history = messages.map(m => ({
         role: m.role,
         content: m.content,
       }));
-      
+
       const aiResponse = await generateAIResponse(content, context, history);
 
       // Add AI response
@@ -239,11 +244,11 @@ export function useSimpleAI() {
     } finally {
       setIsThinking(false);
     }
-  }, [isThinking, tasks, habits, events, goals, transactions, profile, subjects, wellnessEntries, messages, allowAIExternalDataAccess]);
+  }, [isThinking, tasks, habits, events, goals, transactions, profile, subjects, wellnessEntries, messages, pathname, allowAIExternalDataAccess]);
 
   const regenerateLastResponse = useCallback(async () => {
     if (!lastUserMessage || isThinking) return;
-    
+
     // Remove the last AI message
     setMessages(prev => {
       const newMessages = [...prev];
@@ -252,7 +257,7 @@ export function useSimpleAI() {
       }
       return newMessages;
     });
-    
+
     setIsThinking(true);
 
     try {
@@ -266,7 +271,7 @@ export function useSimpleAI() {
         subjects: allowAIExternalDataAccess ? subjects : [],
         wellness: allowAIExternalDataAccess ? wellnessEntries : [],
       };
-      
+
       const aiResponse = await generateAIResponse(lastUserMessage, context);
 
       const assistantMessage: AIMessage = {

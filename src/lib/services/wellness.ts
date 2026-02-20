@@ -1,8 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // Wellness Service - Real-time Firestore operations
 import {
   collection,
   doc,
-  addDoc,
   updateDoc,
   deleteDoc,
   query,
@@ -12,7 +12,6 @@ import {
   serverTimestamp,
   Timestamp,
   getDoc,
-  limit,
   setDoc,
 } from 'firebase/firestore';
 import { db, COLLECTIONS } from '../firebase';
@@ -38,6 +37,7 @@ const convertTimestamp = (timestamp: Timestamp | Date | null | undefined): Date 
 };
 
 // Convert WellnessEntry from Firestore
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const convertWellnessFromFirestore = (doc: any): WellnessEntry => {
   const data = doc.data();
   return {
@@ -55,6 +55,7 @@ const convertWellnessFromFirestore = (doc: any): WellnessEntry => {
     activity: {
       steps: data.activity?.steps,
       activeMinutes: data.activity?.activeMinutes || 0,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       exercises: (data.activity?.exercises || []).map((e: any) => ({
         type: e.type,
         duration: e.duration,
@@ -63,6 +64,7 @@ const convertWellnessFromFirestore = (doc: any): WellnessEntry => {
       })),
     },
     nutrition: {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       meals: (data.nutrition?.meals || []).map((m: any) => ({
         type: m.type,
         time: convertTimestamp(m.time),
@@ -88,6 +90,7 @@ const convertWellnessFromFirestore = (doc: any): WellnessEntry => {
       cycleLength: data.period?.cycleLength || 28,
       notes: data.period?.notes,
     },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     focusSessions: (data.focusSessions || []).map((f: any) => ({
       id: f.id,
       startTime: convertTimestamp(f.startTime),
@@ -109,7 +112,7 @@ export const getOrCreateWellnessEntry = async (
 ): Promise<WellnessEntry> => {
   const dateKey = date.toISOString().split('T')[0];
   const entryId = `${userId}_${dateKey}`;
-  
+
   const entryRef = doc(db, COLLECTIONS.WELLNESS_ENTRIES, entryId);
   const entryDoc = await getDoc(entryRef);
 
@@ -153,15 +156,15 @@ export const getOrCreateWellnessEntry = async (
   };
 
   await setDoc(entryRef, newEntry);
-  
+
   return {
     id: entryId,
     userId,
     date,
-    sleep: newEntry.sleep as any,
-    activity: newEntry.activity as any,
-    nutrition: newEntry.nutrition as any,
-    stress: newEntry.stress as any,
+    sleep: newEntry.sleep as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+    activity: newEntry.activity as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+    nutrition: newEntry.nutrition as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+    stress: newEntry.stress as any, // eslint-disable-line @typescript-eslint/no-explicit-any
     focusSessions: [],
     createdAt: new Date(),
   } as WellnessEntry;
@@ -175,7 +178,7 @@ export const updateSleepData = async (
 ): Promise<void> => {
   const dateKey = date.toISOString().split('T')[0];
   const entryId = `${userId}_${dateKey}`;
-  
+
   const entryRef = doc(db, COLLECTIONS.WELLNESS_ENTRIES, entryId);
   const entryDoc = await getDoc(entryRef);
 
@@ -184,7 +187,7 @@ export const updateSleepData = async (
   }
 
   const currentSleep = entryDoc.exists() ? entryDoc.data().sleep || {} : {};
-  
+
   await updateDoc(entryRef, {
     sleep: { ...currentSleep, ...sleepData },
   });
@@ -198,7 +201,7 @@ export const updateActivityData = async (
 ): Promise<void> => {
   const dateKey = date.toISOString().split('T')[0];
   const entryId = `${userId}_${dateKey}`;
-  
+
   const entryRef = doc(db, COLLECTIONS.WELLNESS_ENTRIES, entryId);
   const entryDoc = await getDoc(entryRef);
 
@@ -207,7 +210,7 @@ export const updateActivityData = async (
   }
 
   const currentActivity = entryDoc.exists() ? entryDoc.data().activity || {} : {};
-  
+
   await updateDoc(entryRef, {
     activity: { ...currentActivity, ...activityData },
   });
@@ -221,7 +224,7 @@ export const addExercise = async (
 ): Promise<void> => {
   const dateKey = date.toISOString().split('T')[0];
   const entryId = `${userId}_${dateKey}`;
-  
+
   const entryRef = doc(db, COLLECTIONS.WELLNESS_ENTRIES, entryId);
   const entryDoc = await getDoc(entryRef);
 
@@ -231,7 +234,7 @@ export const addExercise = async (
 
   const currentExercises = entryDoc.exists() ? entryDoc.data().activity?.exercises || [] : [];
   const currentActiveMinutes = entryDoc.exists() ? entryDoc.data().activity?.activeMinutes || 0 : 0;
-  
+
   await updateDoc(entryRef, {
     'activity.exercises': [...currentExercises, exercise],
     'activity.activeMinutes': currentActiveMinutes + exercise.duration,
@@ -246,7 +249,7 @@ export const updateNutritionData = async (
 ): Promise<void> => {
   const dateKey = date.toISOString().split('T')[0];
   const entryId = `${userId}_${dateKey}`;
-  
+
   const entryRef = doc(db, COLLECTIONS.WELLNESS_ENTRIES, entryId);
   const entryDoc = await getDoc(entryRef);
 
@@ -255,7 +258,7 @@ export const updateNutritionData = async (
   }
 
   const currentNutrition = entryDoc.exists() ? entryDoc.data().nutrition || {} : {};
-  
+
   await updateDoc(entryRef, {
     nutrition: { ...currentNutrition, ...nutritionData },
   });
@@ -269,7 +272,7 @@ export const addMeal = async (
 ): Promise<void> => {
   const dateKey = date.toISOString().split('T')[0];
   const entryId = `${userId}_${dateKey}`;
-  
+
   const entryRef = doc(db, COLLECTIONS.WELLNESS_ENTRIES, entryId);
   const entryDoc = await getDoc(entryRef);
 
@@ -278,7 +281,7 @@ export const addMeal = async (
   }
 
   const currentMeals = entryDoc.exists() ? entryDoc.data().nutrition?.meals || [] : [];
-  
+
   await updateDoc(entryRef, {
     'nutrition.meals': [...currentMeals, meal],
   });
@@ -292,7 +295,7 @@ export const updateWaterIntake = async (
 ): Promise<void> => {
   const dateKey = date.toISOString().split('T')[0];
   const entryId = `${userId}_${dateKey}`;
-  
+
   const entryRef = doc(db, COLLECTIONS.WELLNESS_ENTRIES, entryId);
   const entryDoc = await getDoc(entryRef);
 
@@ -301,7 +304,7 @@ export const updateWaterIntake = async (
   }
 
   const currentIntake = entryDoc.exists() ? entryDoc.data().nutrition?.waterIntake || 0 : 0;
-  
+
   await updateDoc(entryRef, {
     'nutrition.waterIntake': currentIntake + amount,
   });
@@ -315,7 +318,7 @@ export const updateStressData = async (
 ): Promise<void> => {
   const dateKey = date.toISOString().split('T')[0];
   const entryId = `${userId}_${dateKey}`;
-  
+
   const entryRef = doc(db, COLLECTIONS.WELLNESS_ENTRIES, entryId);
   const entryDoc = await getDoc(entryRef);
 
@@ -324,7 +327,7 @@ export const updateStressData = async (
   }
 
   const currentStress = entryDoc.exists() ? entryDoc.data().stress || {} : {};
-  
+
   await updateDoc(entryRef, {
     stress: { ...currentStress, ...stressData },
   });
@@ -361,7 +364,7 @@ export const addFocusSession = async (
 ): Promise<void> => {
   const dateKey = date.toISOString().split('T')[0];
   const entryId = `${userId}_${dateKey}`;
-  
+
   const entryRef = doc(db, COLLECTIONS.WELLNESS_ENTRIES, entryId);
   const entryDoc = await getDoc(entryRef);
 
@@ -370,7 +373,7 @@ export const addFocusSession = async (
   }
 
   const currentSessions = entryDoc.exists() ? entryDoc.data().focusSessions || [] : [];
-  
+
   const newSession: FocusSession = {
     ...session,
     id: `focus_${Date.now()}`,
@@ -390,7 +393,7 @@ export const subscribeToWellnessEntry = (
 ): (() => void) => {
   const dateKey = date.toISOString().split('T')[0];
   const entryId = `${userId}_${dateKey}`;
-  
+
   const entryRef = doc(db, COLLECTIONS.WELLNESS_ENTRIES, entryId);
 
   const unsubscribe = onSnapshot(
@@ -453,7 +456,7 @@ export const subscribeToRecentWellness = (
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - days);
   startDate.setHours(0, 0, 0, 0);
-  
+
   const endDate = new Date();
   endDate.setHours(23, 59, 59, 999);
 

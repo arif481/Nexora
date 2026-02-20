@@ -55,7 +55,7 @@ export function useNotificationTriggers() {
             todayEnd.setDate(todayEnd.getDate() + 1);
 
             for (const task of tasks) {
-                if (!task.dueDate || task.status === 'completed') continue;
+                if (!task.dueDate || task.status === 'done') continue;
 
                 const dueDate = new Date(task.dueDate);
                 const notifKey = `task-due-${task.id}-${dueDate.toDateString()}`;

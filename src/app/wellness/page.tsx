@@ -57,6 +57,8 @@ import { useUser } from '@/hooks/useUser';
 import { useWellness, useRecentWellness, useWellnessStats } from '@/hooks/useWellness';
 import { cn } from '@/lib/utils';
 import type { Exercise, Meal, PeriodData, WellnessEntry } from '@/types';
+import { WorkoutLogger } from '@/components/features/wellness/WorkoutLogger';
+import { MentalHealthCheckIn } from '@/components/features/wellness/MentalHealthCheckIn';
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
@@ -166,7 +168,7 @@ export default function WellnessPage() {
     const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
-    
+
     if (date.toDateString() === today.toDateString()) return 'Today';
     if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
     return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
@@ -320,630 +322,636 @@ export default function WellnessPage() {
           {showPeriodTracker && (
             <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_right,rgba(236,72,153,0.12),transparent_45%),radial-gradient(circle_at_bottom_left,rgba(168,85,247,0.10),transparent_40%)]" />
           )}
-        {/* Date Navigation */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigateDate('prev')}
-              leftIcon={<ChevronLeft className="w-4 h-4" />}
-            />
-            <div className="text-center">
-              <h2 className="text-lg font-semibold text-white">{getDateString(selectedDate)}</h2>
-              <p className="text-sm text-dark-400">
-                {selectedDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-              </p>
+          {/* Date Navigation */}
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigateDate('prev')}
+                leftIcon={<ChevronLeft className="w-4 h-4" />}
+              />
+              <div className="text-center">
+                <h2 className="text-lg font-semibold text-white">{getDateString(selectedDate)}</h2>
+                <p className="text-sm text-dark-400">
+                  {selectedDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigateDate('next')}
+                rightIcon={<ChevronRight className="w-4 h-4" />}
+                disabled={selectedDate.toDateString() === new Date().toDateString()}
+              />
             </div>
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => navigateDate('next')}
-              rightIcon={<ChevronRight className="w-4 h-4" />}
-              disabled={selectedDate.toDateString() === new Date().toDateString()}
-            />
+              onClick={() => openAIPanel()}
+              leftIcon={<Sparkles className="w-4 h-4" />}
+            >
+              AI Health Insights
+            </Button>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => openAIPanel()}
-            leftIcon={<Sparkles className="w-4 h-4" />}
+
+          {/* Weekly Stats Overview */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6"
           >
-            AI Health Insights
-          </Button>
-        </div>
+            <Card variant="glass" className="p-4">
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-sm text-dark-400">Avg Sleep</span>
+                <Moon className="w-6 h-6 text-neon-purple" />
+              </div>
+              <p className="text-2xl font-bold text-white">{formatTime(Math.round(wellnessStats.avgSleepDuration))}</p>
+              <p className="text-xs text-dark-500">{wellnessStats.avgSleepQuality.toFixed(0)}% quality</p>
+            </Card>
 
-        {/* Weekly Stats Overview */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6"
-        >
-          <Card variant="glass" className="p-4">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-sm text-dark-400">Avg Sleep</span>
-              <Moon className="w-6 h-6 text-neon-purple" />
+            <Card variant="glass" className="p-4">
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-sm text-dark-400">Active Minutes</span>
+                <Activity className="w-6 h-6 text-neon-green" />
+              </div>
+              <p className="text-2xl font-bold text-white">{wellnessStats.totalActiveMinutes}</p>
+              <p className="text-xs text-dark-500">this week</p>
+            </Card>
+
+            <Card variant="glass" className="p-4">
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-sm text-dark-400">Water Intake</span>
+                <Droplets className="w-6 h-6 text-blue-400" />
+              </div>
+              <p className="text-2xl font-bold text-white">{wellnessStats.totalWaterIntake}</p>
+              <p className="text-xs text-dark-500">glasses total</p>
+            </Card>
+
+            <Card variant="glass" className="p-4">
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-sm text-dark-400">Focus Time</span>
+                <Brain className="w-6 h-6 text-neon-cyan" />
+              </div>
+              <p className="text-2xl font-bold text-white">{formatTime(wellnessStats.totalFocusMinutes)}</p>
+              <p className="text-xs text-dark-500">this week</p>
+            </Card>
+          </motion.div>
+
+          {/* Main Content Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left Column - Daily Tracking */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Initialize Entry Button if no entry exists */}
+              {!entry && (
+                <Card variant="glass" className="p-8 text-center">
+                  <Calendar className="w-12 h-12 text-neon-cyan mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-white mb-2">No data for this day</h3>
+                  <p className="text-dark-400 mb-4">Start tracking your wellness for {getDateString(selectedDate)}</p>
+                  <Button variant="glow" onClick={handleInitialize} leftIcon={<Plus className="w-4 h-4" />}>
+                    Start Tracking
+                  </Button>
+                </Card>
+              )}
+
+              {entry && (
+                <>
+                  {/* Sleep Card */}
+                  <Card variant="glass">
+                    <CardHeader className="flex flex-row items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 rounded-xl bg-neon-purple/20">
+                          <Moon className="w-5 h-5 text-neon-purple" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-semibold text-white">Sleep</h3>
+                          <p className="text-sm text-dark-400">Track your rest</p>
+                        </div>
+                      </div>
+                      <Button variant="ghost" size="sm" onClick={() => setIsAddSleepOpen(true)} leftIcon={<Plus className="w-4 h-4" />}>
+                        Log Sleep
+                      </Button>
+                    </CardHeader>
+                    <CardContent>
+                      {entry.sleep?.duration > 0 ? (
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-2xl font-bold text-white">{formatTime(entry.sleep.duration)}</p>
+                              <p className="text-sm text-dark-400">sleep duration</p>
+                            </div>
+                            <CircularProgress value={entry.sleep.quality} size={60} strokeWidth={6}>
+                              <span className="text-sm font-bold text-white">{entry.sleep.quality}%</span>
+                            </CircularProgress>
+                          </div>
+                          {entry.sleep.bedTime && entry.sleep.wakeTime && (
+                            <div className="flex items-center gap-4 text-sm text-dark-400">
+                              <span>🛏️ {typeof entry.sleep.bedTime === 'string' ? entry.sleep.bedTime : new Date(entry.sleep.bedTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                              <span>→</span>
+                              <span>☀️ {typeof entry.sleep.wakeTime === 'string' ? entry.sleep.wakeTime : new Date(entry.sleep.wakeTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-dark-400 text-center py-4">No sleep data recorded</p>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Activity Card */}
+                  <Card variant="glass">
+                    <CardHeader className="flex flex-row items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 rounded-xl bg-neon-green/20">
+                          <Activity className="w-5 h-5 text-neon-green" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-semibold text-white">Activity</h3>
+                          <p className="text-sm text-dark-400">Exercise and movement</p>
+                        </div>
+                      </div>
+                      <Button variant="ghost" size="sm" onClick={() => setIsAddExerciseOpen(true)} leftIcon={<Plus className="w-4 h-4" />}>
+                        Add Exercise
+                      </Button>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-3 gap-4 mb-4">
+                        <div className="text-center p-3 rounded-lg bg-dark-800/50">
+                          <Footprints className="w-5 h-5 mx-auto text-neon-cyan mb-1" />
+                          <p className="text-xl font-bold text-white">{entry.activity?.steps || 0}</p>
+                          <p className="text-xs text-dark-400">steps</p>
+                        </div>
+                        <div className="text-center p-3 rounded-lg bg-dark-800/50">
+                          <Timer className="w-5 h-5 mx-auto text-neon-green mb-1" />
+                          <p className="text-xl font-bold text-white">{entry.activity?.activeMinutes || 0}</p>
+                          <p className="text-xs text-dark-400">active min</p>
+                        </div>
+                        <div className="text-center p-3 rounded-lg bg-dark-800/50">
+                          <Dumbbell className="w-5 h-5 mx-auto text-neon-orange mb-1" />
+                          <p className="text-xl font-bold text-white">{entry.activity?.exercises?.length || 0}</p>
+                          <p className="text-xs text-dark-400">exercises</p>
+                        </div>
+                      </div>
+                      {entry.activity?.exercises && entry.activity.exercises.length > 0 ? (
+                        <div className="space-y-2">
+                          <h4 className="text-sm font-medium text-dark-300">Exercises</h4>
+                          {entry.activity.exercises.map((exercise, index) => (
+                            <div key={index} className="flex items-center justify-between p-2 rounded-lg bg-dark-800/30">
+                              <div className="flex items-center gap-2">
+                                <Dumbbell className="w-4 h-4 text-dark-400" />
+                                <span className="text-sm text-white">{exercise.type}</span>
+                                <Badge variant="outline" size="sm">{exercise.intensity}</Badge>
+                              </div>
+                              <span className="text-xs text-dark-400">{exercise.duration}min</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-dark-400 text-center py-2">No exercises logged</p>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Nutrition Card */}
+                  <Card variant="glass">
+                    <CardHeader className="flex flex-row items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 rounded-xl bg-neon-orange/20">
+                          <Apple className="w-5 h-5 text-neon-orange" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-semibold text-white">Nutrition</h3>
+                          <p className="text-sm text-dark-400">Food and hydration</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button variant="ghost" size="sm" onClick={() => setIsAddWaterOpen(true)} leftIcon={<Droplets className="w-4 h-4" />}>
+                          Water
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => setIsAddMealOpen(true)} leftIcon={<Plus className="w-4 h-4" />}>
+                          Meal
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div className="p-3 rounded-lg bg-dark-800/50">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm text-dark-400">Water</span>
+                            <Droplets className="w-4 h-4 text-blue-400" />
+                          </div>
+                          <p className="text-xl font-bold text-white">{entry.nutrition?.waterIntake || 0}</p>
+                          <p className="text-xs text-dark-500">of 8 glasses</p>
+                          <Progress value={((entry.nutrition?.waterIntake || 0) / 8) * 100} variant="cyan" size="sm" className="mt-2" />
+                        </div>
+                        <div className="p-3 rounded-lg bg-dark-800/50">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm text-dark-400">Meals</span>
+                            <Apple className="w-4 h-4 text-neon-orange" />
+                          </div>
+                          <p className="text-xl font-bold text-white">{entry.nutrition?.meals?.length || 0}</p>
+                          <p className="text-xs text-dark-500">logged today</p>
+                        </div>
+                      </div>
+                      {entry.nutrition?.meals && entry.nutrition.meals.length > 0 ? (
+                        <div className="space-y-2">
+                          <h4 className="text-sm font-medium text-dark-300">Meals</h4>
+                          {entry.nutrition.meals.map((meal, index) => (
+                            <div key={index} className="flex items-center justify-between p-2 rounded-lg bg-dark-800/30">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm text-white capitalize">{meal.type}</span>
+                                {meal.description && (
+                                  <span className="text-xs text-dark-400">- {meal.description}</span>
+                                )}
+                              </div>
+                              {meal.healthRating && (
+                                <div className="flex items-center gap-1">
+                                  {Array.from({ length: meal.healthRating }).map((_, i) => (
+                                    <span key={i} className="text-neon-green">★</span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-dark-400 text-center py-2">No meals logged</p>
+                      )}
+                    </CardContent>
+                  </Card>
+                </>
+              )}
             </div>
-            <p className="text-2xl font-bold text-white">{formatTime(Math.round(wellnessStats.avgSleepDuration))}</p>
-            <p className="text-xs text-dark-500">{wellnessStats.avgSleepQuality.toFixed(0)}% quality</p>
-          </Card>
 
-          <Card variant="glass" className="p-4">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-sm text-dark-400">Active Minutes</span>
-              <Activity className="w-6 h-6 text-neon-green" />
-            </div>
-            <p className="text-2xl font-bold text-white">{wellnessStats.totalActiveMinutes}</p>
-            <p className="text-xs text-dark-500">this week</p>
-          </Card>
-
-          <Card variant="glass" className="p-4">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-sm text-dark-400">Water Intake</span>
-              <Droplets className="w-6 h-6 text-blue-400" />
-            </div>
-            <p className="text-2xl font-bold text-white">{wellnessStats.totalWaterIntake}</p>
-            <p className="text-xs text-dark-500">glasses total</p>
-          </Card>
-
-          <Card variant="glass" className="p-4">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-sm text-dark-400">Focus Time</span>
-              <Brain className="w-6 h-6 text-neon-cyan" />
-            </div>
-            <p className="text-2xl font-bold text-white">{formatTime(wellnessStats.totalFocusMinutes)}</p>
-            <p className="text-xs text-dark-500">this week</p>
-          </Card>
-        </motion.div>
-
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column - Daily Tracking */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Initialize Entry Button if no entry exists */}
-            {!entry && (
-              <Card variant="glass" className="p-8 text-center">
-                <Calendar className="w-12 h-12 text-neon-cyan mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-white mb-2">No data for this day</h3>
-                <p className="text-dark-400 mb-4">Start tracking your wellness for {getDateString(selectedDate)}</p>
-                <Button variant="glow" onClick={handleInitialize} leftIcon={<Plus className="w-4 h-4" />}>
-                  Start Tracking
-                </Button>
-              </Card>
-            )}
-
-            {entry && (
-              <>
-                {/* Sleep Card */}
+            {/* Right Column - Sidebar */}
+            <div className="space-y-6">
+              {/* Mood & Stress Card */}
+              {entry && (
                 <Card variant="glass">
                   <CardHeader className="flex flex-row items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2.5 rounded-xl bg-neon-purple/20">
-                        <Moon className="w-5 h-5 text-neon-purple" />
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-semibold text-white">Sleep</h3>
-                        <p className="text-sm text-dark-400">Track your rest</p>
-                      </div>
-                    </div>
-                    <Button variant="ghost" size="sm" onClick={() => setIsAddSleepOpen(true)} leftIcon={<Plus className="w-4 h-4" />}>
-                      Log Sleep
+                    <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                      <Heart className="w-5 h-5 text-neon-pink" />
+                      Mood & Stress
+                    </h3>
+                    <Button variant="ghost" size="sm" onClick={() => setIsUpdateMoodOpen(true)}>
+                      Update
                     </Button>
                   </CardHeader>
                   <CardContent>
-                    {entry.sleep?.duration > 0 ? (
+                    {entry.stress?.level ? (
                       <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-2xl font-bold text-white">{formatTime(entry.sleep.duration)}</p>
-                            <p className="text-sm text-dark-400">sleep duration</p>
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm text-dark-400">Stress Level</span>
+                            <span className="text-sm text-white">{entry.stress.level}/10</span>
                           </div>
-                          <CircularProgress value={entry.sleep.quality} size={60} strokeWidth={6}>
-                            <span className="text-sm font-bold text-white">{entry.sleep.quality}%</span>
-                          </CircularProgress>
+                          <Progress
+                            value={entry.stress.level * 10}
+                            variant={entry.stress.level > 7 ? 'orange' : entry.stress.level > 4 ? 'cyan' : 'green'}
+                            size="sm"
+                          />
                         </div>
-                        {entry.sleep.bedTime && entry.sleep.wakeTime && (
-                          <div className="flex items-center gap-4 text-sm text-dark-400">
-                            <span>🛏️ {typeof entry.sleep.bedTime === 'string' ? entry.sleep.bedTime : new Date(entry.sleep.bedTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                            <span>→</span>
-                            <span>☀️ {typeof entry.sleep.wakeTime === 'string' ? entry.sleep.wakeTime : new Date(entry.sleep.wakeTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        {entry.stress.triggers && entry.stress.triggers.length > 0 && (
+                          <div>
+                            <span className="text-sm text-dark-400">Triggers</span>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {entry.stress.triggers.map((trigger, i) => (
+                                <Badge key={i} variant="outline" size="sm">{trigger}</Badge>
+                              ))}
+                            </div>
                           </div>
+                        )}
+                        {entry.stress.notes && (
+                          <p className="text-sm text-dark-400 italic">{entry.stress.notes}</p>
                         )}
                       </div>
                     ) : (
-                      <p className="text-dark-400 text-center py-4">No sleep data recorded</p>
+                      <div className="text-center py-4">
+                        <p className="text-dark-400 mb-2">How are you feeling today?</p>
+                        <Button variant="outline" size="sm" onClick={() => setIsUpdateMoodOpen(true)}>
+                          Log Mood
+                        </Button>
+                      </div>
                     )}
                   </CardContent>
                 </Card>
+              )}
 
-                {/* Activity Card */}
-                <Card variant="glass">
+              {/* Period Tracker (female profile only) */}
+              {entry && showPeriodTracker && (
+                <Card variant="glass" className="border border-neon-pink/20 bg-gradient-to-br from-neon-pink/10 to-neon-purple/5">
                   <CardHeader className="flex flex-row items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2.5 rounded-xl bg-neon-green/20">
-                        <Activity className="w-5 h-5 text-neon-green" />
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-semibold text-white">Activity</h3>
-                        <p className="text-sm text-dark-400">Exercise and movement</p>
-                      </div>
-                    </div>
-                    <Button variant="ghost" size="sm" onClick={() => setIsAddExerciseOpen(true)} leftIcon={<Plus className="w-4 h-4" />}>
-                      Add Exercise
+                    <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                      <Heart className="w-5 h-5 text-neon-pink" />
+                      Period Tracker
+                    </h3>
+                    <Button variant="ghost" size="sm" onClick={() => setIsUpdatePeriodOpen(true)}>
+                      Update
                     </Button>
                   </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-3 gap-4 mb-4">
-                      <div className="text-center p-3 rounded-lg bg-dark-800/50">
-                        <Footprints className="w-5 h-5 mx-auto text-neon-cyan mb-1" />
-                        <p className="text-xl font-bold text-white">{entry.activity?.steps || 0}</p>
-                        <p className="text-xs text-dark-400">steps</p>
+                  <CardContent className="space-y-4">
+                    <div className="p-3 rounded-lg bg-dark-800/40 border border-neon-pink/20">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-dark-300">Today</span>
+                        <Badge variant={entry.period?.isPeriodDay ? 'pink' : 'default'} size="sm">
+                          {entry.period?.isPeriodDay ? 'Period Day' : 'Not Period Day'}
+                        </Badge>
                       </div>
-                      <div className="text-center p-3 rounded-lg bg-dark-800/50">
-                        <Timer className="w-5 h-5 mx-auto text-neon-green mb-1" />
-                        <p className="text-xl font-bold text-white">{entry.activity?.activeMinutes || 0}</p>
-                        <p className="text-xs text-dark-400">active min</p>
-                      </div>
-                      <div className="text-center p-3 rounded-lg bg-dark-800/50">
-                        <Dumbbell className="w-5 h-5 mx-auto text-neon-orange mb-1" />
-                        <p className="text-xl font-bold text-white">{entry.activity?.exercises?.length || 0}</p>
-                        <p className="text-xs text-dark-400">exercises</p>
+                      <div className="grid grid-cols-3 gap-3 mt-3">
+                        <div>
+                          <p className="text-xs text-dark-400">Flow</p>
+                          <p className="text-sm text-white">{entry.period?.flowLevel || 0}/4</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-dark-400">Pain</p>
+                          <p className="text-sm text-white">{entry.period?.painLevel || 0}/10</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-dark-400">Mood</p>
+                          <p className="text-sm text-white">{entry.period?.moodScore || 5}/10</p>
+                        </div>
                       </div>
                     </div>
-                    {entry.activity?.exercises && entry.activity.exercises.length > 0 ? (
-                      <div className="space-y-2">
-                        <h4 className="text-sm font-medium text-dark-300">Exercises</h4>
-                        {entry.activity.exercises.map((exercise, index) => (
-                          <div key={index} className="flex items-center justify-between p-2 rounded-lg bg-dark-800/30">
-                            <div className="flex items-center gap-2">
-                              <Dumbbell className="w-4 h-4 text-dark-400" />
-                              <span className="text-sm text-white">{exercise.type}</span>
-                              <Badge variant="outline" size="sm">{exercise.intensity}</Badge>
-                            </div>
-                            <span className="text-xs text-dark-400">{exercise.duration}min</span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-dark-400 text-center py-2">No exercises logged</p>
-                    )}
-                  </CardContent>
-                </Card>
 
-                {/* Nutrition Card */}
-                <Card variant="glass">
-                  <CardHeader className="flex flex-row items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2.5 rounded-xl bg-neon-orange/20">
-                        <Apple className="w-5 h-5 text-neon-orange" />
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-semibold text-white">Nutrition</h3>
-                        <p className="text-sm text-dark-400">Food and hydration</p>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button variant="ghost" size="sm" onClick={() => setIsAddWaterOpen(true)} leftIcon={<Droplets className="w-4 h-4" />}>
-                        Water
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => setIsAddMealOpen(true)} leftIcon={<Plus className="w-4 h-4" />}>
-                        Meal
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 gap-4 mb-4">
-                      <div className="p-3 rounded-lg bg-dark-800/50">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm text-dark-400">Water</span>
-                          <Droplets className="w-4 h-4 text-blue-400" />
+                    {periodInsights && (
+                      <div className="p-3 rounded-lg bg-dark-800/30">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm text-dark-300">Cycle estimate</span>
+                          <Badge variant="outline" size="sm">{periodInsights.avgCycleLength} days</Badge>
                         </div>
-                        <p className="text-xl font-bold text-white">{entry.nutrition?.waterIntake || 0}</p>
-                        <p className="text-xs text-dark-500">of 8 glasses</p>
-                        <Progress value={((entry.nutrition?.waterIntake || 0) / 8) * 100} variant="cyan" size="sm" className="mt-2" />
+                        <p className="text-xs text-dark-400">
+                          {periodInsights.nextStart
+                            ? `Next expected start: ${periodInsights.nextStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}${periodInsights.daysUntilNext !== null ? ` (${periodInsights.daysUntilNext >= 0 ? `${periodInsights.daysUntilNext}d` : `${Math.abs(periodInsights.daysUntilNext)}d late`})` : ''}`
+                            : 'Log your first period day to unlock cycle prediction.'}
+                        </p>
                       </div>
-                      <div className="p-3 rounded-lg bg-dark-800/50">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm text-dark-400">Meals</span>
-                          <Apple className="w-4 h-4 text-neon-orange" />
-                        </div>
-                        <p className="text-xl font-bold text-white">{entry.nutrition?.meals?.length || 0}</p>
-                        <p className="text-xs text-dark-500">logged today</p>
+                    )}
+
+                    <div className="p-3 rounded-lg bg-neon-pink/10 border border-neon-pink/30">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-sm text-neon-pink font-medium">Cute P Cycle</p>
+                        <Badge variant="pink" size="sm">
+                          {cyclePhase || 'tracking'}
+                        </Badge>
                       </div>
-                    </div>
-                    {entry.nutrition?.meals && entry.nutrition.meals.length > 0 ? (
-                      <div className="space-y-2">
-                        <h4 className="text-sm font-medium text-dark-300">Meals</h4>
-                        {entry.nutrition.meals.map((meal, index) => (
-                          <div key={index} className="flex items-center justify-between p-2 rounded-lg bg-dark-800/30">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm text-white capitalize">{meal.type}</span>
-                              {meal.description && (
-                                <span className="text-xs text-dark-400">- {meal.description}</span>
-                              )}
-                            </div>
-                            {meal.healthRating && (
-                              <div className="flex items-center gap-1">
-                                {Array.from({ length: meal.healthRating }).map((_, i) => (
-                                  <span key={i} className="text-neon-green">★</span>
-                                ))}
-                              </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        {cyclePhases.map(phase => (
+                          <div
+                            key={phase.id}
+                            className={cn(
+                              'rounded-lg px-2 py-1.5 text-xs border transition-colors',
+                              cyclePhase === phase.id
+                                ? 'border-neon-pink/60 bg-neon-pink/20 text-neon-pink'
+                                : 'border-dark-700/60 bg-dark-800/30 text-dark-300'
                             )}
+                          >
+                            <p>
+                              {phase.emoji} {phase.label}
+                            </p>
+                            <p className="text-[10px] text-dark-400">{phase.range}</p>
                           </div>
                         ))}
                       </div>
-                    ) : (
-                      <p className="text-dark-400 text-center py-2">No meals logged</p>
-                    )}
+                    </div>
+
+                    <div>
+                      <p className="text-sm text-dark-300 mb-2">Comfort Suggestions</p>
+                      <div className="space-y-2">
+                        {periodSuggestions.map((tip, index) => (
+                          <div key={index} className="text-xs text-dark-300 p-2 rounded-lg bg-dark-800/30 border border-dark-700/40">
+                            {tip}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
-              </>
-            )}
-          </div>
+              )}
 
-          {/* Right Column - Sidebar */}
-          <div className="space-y-6">
-            {/* Mood & Stress Card */}
-            {entry && (
+              {/* Mood Trend Graph */}
               <Card variant="glass">
-                <CardHeader className="flex flex-row items-center justify-between">
+                <CardHeader>
                   <h3 className="text-lg font-semibold text-white flex items-center gap-2">
                     <Heart className="w-5 h-5 text-neon-pink" />
-                    Mood & Stress
+                    Mood Trend
                   </h3>
-                  <Button variant="ghost" size="sm" onClick={() => setIsUpdateMoodOpen(true)}>
-                    Update
-                  </Button>
                 </CardHeader>
                 <CardContent>
-                  {entry.stress?.level ? (
-                    <div className="space-y-4">
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-sm text-dark-400">Stress Level</span>
-                          <span className="text-sm text-white">{entry.stress.level}/10</span>
-                        </div>
-                        <Progress 
-                          value={entry.stress.level * 10} 
-                          variant={entry.stress.level > 7 ? 'orange' : entry.stress.level > 4 ? 'cyan' : 'green'} 
-                          size="sm" 
-                        />
-                      </div>
-                      {entry.stress.triggers && entry.stress.triggers.length > 0 && (
-                        <div>
-                          <span className="text-sm text-dark-400">Triggers</span>
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {entry.stress.triggers.map((trigger, i) => (
-                              <Badge key={i} variant="outline" size="sm">{trigger}</Badge>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      {entry.stress.notes && (
-                        <p className="text-sm text-dark-400 italic">{entry.stress.notes}</p>
-                      )}
-                    </div>
+                  {moodTrendData.length === 0 ? (
+                    <p className="text-sm text-dark-400 text-center py-4">Log daily wellness to unlock your mood pattern.</p>
                   ) : (
-                    <div className="text-center py-4">
-                      <p className="text-dark-400 mb-2">How are you feeling today?</p>
-                      <Button variant="outline" size="sm" onClick={() => setIsUpdateMoodOpen(true)}>
-                        Log Mood
-                      </Button>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Period Tracker (female profile only) */}
-            {entry && showPeriodTracker && (
-              <Card variant="glass" className="border border-neon-pink/20 bg-gradient-to-br from-neon-pink/10 to-neon-purple/5">
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                    <Heart className="w-5 h-5 text-neon-pink" />
-                    Period Tracker
-                  </h3>
-                  <Button variant="ghost" size="sm" onClick={() => setIsUpdatePeriodOpen(true)}>
-                    Update
-                  </Button>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="p-3 rounded-lg bg-dark-800/40 border border-neon-pink/20">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-dark-300">Today</span>
-                      <Badge variant={entry.period?.isPeriodDay ? 'pink' : 'default'} size="sm">
-                        {entry.period?.isPeriodDay ? 'Period Day' : 'Not Period Day'}
-                      </Badge>
-                    </div>
-                    <div className="grid grid-cols-3 gap-3 mt-3">
-                      <div>
-                        <p className="text-xs text-dark-400">Flow</p>
-                        <p className="text-sm text-white">{entry.period?.flowLevel || 0}/4</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-dark-400">Pain</p>
-                        <p className="text-sm text-white">{entry.period?.painLevel || 0}/10</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-dark-400">Mood</p>
-                        <p className="text-sm text-white">{entry.period?.moodScore || 5}/10</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {periodInsights && (
-                    <div className="p-3 rounded-lg bg-dark-800/30">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm text-dark-300">Cycle estimate</span>
-                        <Badge variant="outline" size="sm">{periodInsights.avgCycleLength} days</Badge>
+                    <div className="space-y-3">
+                      <div className="h-40">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={moodTrendData} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
+                            <defs>
+                              <linearGradient id="moodTrendFill" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#ff79c6" stopOpacity={0.45} />
+                                <stop offset="100%" stopColor="#ff79c6" stopOpacity={0.02} />
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                            <XAxis dataKey="day" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                            <YAxis domain={[0, 10]} tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                            <RechartsTooltip
+                              contentStyle={{
+                                backgroundColor: '#0f172a',
+                                border: '1px solid rgba(255,255,255,0.15)',
+                                borderRadius: '0.75rem',
+                                color: '#fff',
+                              }}
+                            />
+                            <Area
+                              type="monotone"
+                              dataKey="mood"
+                              stroke="#ff79c6"
+                              strokeWidth={2}
+                              fill="url(#moodTrendFill)"
+                            />
+                          </AreaChart>
+                        </ResponsiveContainer>
                       </div>
                       <p className="text-xs text-dark-400">
-                        {periodInsights.nextStart
-                          ? `Next expected start: ${periodInsights.nextStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}${periodInsights.daysUntilNext !== null ? ` (${periodInsights.daysUntilNext >= 0 ? `${periodInsights.daysUntilNext}d` : `${Math.abs(periodInsights.daysUntilNext)}d late`})` : ''}`
-                          : 'Log your first period day to unlock cycle prediction.'}
+                        You&rsquo;re doing great. Keep logging small check-ins to get gentler, personalized support trends.
                       </p>
                     </div>
                   )}
-
-                  <div className="p-3 rounded-lg bg-neon-pink/10 border border-neon-pink/30">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-sm text-neon-pink font-medium">Cute P Cycle</p>
-                      <Badge variant="pink" size="sm">
-                        {cyclePhase || 'tracking'}
-                      </Badge>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      {cyclePhases.map(phase => (
-                        <div
-                          key={phase.id}
-                          className={cn(
-                            'rounded-lg px-2 py-1.5 text-xs border transition-colors',
-                            cyclePhase === phase.id
-                              ? 'border-neon-pink/60 bg-neon-pink/20 text-neon-pink'
-                              : 'border-dark-700/60 bg-dark-800/30 text-dark-300'
-                          )}
-                        >
-                          <p>
-                            {phase.emoji} {phase.label}
-                          </p>
-                          <p className="text-[10px] text-dark-400">{phase.range}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <p className="text-sm text-dark-300 mb-2">Comfort Suggestions</p>
-                    <div className="space-y-2">
-                      {periodSuggestions.map((tip, index) => (
-                        <div key={index} className="text-xs text-dark-300 p-2 rounded-lg bg-dark-800/30 border border-dark-700/40">
-                          {tip}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
                 </CardContent>
               </Card>
-            )}
 
-            {/* Mood Trend Graph */}
-            <Card variant="glass">
-              <CardHeader>
-                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                  <Heart className="w-5 h-5 text-neon-pink" />
-                  Mood Trend
-                </h3>
-              </CardHeader>
-              <CardContent>
-                {moodTrendData.length === 0 ? (
-                  <p className="text-sm text-dark-400 text-center py-4">Log daily wellness to unlock your mood pattern.</p>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="h-40">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={moodTrendData} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
-                          <defs>
-                            <linearGradient id="moodTrendFill" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="#ff79c6" stopOpacity={0.45} />
-                              <stop offset="100%" stopColor="#ff79c6" stopOpacity={0.02} />
-                            </linearGradient>
-                          </defs>
-                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
-                          <XAxis dataKey="day" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
-                          <YAxis domain={[0, 10]} tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
-                          <RechartsTooltip
-                            contentStyle={{
-                              backgroundColor: '#0f172a',
-                              border: '1px solid rgba(255,255,255,0.15)',
-                              borderRadius: '0.75rem',
-                              color: '#fff',
-                            }}
-                          />
-                          <Area
-                            type="monotone"
-                            dataKey="mood"
-                            stroke="#ff79c6"
-                            strokeWidth={2}
-                            fill="url(#moodTrendFill)"
-                          />
-                        </AreaChart>
-                      </ResponsiveContainer>
+              {/* Weekly Trend */}
+              <Card variant="glass">
+                <CardHeader>
+                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-neon-green" />
+                    Weekly Overview
+                  </h3>
+                </CardHeader>
+                <CardContent>
+                  {weeklyEntries.length === 0 ? (
+                    <p className="text-sm text-dark-400 text-center py-4">No data this week</p>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-dark-400">Days tracked</span>
+                        <span className="text-sm font-medium text-white">{weeklyEntries.length}/7</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-dark-400">Exercises logged</span>
+                        <span className="text-sm font-medium text-white">{wellnessStats.exerciseCount}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-dark-400">Avg meals/day</span>
+                        <span className="text-sm font-medium text-white">{wellnessStats.avgMealsPerDay.toFixed(1)}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-dark-400">Avg stress</span>
+                        <span className="text-sm font-medium text-white">{wellnessStats.avgStressLevel.toFixed(1)}/10</span>
+                      </div>
                     </div>
-                    <p className="text-xs text-dark-400">
-                      You&rsquo;re doing great. Keep logging small check-ins to get gentler, personalized support trends.
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                  )}
+                </CardContent>
+              </Card>
 
-            {/* Weekly Trend */}
-            <Card variant="glass">
-              <CardHeader>
-                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-neon-green" />
-                  Weekly Overview
-                </h3>
-              </CardHeader>
-              <CardContent>
-                {weeklyEntries.length === 0 ? (
-                  <p className="text-sm text-dark-400 text-center py-4">No data this week</p>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-dark-400">Days tracked</span>
-                      <span className="text-sm font-medium text-white">{weeklyEntries.length}/7</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-dark-400">Exercises logged</span>
-                      <span className="text-sm font-medium text-white">{wellnessStats.exerciseCount}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-dark-400">Avg meals/day</span>
-                      <span className="text-sm font-medium text-white">{wellnessStats.avgMealsPerDay.toFixed(1)}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-dark-400">Avg stress</span>
-                      <span className="text-sm font-medium text-white">{wellnessStats.avgStressLevel.toFixed(1)}/10</span>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Quick Actions */}
-            <Card variant="glass">
-              <CardHeader>
-                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                  <Zap className="w-5 h-5 text-neon-cyan" />
-                  Quick Log
-                </h3>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start"
-                  leftIcon={<Droplets className="w-4 h-4" />}
-                  onClick={() => entry && addWater(selectedDate, 1)}
-                  disabled={!entry}
-                >
-                  +1 Glass of Water
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start"
-                  leftIcon={<Footprints className="w-4 h-4" />}
-                  onClick={() => entry && updateActivity(selectedDate, { steps: (entry.activity?.steps || 0) + 1000 })}
-                  disabled={!entry}
-                >
-                  +1000 Steps
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start"
-                  leftIcon={<Coffee className="w-4 h-4" />}
-                  onClick={() => setIsAddMealOpen(true)}
-                  disabled={!entry}
-                >
-                  Log Meal
-                </Button>
-              </CardContent>
-            </Card>
+              {/* Quick Actions */}
+              <Card variant="glass">
+                <CardHeader>
+                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                    <Zap className="w-5 h-5 text-neon-cyan" />
+                    Quick Log
+                  </h3>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start"
+                    leftIcon={<Droplets className="w-4 h-4" />}
+                    onClick={() => entry && addWater(selectedDate, 1)}
+                    disabled={!entry}
+                  >
+                    +1 Glass of Water
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start"
+                    leftIcon={<Footprints className="w-4 h-4" />}
+                    onClick={() => entry && updateActivity(selectedDate, { steps: (entry.activity?.steps || 0) + 1000 })}
+                    disabled={!entry}
+                  >
+                    +1000 Steps
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start"
+                    leftIcon={<Coffee className="w-4 h-4" />}
+                    onClick={() => setIsAddMealOpen(true)}
+                    disabled={!entry}
+                  >
+                    Log Meal
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
           </div>
-        </div>
 
-        {/* Add Sleep Modal */}
-        <Modal
-          isOpen={isAddSleepOpen}
-          onClose={() => setIsAddSleepOpen(false)}
-          title="Log Sleep"
-        >
-          <AddSleepForm
+          {/* Add Sleep Modal */}
+          <Modal
+            isOpen={isAddSleepOpen}
             onClose={() => setIsAddSleepOpen(false)}
-            onSubmit={async (data) => {
-              await updateSleep(selectedDate, data);
-              setIsAddSleepOpen(false);
-            }}
-          />
-        </Modal>
+            title="Log Sleep"
+          >
+            <AddSleepForm
+              onClose={() => setIsAddSleepOpen(false)}
+              onSubmit={async (data) => {
+                await updateSleep(selectedDate, data);
+                setIsAddSleepOpen(false);
+              }}
+            />
+          </Modal>
 
-        {/* Add Exercise Modal */}
-        <Modal
-          isOpen={isAddExerciseOpen}
-          onClose={() => setIsAddExerciseOpen(false)}
-          title="Add Exercise"
-        >
-          <AddExerciseForm
+          {/* Workout Logger Modal */}
+          <Modal
+            isOpen={isAddExerciseOpen}
             onClose={() => setIsAddExerciseOpen(false)}
-            onSubmit={async (data) => {
-              await addExercise(selectedDate, data);
-              setIsAddExerciseOpen(false);
-            }}
-          />
-        </Modal>
+            title="Workout Log"
+          >
+            <WorkoutLogger
+              initialExercises={entry?.activity?.exercises || []}
+              onCancel={() => setIsAddExerciseOpen(false)}
+              onSave={async (exercises) => {
+                // Get current activity data and just update the exercises array
+                await updateActivity(selectedDate, {
+                  steps: entry?.activity?.steps || 0,
+                  activeMinutes: entry?.activity?.activeMinutes || 0,
+                  exercises
+                });
+                setIsAddExerciseOpen(false);
+              }}
+            />
+          </Modal>
 
-        {/* Add Meal Modal */}
-        <Modal
-          isOpen={isAddMealOpen}
-          onClose={() => setIsAddMealOpen(false)}
-          title="Log Meal"
-        >
-          <AddMealForm
+          {/* Add Meal Modal */}
+          <Modal
+            isOpen={isAddMealOpen}
             onClose={() => setIsAddMealOpen(false)}
-            onSubmit={async (data) => {
-              await addMeal(selectedDate, data);
-              setIsAddMealOpen(false);
-            }}
-          />
-        </Modal>
+            title="Log Meal"
+          >
+            <AddMealForm
+              onClose={() => setIsAddMealOpen(false)}
+              onSubmit={async (data) => {
+                await addMeal(selectedDate, data);
+                setIsAddMealOpen(false);
+              }}
+            />
+          </Modal>
 
-        {/* Add Water Modal */}
-        <Modal
-          isOpen={isAddWaterOpen}
-          onClose={() => setIsAddWaterOpen(false)}
-          title="Log Water Intake"
-        >
-          <AddWaterForm
-            currentAmount={entry?.nutrition?.waterIntake || 0}
+          {/* Add Water Modal */}
+          <Modal
+            isOpen={isAddWaterOpen}
             onClose={() => setIsAddWaterOpen(false)}
-            onSubmit={async (amount) => {
-              await addWater(selectedDate, amount);
-              setIsAddWaterOpen(false);
-            }}
-          />
-        </Modal>
+            title="Log Water Intake"
+          >
+            <AddWaterForm
+              currentAmount={entry?.nutrition?.waterIntake || 0}
+              onClose={() => setIsAddWaterOpen(false)}
+              onSubmit={async (amount) => {
+                await addWater(selectedDate, amount);
+                setIsAddWaterOpen(false);
+              }}
+            />
+          </Modal>
 
-        {/* Update Mood Modal */}
-        <Modal
-          isOpen={isUpdateMoodOpen}
-          onClose={() => setIsUpdateMoodOpen(false)}
-          title="Update Mood & Stress"
-        >
-          <UpdateMoodForm
-            currentData={entry?.stress}
+          {/* Update Mood Modal */}
+          <Modal
+            isOpen={isUpdateMoodOpen}
             onClose={() => setIsUpdateMoodOpen(false)}
-            onSubmit={async (data) => {
-              await updateStress(selectedDate, data);
-              setIsUpdateMoodOpen(false);
-            }}
-          />
-        </Modal>
+            title="Mental Health Check-In"
+          >
+            <MentalHealthCheckIn
+              initialData={entry?.stress}
+              onCancel={() => setIsUpdateMoodOpen(false)}
+              onSave={async (data) => {
+                await updateStress(selectedDate, data);
+                setIsUpdateMoodOpen(false);
+              }}
+            />
+          </Modal>
 
-        {/* Update Period Modal */}
-        <Modal
-          isOpen={isUpdatePeriodOpen}
-          onClose={() => setIsUpdatePeriodOpen(false)}
-          title="Period & Comfort Log"
-        >
-          <UpdatePeriodForm
-            currentData={entry?.period}
+          {/* Update Period Modal */}
+          <Modal
+            isOpen={isUpdatePeriodOpen}
             onClose={() => setIsUpdatePeriodOpen(false)}
-            onSubmit={async (data) => {
-              await updatePeriod(selectedDate, data);
-              setIsUpdatePeriodOpen(false);
-            }}
-          />
-        </Modal>
+            title="Period & Comfort Log"
+          >
+            <UpdatePeriodForm
+              currentData={entry?.period}
+              onClose={() => setIsUpdatePeriodOpen(false)}
+              onSubmit={async (data) => {
+                await updatePeriod(selectedDate, data);
+                setIsUpdatePeriodOpen(false);
+              }}
+            />
+          </Modal>
         </div>
       </PageContainer>
     </MainLayout>
@@ -951,11 +959,11 @@ export default function WellnessPage() {
 }
 
 // Add Sleep Form
-function AddSleepForm({ 
-  onClose, 
-  onSubmit 
-}: { 
-  onClose: () => void; 
+function AddSleepForm({
+  onClose,
+  onSubmit
+}: {
+  onClose: () => void;
   onSubmit: (data: { duration: number; quality: number; bedTime?: Date; wakeTime?: Date }) => Promise<void>;
 }) {
   const [hours, setHours] = useState('7');
@@ -1053,11 +1061,11 @@ function AddSleepForm({
 }
 
 // Add Exercise Form
-function AddExerciseForm({ 
-  onClose, 
-  onSubmit 
-}: { 
-  onClose: () => void; 
+function AddExerciseForm({
+  onClose,
+  onSubmit
+}: {
+  onClose: () => void;
   onSubmit: (data: Exercise) => Promise<void>;
 }) {
   const [type, setType] = useState('cardio');
@@ -1138,11 +1146,11 @@ function AddExerciseForm({
 }
 
 // Add Meal Form
-function AddMealForm({ 
-  onClose, 
-  onSubmit 
-}: { 
-  onClose: () => void; 
+function AddMealForm({
+  onClose,
+  onSubmit
+}: {
+  onClose: () => void;
   onSubmit: (data: Meal) => Promise<void>;
 }) {
   const [type, setType] = useState<Meal['type']>('lunch');
@@ -1223,13 +1231,13 @@ function AddMealForm({
 }
 
 // Add Water Form
-function AddWaterForm({ 
+function AddWaterForm({
   currentAmount,
-  onClose, 
-  onSubmit 
-}: { 
+  onClose,
+  onSubmit
+}: {
   currentAmount: number;
-  onClose: () => void; 
+  onClose: () => void;
   onSubmit: (amount: number) => Promise<void>;
 }) {
   const [glasses, setGlasses] = useState('1');
@@ -1294,13 +1302,13 @@ function AddWaterForm({
 }
 
 // Update Mood Form - actually updates StressData
-function UpdateMoodForm({ 
+function UpdateMoodForm({
   currentData,
-  onClose, 
-  onSubmit 
-}: { 
+  onClose,
+  onSubmit
+}: {
   currentData?: { level: number; triggers?: string[]; copingMethods?: string[]; notes?: string };
-  onClose: () => void; 
+  onClose: () => void;
   onSubmit: (data: { level: number; triggers: string[]; copingMethods: string[]; notes?: string }) => Promise<void>;
 }) {
   const [stress, setStress] = useState(currentData?.level?.toString() || '5');

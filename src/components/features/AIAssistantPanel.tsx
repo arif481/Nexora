@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useUIStore } from '@/stores/uiStore';
 import { useSimpleAI } from '@/hooks/useAI';
@@ -25,15 +26,11 @@ import {
   Bot,
   User,
   Check,
+  MicOff,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { AIThinkingAnimation } from '../ui/Loading';
 
-const quickActions = [
-  { label: 'Plan my day', icon: Zap },
-  { label: 'Analyze my habits', icon: Brain },
-  { label: 'Suggest focus time', icon: Lightbulb },
-];
 
 export function AIAssistantPanel() {
   const { aiPanelOpen, toggleAIPanel, aiMinimized, setAIMinimized } = useUIStore();
@@ -42,8 +39,51 @@ export function AIAssistantPanel() {
   const [input, setInput] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [feedbackGiven, setFeedbackGiven] = useState<Record<string, 'up' | 'down'>>({});
+  const [listening, setListening] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const recognitionRef = useRef<any>(null);
+  const pathname = usePathname();
+
+  const quickActions = useMemo(() => {
+    if (!pathname) return [
+      { label: 'Plan my day', icon: Zap },
+      { label: 'Analyze my habits', icon: Brain },
+      { label: 'Suggest focus time', icon: Lightbulb },
+    ];
+    if (pathname.includes('/finance')) {
+      return [
+        { label: 'Analyze my spending limit', icon: Zap },
+        { label: 'How can I save more?', icon: Lightbulb },
+        { label: 'Review my net worth', icon: Brain },
+      ];
+    }
+    if (pathname.includes('/tasks') || pathname.includes('/dashboard') || pathname === '/') {
+      return [
+        { label: 'Plan my day', icon: Zap },
+        { label: 'Prioritize my tasks', icon: Brain },
+        { label: 'Suggest focus time', icon: Lightbulb },
+      ];
+    }
+    if (pathname.includes('/habits')) {
+      return [
+        { label: 'Analyze my habits', icon: Brain },
+        { label: 'Suggest new habits', icon: Lightbulb },
+        { label: 'How to build consistency?', icon: Zap },
+      ];
+    }
+    if (pathname.includes('/calendar')) {
+      return [
+        { label: 'Optimize my schedule', icon: Zap },
+        { label: 'Find a meeting slot', icon: Brain },
+      ];
+    }
+    return [
+      { label: 'What should I do now?', icon: Zap },
+      { label: 'Summarize my dashboard', icon: Brain },
+      { label: 'Give me a productivity tip', icon: Lightbulb },
+    ];
+  }, [pathname]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -74,6 +114,26 @@ export function AIAssistantPanel() {
       e.preventDefault();
       handleSend();
     }
+  };
+
+  const startVoice = () => {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      alert('Speech recognition is not supported in this browser.');
+      return;
+    }
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const rec = new SpeechRecognition();
+    rec.continuous = false;
+    rec.interimResults = false;
+    rec.onresult = (e: any) => {
+      const transcript = e.results[0][0].transcript;
+      setInput(prev => prev + (prev ? ' ' : '') + transcript);
+      setListening(false);
+    };
+    rec.onend = () => setListening(false);
+    rec.start();
+    recognitionRef.current = rec;
+    setListening(true);
   };
 
   // Copy message to clipboard
@@ -108,9 +168,9 @@ export function AIAssistantPanel() {
       {aiPanelOpen && (
         <motion.div
           initial={{ opacity: 0, y: 20, scale: 0.95 }}
-          animate={{ 
-            opacity: 1, 
-            y: 0, 
+          animate={{
+            opacity: 1,
+            y: 0,
             scale: 1,
             height: aiMinimized ? 'auto' : '600px',
           }}
@@ -218,7 +278,7 @@ export function AIAssistantPanel() {
                       {/* Actions for AI messages */}
                       {message.role === 'assistant' && (
                         <div className="flex items-center gap-2 mt-2">
-                          <button 
+                          <button
                             onClick={() => handleCopy(message.content, message.id)}
                             className="p-1 rounded text-white/30 hover:text-white/60 transition-colors"
                             title="Copy response"
@@ -229,31 +289,31 @@ export function AIAssistantPanel() {
                               <Copy className="w-3 h-3" />
                             )}
                           </button>
-                          <button 
+                          <button
                             onClick={() => handleFeedback(message.id, 'up')}
                             className={cn(
                               "p-1 rounded transition-colors",
-                              feedbackGiven[message.id] === 'up' 
-                                ? "text-neon-green" 
+                              feedbackGiven[message.id] === 'up'
+                                ? "text-neon-green"
                                 : "text-white/30 hover:text-neon-green"
                             )}
                             title="Good response"
                           >
                             <ThumbsUp className="w-3 h-3" />
                           </button>
-                          <button 
+                          <button
                             onClick={() => handleFeedback(message.id, 'down')}
                             className={cn(
                               "p-1 rounded transition-colors",
-                              feedbackGiven[message.id] === 'down' 
-                                ? "text-red-400" 
+                              feedbackGiven[message.id] === 'down'
+                                ? "text-red-400"
                                 : "text-white/30 hover:text-red-400"
                             )}
                             title="Poor response"
                           >
                             <ThumbsDown className="w-3 h-3" />
                           </button>
-                          <button 
+                          <button
                             onClick={handleRegenerate}
                             disabled={isThinking}
                             className="p-1 rounded text-white/30 hover:text-white/60 disabled:opacity-50 transition-colors"
@@ -285,9 +345,14 @@ export function AIAssistantPanel() {
               {/* Quick Actions */}
               {messages.length === 1 && (
                 <div className="px-4 pb-2">
-                  <p className="text-xs text-white/40 mb-2">Quick actions</p>
+                  <p className="text-xs text-white/40 mb-2">Suggestions for {
+                    pathname.includes('/finance') ? 'Finance' :
+                      pathname.includes('/tasks') ? 'Tasks' :
+                        pathname.includes('/habits') ? 'Habits' :
+                          pathname.includes('/calendar') ? 'Calendar' : 'Dashboard'
+                  }</p>
                   <div className="flex flex-wrap gap-2">
-                    {quickActions.map((action, index) => (
+                    {quickActions.map((action: any, index: number) => (
                       <button
                         key={index}
                         onClick={() => handleQuickAction(action.label)}
@@ -325,8 +390,12 @@ export function AIAssistantPanel() {
                       <button className="p-1.5 rounded-lg text-white/40 hover:text-white/60 transition-colors">
                         <Paperclip className="w-4 h-4" />
                       </button>
-                      <button className="p-1.5 rounded-lg text-white/40 hover:text-white/60 transition-colors">
-                        <Mic className="w-4 h-4" />
+                      <button
+                        onClick={listening ? () => { recognitionRef.current?.stop(); setListening(false); } : startVoice}
+                        className={cn("p-1.5 rounded-lg transition-colors", listening ? "text-neon-orange" : "text-white/40 hover:text-white/60")}
+                        title={listening ? "Stop listening" : "Voice input"}
+                      >
+                        {listening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
                       </button>
                     </div>
                   </div>

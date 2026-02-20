@@ -45,6 +45,8 @@ import { useUIStore } from '@/stores/uiStore';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useGoals, useGoalStats } from '@/hooks/useGoals';
+import { useOKR } from '@/hooks/useOKR';
+import { OKRTracker } from '@/components/features/goals/OKRTracker';
 import type { Goal, Milestone as MilestoneType } from '@/lib/services/goals';
 
 const categoryConfig: Record<string, { label: string; icon: string; color: string }> = {
@@ -59,17 +61,18 @@ const categoryConfig: Record<string, { label: string; icon: string; color: strin
 export default function GoalsPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const { 
-    goals, 
-    loading: goalsLoading, 
-    createGoal, 
-    updateGoal, 
-    deleteGoal, 
+  const {
+    goals,
+    loading: goalsLoading,
+    createGoal,
+    updateGoal,
+    deleteGoal,
     toggleMilestone: toggleMilestoneService,
     addMilestone: addMilestoneService,
   } = useGoals();
   const goalStats = useGoalStats(goals);
-  
+  const { objectives, addObjective, editObjective, removeObjective } = useOKR();
+
   const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -79,7 +82,7 @@ export default function GoalsPage() {
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
   const [expandedGoals, setExpandedGoals] = useState<Set<string>>(new Set());
   const { openAIPanel } = useUIStore();
-  
+
   // Edit form state
   const [editForm, setEditForm] = useState({
     title: '',
@@ -138,7 +141,7 @@ export default function GoalsPage() {
   // Save edited goal
   const handleSaveEdit = async () => {
     if (!selectedGoal || !editForm.title.trim()) return;
-    
+
     setIsSaving(true);
     try {
       await updateGoal(selectedGoal.id, {
@@ -161,7 +164,7 @@ export default function GoalsPage() {
   const handleDeleteGoal = async () => {
     if (!selectedGoal) return;
     if (!confirm('Are you sure you want to delete this goal?')) return;
-    
+
     setIsSaving(true);
     try {
       await deleteGoal(selectedGoal.id);
@@ -177,7 +180,7 @@ export default function GoalsPage() {
   // Add milestone to goal
   const handleAddMilestone = async () => {
     if (!selectedGoal || !newMilestoneTitle.trim()) return;
-    
+
     setIsSaving(true);
     try {
       await addMilestoneService(selectedGoal.id, { title: newMilestoneTitle });
@@ -285,10 +288,10 @@ export default function GoalsPage() {
                     goal.status === 'in-progress'
                       ? 'cyan'
                       : goal.status === 'completed'
-                      ? 'green'
-                      : goal.status === 'paused'
-                      ? 'orange'
-                      : 'default'
+                        ? 'green'
+                        : goal.status === 'paused'
+                          ? 'orange'
+                          : 'default'
                   }
                   size="sm"
                 >
@@ -380,7 +383,7 @@ export default function GoalsPage() {
                       )}
                     </div>
                   ))}
-                  
+
                   {/* Add Milestone Button */}
                   <button
                     onClick={() => {
@@ -502,6 +505,25 @@ export default function GoalsPage() {
             )}
           </motion.div>
 
+          {/* OKR Section below Goals */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            className="lg:col-span-2"
+          >
+            <Card variant="glass">
+              <CardContent className="p-5">
+                <OKRTracker
+                  objectives={objectives}
+                  onAddObjective={addObjective}
+                  onUpdateObjective={editObjective}
+                  onDeleteObjective={removeObjective}
+                />
+              </CardContent>
+            </Card>
+          </motion.div>
+
           {/* Sidebar */}
           <motion.div
             initial={{ opacity: 0, x: 20 }}
@@ -579,25 +601,43 @@ export default function GoalsPage() {
                 icon={<Brain className="w-5 h-5 text-neon-purple" />}
               />
               <CardContent className="space-y-3">
-                <div className="p-3 rounded-lg bg-neon-green/10 border border-neon-green/20">
-                  <div className="flex items-center gap-2 mb-1">
-                    <TrendingUp className="w-4 h-4 text-neon-green" />
-                    <span className="text-xs font-medium text-neon-green">Great Progress!</span>
-                  </div>
-                  <p className="text-sm text-dark-300">
-                    Your financial goal is ahead of schedule. Keep up the savings momentum!
+                {goals.filter(g => g.status !== 'completed' && g.progress > 0).length > 0 ? (
+                  <>
+                    {goals
+                      .filter(g => g.status !== 'completed')
+                      .sort((a, b) => b.progress - a.progress)
+                      .slice(0, 1)
+                      .map(g => (
+                        <div key={`insight-top-${g.id}`} className="p-3 rounded-lg bg-neon-green/10 border border-neon-green/20">
+                          <div className="flex items-center gap-2 mb-1">
+                            <TrendingUp className="w-4 h-4 text-neon-green" />
+                            <span className="text-xs font-medium text-neon-green">Great Progress!</span>
+                          </div>
+                          <p className="text-sm text-dark-300">
+                            &quot;{g.title}&quot; is at {g.progress}% — keep up the momentum!
+                          </p>
+                        </div>
+                      ))}
+                    {goals
+                      .filter(g => g.status !== 'completed' && g.progress < 30)
+                      .slice(0, 1)
+                      .map(g => (
+                        <div key={`insight-low-${g.id}`} className="p-3 rounded-lg bg-neon-orange/10 border border-neon-orange/20">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Flame className="w-4 h-4 text-neon-orange" />
+                            <span className="text-xs font-medium text-neon-orange">Needs Attention</span>
+                          </div>
+                          <p className="text-sm text-dark-300">
+                            &quot;{g.title}&quot; is only at {g.progress}%. Break it into smaller steps.
+                          </p>
+                        </div>
+                      ))}
+                  </>
+                ) : (
+                  <p className="text-sm text-dark-400 text-center py-2">
+                    Add goals and start tracking to see AI insights.
                   </p>
-                </div>
-
-                <div className="p-3 rounded-lg bg-neon-orange/10 border border-neon-orange/20">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Flame className="w-4 h-4 text-neon-orange" />
-                    <span className="text-xs font-medium text-neon-orange">Action Needed</span>
-                  </div>
-                  <p className="text-sm text-dark-300">
-                    Spanish learning needs more consistency. Try 15 min daily practice.
-                  </p>
-                </div>
+                )}
 
                 <Button variant="ghost" size="sm" className="w-full" onClick={openAIPanel}>
                   <Sparkles className="w-4 h-4 mr-1" />
@@ -653,7 +693,7 @@ export default function GoalsPage() {
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Description
@@ -665,7 +705,7 @@ export default function GoalsPage() {
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
                 />
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -684,7 +724,7 @@ export default function GoalsPage() {
                     <option value="relationships">Relationships</option>
                   </select>
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Priority
@@ -700,7 +740,7 @@ export default function GoalsPage() {
                   </select>
                 </div>
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Target Date
@@ -712,7 +752,7 @@ export default function GoalsPage() {
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
                 />
               </div>
-              
+
               <div className="flex justify-between pt-4">
                 <button
                   onClick={handleDeleteGoal}
@@ -722,7 +762,7 @@ export default function GoalsPage() {
                   {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                   Delete Goal
                 </button>
-                
+
                 <div className="flex gap-2">
                   <button
                     onClick={() => setIsEditModalOpen(false)}
@@ -767,7 +807,7 @@ export default function GoalsPage() {
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
               />
             </div>
-            
+
             <div className="flex justify-end gap-2 pt-2">
               <button
                 onClick={() => {
@@ -876,8 +916,8 @@ function CreateGoalForm({ onClose }: { onClose: () => void }) {
                     ? p === 'high'
                       ? 'bg-neon-orange/20 text-neon-orange'
                       : p === 'medium'
-                      ? 'bg-neon-cyan/20 text-neon-cyan'
-                      : 'bg-dark-600/50 text-dark-200'
+                        ? 'bg-neon-cyan/20 text-neon-cyan'
+                        : 'bg-dark-600/50 text-dark-200'
                     : 'bg-dark-800/50 text-dark-300 hover:text-white'
                 )}
               >

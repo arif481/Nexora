@@ -52,22 +52,22 @@ export default function ProfilePage() {
   }
 
   // Calculate stats
-  const completedTasks = tasks.filter(t => t.status === 'completed').length;
+  const completedTasks = tasks.filter(t => t.status === 'done').length;
   const totalTasks = tasks.length;
   const activeHabits = habits.length;
   const completedGoals = goals.filter(g => g.status === 'completed').length;
   const totalGoals = goals.length;
   const journalCount = journalEntries.length;
-  
+
   // Calculate longest habit streak
   const longestStreak = habits.reduce((max, h) => Math.max(max, h.longestStreak || 0), 0);
 
   // Member since
-  const memberSince = user.metadata?.creationTime 
-    ? new Date(user.metadata.creationTime).toLocaleDateString('en-US', { 
-        month: 'long', 
-        year: 'numeric' 
-      })
+  const memberSince = user.metadata?.creationTime
+    ? new Date(user.metadata.creationTime).toLocaleDateString('en-US', {
+      month: 'long',
+      year: 'numeric'
+    })
     : 'Unknown';
 
   const stats = [
@@ -183,7 +183,7 @@ export default function ProfilePage() {
               <div className="space-y-4">
                 {/* Recent completed tasks */}
                 {tasks
-                  .filter(t => t.status === 'completed')
+                  .filter(t => t.status === 'done')
                   .sort((a, b) => (b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0))
                   .slice(0, 5)
                   .map(task => (
@@ -193,7 +193,7 @@ export default function ProfilePage() {
                       <Badge variant="green" size="sm">Done</Badge>
                     </div>
                   ))}
-                
+
                 {/* Active goals */}
                 {goals
                   .filter(g => g.status === 'in-progress')

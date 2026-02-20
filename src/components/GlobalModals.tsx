@@ -50,7 +50,7 @@ export function GlobalModals() {
       await createTask({
         title: taskTitle.trim(),
         priority: 'medium',
-        status: 'pending',
+        status: 'todo',
       });
       handleClose();
       router.push('/tasks');
@@ -131,7 +131,7 @@ export function GlobalModals() {
       await createTask({
         title: quickCapture.trim(),
         priority: 'medium',
-        status: 'pending',
+        status: 'todo',
       });
       handleClose();
     } catch (error) {
@@ -162,8 +162,8 @@ export function GlobalModals() {
             </div>
             <div className="flex gap-3 justify-end">
               <Button variant="ghost" onClick={handleClose}>Cancel</Button>
-              <Button 
-                variant="primary" 
+              <Button
+                variant="primary"
                 onClick={handleCreateTask}
                 disabled={!taskTitle.trim() || isSubmitting}
               >
@@ -192,8 +192,8 @@ export function GlobalModals() {
             <p className="text-sm text-white/40">Event will be created for 1 hour from now. Edit details on the calendar page.</p>
             <div className="flex gap-3 justify-end">
               <Button variant="ghost" onClick={handleClose}>Cancel</Button>
-              <Button 
-                variant="primary" 
+              <Button
+                variant="primary"
                 onClick={handleCreateEvent}
                 disabled={!eventTitle.trim() || isSubmitting}
               >
@@ -221,8 +221,8 @@ export function GlobalModals() {
             </div>
             <div className="flex gap-3 justify-end">
               <Button variant="ghost" onClick={handleClose}>Cancel</Button>
-              <Button 
-                variant="primary" 
+              <Button
+                variant="primary"
                 onClick={handleCreateNote}
                 disabled={!noteTitle.trim() || isSubmitting}
               >
@@ -249,8 +249,8 @@ export function GlobalModals() {
             </div>
             <div className="flex gap-3 justify-end">
               <Button variant="ghost" onClick={handleClose}>Cancel</Button>
-              <Button 
-                variant="primary" 
+              <Button
+                variant="primary"
                 onClick={handleCreateJournal}
                 disabled={!journalContent.trim() || isSubmitting}
               >
@@ -279,8 +279,8 @@ export function GlobalModals() {
             <p className="text-sm text-white/40">Creates a task with your text. You can categorize it later.</p>
             <div className="flex gap-3 justify-end">
               <Button variant="ghost" onClick={handleClose}>Cancel</Button>
-              <Button 
-                variant="primary" 
+              <Button
+                variant="primary"
                 onClick={handleQuickCapture}
                 disabled={!quickCapture.trim() || isSubmitting}
               >

@@ -100,6 +100,7 @@ const defaultStats: UserStats = {
 };
 
 // Convert User from Firestore
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const convertUserFromFirestore = (doc: any): User => {
   const data = doc.data();
   return {
@@ -197,7 +198,7 @@ export const updateUserPreferences = async (
   }
 
   const currentPreferences = mergePreferences(userDoc.data().preferences);
-  
+
   await updateDoc(userRef, {
     preferences: mergePreferences({ ...currentPreferences, ...preferences }),
   });
@@ -216,7 +217,7 @@ export const updateUserStats = async (
   }
 
   const currentStats = userDoc.data().stats || defaultStats;
-  
+
   await updateDoc(userRef, {
     stats: { ...currentStats, ...stats },
   });
@@ -237,7 +238,7 @@ export const incrementUserStat = async (
 
   const currentStats = userDoc.data().stats || defaultStats;
   const currentValue = currentStats[statKey] || 0;
-  
+
   // Calculate new experience and level if incrementing stats
   const updates: Partial<UserStats> = {
     [statKey]: currentValue + amount,
@@ -254,10 +255,10 @@ export const incrementUserStat = async (
   if (xpRewards[statKey]) {
     const xpGained = Math.floor(amount * xpRewards[statKey]);
     const newExperience = (currentStats.experience || 0) + xpGained;
-    
+
     // Calculate level (100 XP per level)
     const newLevel = Math.floor(newExperience / 100) + 1;
-    
+
     updates.experience = newExperience;
     updates.level = newLevel;
   }
@@ -313,15 +314,15 @@ export const updateStreak = async (userId: string): Promise<void> => {
   const userData = userDoc.data();
   const lastLogin = userData.lastLoginAt?.toDate() || new Date(0);
   const now = new Date();
-  
+
   // Check if last login was yesterday
   const yesterday = new Date(now);
   yesterday.setDate(yesterday.getDate() - 1);
   yesterday.setHours(0, 0, 0, 0);
-  
+
   const lastLoginDay = new Date(lastLogin);
   lastLoginDay.setHours(0, 0, 0, 0);
-  
+
   const today = new Date(now);
   today.setHours(0, 0, 0, 0);
 

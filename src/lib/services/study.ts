@@ -27,6 +27,7 @@ const convertTimestamp = (timestamp: Timestamp | Date | null | undefined): Date 
 };
 
 // Convert Subject from Firestore
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const convertSubjectFromFirestore = (doc: any): Subject => {
   const data = doc.data();
   return {
@@ -36,15 +37,18 @@ const convertSubjectFromFirestore = (doc: any): Subject => {
     description: data.description,
     color: data.color || '#06b6d4',
     icon: data.icon,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     topics: (data.topics || []).map((t: any) => ({
       ...t,
       lastStudied: convertTimestamp(t.lastStudied),
     })),
     resources: data.resources || [],
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     examDates: (data.examDates || []).map((e: any) => ({
       ...e,
       date: convertTimestamp(e.date),
     })),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     grades: (data.grades || []).map((g: any) => ({
       ...g,
       date: convertTimestamp(g.date),
@@ -62,7 +66,7 @@ export const createSubject = async (
   subjectData: Partial<Omit<Subject, 'id' | 'userId' | 'createdAt' | 'updatedAt'>>
 ): Promise<string> => {
   const subjectsRef = collection(db, COLLECTIONS.SUBJECTS);
-  
+
   const newSubject = {
     userId,
     name: subjectData.name || 'New Subject',
@@ -108,13 +112,13 @@ export const addStudyTime = async (
 ): Promise<void> => {
   const subjectRef = doc(db, COLLECTIONS.SUBJECTS, subjectId);
   const subjectDoc = await getDoc(subjectRef);
-  
+
   if (!subjectDoc.exists()) {
     throw new Error('Subject not found');
   }
 
   const currentTime = subjectDoc.data().studyTime || 0;
-  
+
   await updateDoc(subjectRef, {
     studyTime: currentTime + minutes,
     updatedAt: serverTimestamp(),
@@ -320,7 +324,7 @@ export const subscribeToSubjects = (
 // Get upcoming exams across all subjects
 export const subscribeToUpcomingExams = (
   userId: string,
-  callback: (exams: (ExamDate & { subjectId: string; subjectName: string; subjectColor: string })[] ) => void,
+  callback: (exams: (ExamDate & { subjectId: string; subjectName: string; subjectColor: string })[]) => void,
   onError?: (error: Error) => void
 ): (() => void) => {
   const subjectsRef = collection(db, COLLECTIONS.SUBJECTS);
@@ -334,7 +338,7 @@ export const subscribeToUpcomingExams = (
     (snapshot) => {
       const now = new Date();
       const allExams: (ExamDate & { subjectId: string; subjectName: string; subjectColor: string })[] = [];
-      
+
       snapshot.docs.forEach(doc => {
         const subject = convertSubjectFromFirestore(doc);
         subject.examDates
