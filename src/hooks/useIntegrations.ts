@@ -40,7 +40,7 @@ export function useIntegrations() {
     return () => unsubscribe();
   }, [user]);
 
-  // Connect Google Calendar - opens OAuth flow
+  // Connect Google Calendar - opens Client-Side OAuth flow
   const connectGoogleCalendar = useCallback(() => {
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CALENDAR_CLIENT_ID;
 
@@ -53,12 +53,33 @@ export function useIntegrations() {
       return;
     }
 
-    const redirectUri = `${window.location.origin}/Nexora/api/integrations/google-calendar/callback`;
+    // Pointing to the new static callback route
+    const redirectUri = `${window.location.origin}/Nexora/auth/callback`;
     const scope = encodeURIComponent('https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events');
-    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&access_type=offline&prompt=consent`;
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${scope}&prompt=consent`;
 
-    window.open(authUrl, '_blank', 'width=600,height=700');
-  }, []);
+    // Listen for the postMessage from the popup
+    const messageListener = async (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type === 'NEXORA_OAUTH_SUCCESS' && event.data?.payload?.provider === 'googleCalendar') {
+        window.removeEventListener('message', messageListener);
+        const { accessToken } = event.data.payload;
+        try {
+          await connectDataIntegration(user?.uid || '', 'googleCalendar', {
+            syncMode: 'two-way',
+            platform: 'web',
+            autoImport: { calendar: true },
+            credentials: { accessToken },
+          });
+        } catch (err) {
+          console.error('Failed to capture Google Calendar token', err);
+        }
+      }
+    };
+
+    window.addEventListener('message', messageListener);
+    window.open(authUrl, 'nexora_oauth', 'width=600,height=700');
+  }, [user]);
 
   const connectAppleCalendar = useCallback(async () => {
     if (!user) return;
@@ -71,12 +92,19 @@ export function useIntegrations() {
 
   const connectProvider = useCallback(async (
     provider: IntegrationKey,
-    overrides: Record<string, unknown> = {}
+    overrides: Record<string, unknown> = {},
+    customToken?: string
   ) => {
     if (!user) return;
 
     try {
-      await connectDataIntegration(user.uid, provider, overrides);
+      const config = { ...overrides };
+      if (customToken) {
+        config.credentials = {
+          accessToken: customToken,
+        };
+      }
+      await connectDataIntegration(user.uid, provider, config);
     } catch (error) {
       console.error(`Failed to connect ${provider}:`, error);
       throw error;
