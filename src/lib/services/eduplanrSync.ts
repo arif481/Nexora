@@ -17,8 +17,10 @@ export async function runEduPlanrSync(userId: string, jobId: string) {
             throw new Error("EduPlanr is not properly configured. Missing email or sync token.");
         }
 
-        // 2. Call the Next.js API route
-        const response = await fetch('/api/integrations/eduplanr/sync', {
+        // 2. Call the external EduPlanr API route (since Nexora is statically exported, we cannot host the API here)
+        const eduplanrEndpoint = process.env.NEXT_PUBLIC_EDUPLANR_API_URL || 'https://eduplanr.vercel.app/api/nexora-sync';
+
+        const response = await fetch(eduplanrEndpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
