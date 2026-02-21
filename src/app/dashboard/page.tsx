@@ -39,6 +39,8 @@ import { AIDailyBrief } from '@/components/features/AIDailyBrief';
 import { generateAIResponse } from '@/lib/services/ai';
 import { useIntegrations } from '@/hooks/useIntegrations';
 import { EduPlanrWidget } from '@/components/features/dashboard/EduPlanrWidget';
+import { useAutoEduPlanrSync } from '@/hooks/useAutoEduPlanrSync';
+import SyncMonitor from '@/components/features/integrations/SyncMonitor';
 
 
 export default function DashboardPage() {
@@ -52,6 +54,7 @@ export default function DashboardPage() {
   const { openAIPanel } = useUIStore();
   const { integrations } = useIntegrations();
   const isEduplanrConnected = integrations?.eduplanr?.connected;
+  const syncState = useAutoEduPlanrSync();
 
   // Combine errors for display
   const dataError = tasksError || habitsError || eventsError;
@@ -199,6 +202,11 @@ export default function DashboardPage() {
               id: 'eduplanr-summary',
               className: 'md:col-span-1 lg:col-span-1',
               content: <EduPlanrWidget />
+            },
+            {
+              id: 'sync-monitor',
+              className: 'md:col-span-1 lg:col-span-1',
+              content: <SyncMonitor syncState={syncState} isConnected={!!isEduplanrConnected} />
             }] : []),
             {
               id: 'daily-brief',

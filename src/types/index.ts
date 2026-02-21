@@ -204,7 +204,7 @@ export interface CalendarEvent {
   updatedAt: Date;
 }
 
-export type EventCategory = 'work' | 'personal' | 'health' | 'social' | 'learning' | 'rest' | 'other';
+export type EventCategory = 'work' | 'personal' | 'health' | 'social' | 'learning' | 'rest' | 'exam' | 'other';
 
 export interface Attendee {
   email: string;
