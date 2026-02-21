@@ -114,6 +114,8 @@ export interface Task {
   updatedAt: Date;
   completedAt?: Date;
   aiSuggestions?: AISuggestion[];
+  source?: 'nexora' | 'google' | 'todoist' | 'notion' | 'eduplanr';
+  externalId?: string;
 }
 
 export type TaskStatus = 'todo' | 'in-progress' | 'review' | 'done';
@@ -197,7 +199,7 @@ export interface CalendarEvent {
   isFlexible: boolean;
   linkedTaskId?: string;
   externalId?: string; // for synced calendars
-  source: 'nexora' | 'google' | 'outlook' | 'apple';
+  source?: 'nexora' | 'google' | 'outlook' | 'apple' | 'eduplanr';
   createdAt: Date;
   updatedAt: Date;
 }

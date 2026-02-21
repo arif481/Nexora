@@ -54,6 +54,7 @@ import {
   Loader2,
   CheckCircle,
   XCircle,
+  BookOpen,
 } from 'lucide-react';
 import { MainLayout, PageContainer } from '@/components/layout/MainLayout';
 import { Card, CardHeader, CardContent } from '@/components/ui/Card';
@@ -1303,6 +1304,7 @@ function IntegrationsSection() {
 
   const [patModalProvider, setPatModalProvider] = useState<typeof supportedIntegrations[number] | null>(null);
   const [patInput, setPatInput] = useState('');
+  const [patEmailInput, setPatEmailInput] = useState('');
 
   useEffect(() => {
     const persisted = profile?.preferences?.dataPermissions;
@@ -1324,6 +1326,7 @@ function IntegrationsSection() {
     todoist: Check,
     notion: FileText,
     mobileBridge: Smartphone,
+    eduplanr: BookOpen,
   };
 
   const providerDefaults: Record<IntegrationKey, Record<string, unknown>> = {
@@ -1390,6 +1393,11 @@ function IntegrationsSection() {
       appInstalled: false,
       platforms: ['ios', 'android'],
       autoImport: { wellness: true, calendar: true },
+    },
+    eduplanr: {
+      syncMode: 'pull',
+      platform: 'cloud',
+      autoImport: { calendar: true, tasks: true },
     },
   };
 
@@ -1459,11 +1467,18 @@ function IntegrationsSection() {
 
   const handlePatSubmit = async () => {
     if (!patModalProvider || !patInput.trim()) return;
+    if (patModalProvider.key === 'eduplanr' && !patEmailInput.trim()) return;
+
     setSavingPermissions(true);
     try {
-      await connectProvider(patModalProvider.key, providerDefaults[patModalProvider.key], patInput.trim());
+      if (patModalProvider.key === 'eduplanr') {
+        await connectProvider(patModalProvider.key, { email: patEmailInput.trim() }, patInput.trim());
+      } else {
+        await connectProvider(patModalProvider.key, providerDefaults[patModalProvider.key], patInput.trim());
+      }
       setPatModalProvider(null);
       setPatInput('');
+      setPatEmailInput('');
     } catch (error) {
       console.error('Failed to save PAT:', error);
     } finally {
@@ -1808,6 +1823,7 @@ function IntegrationsSection() {
         onClose={() => {
           setPatModalProvider(null);
           setPatInput('');
+          setPatEmailInput('');
         }}
         title={`Connect ${patModalProvider?.name || 'Integration'}`}
         size="md"
@@ -1820,8 +1836,21 @@ function IntegrationsSection() {
             <span className="text-neon-cyan">This token is encrypted and stored safely in your own personal Firebase profile.</span>
           </p>
 
+          {patModalProvider?.key === 'eduplanr' && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-white">EduPlanr Email Address</label>
+              <Input
+                type="email"
+                placeholder="you@example.com"
+                value={patEmailInput}
+                onChange={(e) => setPatEmailInput(e.target.value)}
+                disabled={savingPermissions}
+              />
+            </div>
+          )}
+
           <div className="space-y-2">
-            <label className="text-sm font-medium text-white">Access Token</label>
+            <label className="text-sm font-medium text-white">Access Token / Sync Token</label>
             <Input
               type="password"
               placeholder={`Paste your ${patModalProvider?.name || ''} token here...`}
@@ -1837,6 +1866,7 @@ function IntegrationsSection() {
               onClick={() => {
                 setPatModalProvider(null);
                 setPatInput('');
+                setPatEmailInput('');
               }}
               disabled={savingPermissions}
             >

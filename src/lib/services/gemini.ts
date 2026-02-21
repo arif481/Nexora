@@ -25,6 +25,7 @@ const NOVA_SYSTEM_PROMPT = `You are NOVA, an intelligent AI assistant integrated
 5. **Habits & Streaks**: Build routines, maintain streaks, suggest improvements
 6. **Wellness & Health**: Track sleep, exercise, mood, provide wellness tips
 7. **Focus & Time**: Pomodoro techniques, deep work scheduling, productivity tips
+8. **Academic & Study Planner (via EduPlanr)**: Assist with managing syllabuses, assignments, and optimizing study sessions
 
 IMPORTANT GUIDELINES:
 - Be concise but helpful - users are busy
@@ -160,6 +161,22 @@ ${active.slice(0, 3).map(g => `- ${g.title}: ${g.progress || 0}% complete`).join
     parts.push(`\n**Study Snapshot:**
 ${subjects.map(subject => `- ${subject.name}: ${subject.topics?.length || 0} topics, mastery ${subject.masteryLevel || 0}%`).join('\n')}
 ${upcomingExams.length > 0 ? `\nUpcoming Exams:\n${upcomingExams.slice(0, 4).map(exam => `- ${exam.date.toLocaleDateString()}: ${exam.examName} (${exam.subjectName})`).join('\n')}` : ''}`);
+  }
+
+  const eduplanrTasks = context.tasks?.filter(t => t.source === 'eduplanr') || [];
+  const eduplanrEvents = context.events?.filter(e => e.source === 'eduplanr') || [];
+
+  if (eduplanrTasks.length > 0 || eduplanrEvents.length > 0) {
+    const pendingAcademic = eduplanrTasks.filter(t => t.status !== 'done');
+    const upcomingSessions = eduplanrEvents.filter(e => new Date(e.startTime) >= new Date()).slice(0, 3);
+
+    parts.push(`\n**EduPlanr Academic Context:**
+The user is currently studying. Here is their academic dashboard from EduPlanr:
+- Upcoming Assignments/Exams: ${pendingAcademic.length} pending
+${pendingAcademic.slice(0, 3).map(t => `- ${t.title} ${t.dueDate ? `(Due: ${new Date(t.dueDate).toLocaleDateString()})` : ''}`).join('\n')}
+- Scheduled Study Sessions: ${upcomingSessions.length} upcoming
+${upcomingSessions.slice(0, 3).map(e => `- ${new Date(e.startTime).toLocaleDateString()}: ${e.title}`).join('\n')}
+*AI Directive*: Provide academic advice to help them succeed when relevant, and suggest taking breaks if their wellness data indicates high stress or low sleep.`);
   }
 
   if (context.focusSessions && context.focusSessions.length > 0) {
