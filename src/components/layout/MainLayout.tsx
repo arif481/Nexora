@@ -1,7 +1,8 @@
 'use client';
 
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useUIStore } from '@/stores/uiStore';
 import { Sidebar, MobileNavigation } from './Sidebar';
@@ -18,10 +19,37 @@ interface MainLayoutProps {
 }
 
 export function MainLayout({ children }: MainLayoutProps) {
-  const { sidebarCollapsed, focusModeActive } = useUIStore();
+  const { sidebarCollapsed, focusModeActive, openModal } = useUIStore();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
 
   // Auto-check for due tasks and upcoming events
   useNotificationTriggers();
+
+  // Handle Quick Capture redirects from bookmarklet
+  useEffect(() => {
+    if (searchParams.get('quickcapture') === '1') {
+      const type = searchParams.get('qc_type');
+      const title = searchParams.get('qc_title') || '';
+      const url = searchParams.get('qc_url') || '';
+
+      const newParams = new URLSearchParams(searchParams.toString());
+      newParams.delete('quickcapture');
+      newParams.delete('qc_type');
+      newParams.delete('qc_title');
+      newParams.delete('qc_url');
+      router.replace(`${pathname}?${newParams.toString()}`);
+
+      if (type === 'task') {
+        openModal('create-task', { title: `${title}\n${url}` });
+      } else if (type === 'note') {
+        openModal('create-note', { title, content: `Captured from: ${url}\n\n` });
+      } else if (type === 'recipe') {
+        openModal('create-task', { sourceUrl: url, title }); // fallback if no specific recipe modal, or open recipe modal if valid
+      }
+    }
+  }, [searchParams, router, pathname, openModal]);
 
   return (
     <div className="min-h-screen bg-dark-950">

@@ -66,6 +66,7 @@ type ModalType =
   | 'quick-capture'
   | 'search'
   | 'ai-chat'
+  | 'bulk-import'
   | 'confirmation';
 
 export const useUIStore = create<UIState>()(

@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { X, CheckCircle, Calendar, FileText, BookOpen, Zap, Trash2, Save, Repeat } from 'lucide-react';
 import type { RecurrenceRule } from '@/types';
+import { BulkImportModal } from '@/components/features/import/BulkImportModal';
 import { useState } from 'react';
 import type { TaskStatus, TaskPriority } from '@/types';
 
@@ -374,8 +375,8 @@ export function GlobalModals() {
                       type="button"
                       onClick={() => setEditRecurDays(prev => prev.includes(i) ? prev.filter(d => d !== i) : [...prev, i])}
                       className={`w-8 h-8 rounded-full text-xs font-medium transition-all ${editRecurDays.includes(i)
-                          ? 'bg-neon-cyan/20 text-neon-cyan border border-neon-cyan/50'
-                          : 'bg-dark-800 text-dark-400 border border-dark-700 hover:border-dark-500'
+                        ? 'bg-neon-cyan/20 text-neon-cyan border border-neon-cyan/50'
+                        : 'bg-dark-800 text-dark-400 border border-dark-700 hover:border-dark-500'
                         }`}
                     >
                       {day}
@@ -545,6 +546,14 @@ export function GlobalModals() {
             </div>
           </div>
         </Modal>
+      )}
+
+      {/* Bulk Import Modal */}
+      {activeModal === 'bulk-import' && (
+        <BulkImportModal
+          isOpen={true}
+          onClose={closeModal}
+        />
       )}
     </AnimatePresence>
   );
