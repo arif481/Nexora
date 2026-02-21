@@ -75,6 +75,11 @@ export interface MobileBridgeIntegration extends BaseIntegration {
   platforms?: Array<'ios' | 'android'>;
 }
 
+export interface EduPlanrIntegration extends BaseIntegration {
+  email?: string;
+  syncToken?: string;
+}
+
 export interface UserIntegrations {
   googleCalendar?: GoogleCalendarIntegration;
   appleCalendar?: AppleCalendarIntegration;
@@ -86,6 +91,7 @@ export interface UserIntegrations {
   todoist?: TaskIntegration;
   notion?: TaskIntegration;
   mobileBridge?: MobileBridgeIntegration;
+  eduplanr?: EduPlanrIntegration;
   updatedAt?: any;
 }
 
@@ -107,7 +113,7 @@ export interface UserLinkedAccounts {
 export interface SupportedIntegrationProvider {
   key: IntegrationKey;
   name: string;
-  category: 'calendar' | 'wellness' | 'finance' | 'tasks' | 'bridge';
+  category: 'calendar' | 'wellness' | 'finance' | 'tasks' | 'bridge' | 'academic';
   platform: IntegrationPlatform;
   description: string;
   defaultSyncMode: BaseIntegration['syncMode'];
@@ -204,6 +210,15 @@ export const SUPPORTED_INTEGRATIONS: SupportedIntegrationProvider[] = [
     description: 'Device bridge for iOS/Android protected data ingestion.',
     defaultSyncMode: 'push',
     setupStatus: 'coming-soon',
+  },
+  {
+    key: 'eduplanr',
+    name: 'EduPlanr Academic Engine',
+    category: 'academic',
+    platform: 'cloud',
+    description: 'Sync your study sessions and assignments from EduPlanr via email linking.',
+    defaultSyncMode: 'pull',
+    setupStatus: 'needs-config',
   },
 ];
 
@@ -345,6 +360,32 @@ export async function connectAppleCalendar(
 
 export async function disconnectAppleCalendar(userId: string): Promise<void> {
   await disconnectDataIntegration(userId, 'appleCalendar');
+}
+
+// Connect EduPlanr
+export async function connectEduPlanr(
+  userId: string,
+  email: string,
+  syncToken: string
+): Promise<void> {
+  await setIntegration(userId, 'eduplanr', {
+    connected: true,
+    email,
+    syncToken,
+    syncEnabled: true,
+    syncMode: 'pull',
+    status: 'idle',
+    autoImport: {
+      calendar: true,
+      tasks: true,
+    },
+    lastSynced: null,
+  });
+}
+
+// Disconnect EduPlanr
+export async function disconnectEduPlanr(userId: string): Promise<void> {
+  await disconnectDataIntegration(userId, 'eduplanr');
 }
 
 // ====== LINKED ACCOUNTS (Google Sign-In) ======
