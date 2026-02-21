@@ -185,7 +185,7 @@ export const SUPPORTED_INTEGRATIONS: SupportedIntegrationProvider[] = [
     platform: 'cloud',
     description: 'Keep tasks and due dates synced with Todoist.',
     defaultSyncMode: 'two-way',
-    setupStatus: 'coming-soon',
+    setupStatus: 'needs-config',
   },
   {
     key: 'notion',
@@ -194,7 +194,7 @@ export const SUPPORTED_INTEGRATIONS: SupportedIntegrationProvider[] = [
     platform: 'cloud',
     description: 'Import linked task databases and milestones from Notion.',
     defaultSyncMode: 'pull',
-    setupStatus: 'coming-soon',
+    setupStatus: 'needs-config',
   },
   {
     key: 'mobileBridge',

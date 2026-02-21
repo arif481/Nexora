@@ -1301,6 +1301,9 @@ function IntegrationsSection() {
     allowAIExternalDataAccess: true,
   });
 
+  const [patModalProvider, setPatModalProvider] = useState<typeof supportedIntegrations[number] | null>(null);
+  const [patInput, setPatInput] = useState('');
+
   useEffect(() => {
     const persisted = profile?.preferences?.dataPermissions;
     if (!persisted) return;
@@ -1441,9 +1444,30 @@ function IntegrationsSection() {
         await connectAppleCalendar();
         return;
       }
+
+      const providerInfo = supportedIntegrations.find(p => p.key === providerKey);
+      if (providerInfo?.setupStatus === 'needs-config') {
+        setPatModalProvider(providerInfo);
+        return;
+      }
+
       await connectProvider(providerKey, providerDefaults[providerKey]);
     } catch (error) {
       console.error(`Failed to connect ${providerKey}:`, error);
+    }
+  };
+
+  const handlePatSubmit = async () => {
+    if (!patModalProvider || !patInput.trim()) return;
+    setSavingPermissions(true);
+    try {
+      await connectProvider(patModalProvider.key, providerDefaults[patModalProvider.key], patInput.trim());
+      setPatModalProvider(null);
+      setPatInput('');
+    } catch (error) {
+      console.error('Failed to save PAT:', error);
+    } finally {
+      setSavingPermissions(false);
     }
   };
 
@@ -1777,6 +1801,65 @@ function IntegrationsSection() {
           </div>
         </CardContent>
       </Card>
+
+      {/* PAT Input Modal */}
+      <Modal
+        isOpen={!!patModalProvider}
+        onClose={() => {
+          setPatModalProvider(null);
+          setPatInput('');
+        }}
+        title={`Connect ${patModalProvider?.name || 'Integration'}`}
+        size="md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-dark-400">
+            Because Nexora runs primarily on your local browser and GitHub pages, we cannot securely exchange standard OAuth codes.
+            Instead, please generate a <strong className="text-white">Personal Access Token (PAT)</strong> or <strong className="text-white">API Key</strong> from {patModalProvider?.name}&apos;s developer settings and paste it below.
+            <br /><br />
+            <span className="text-neon-cyan">This token is encrypted and stored safely in your own personal Firebase profile.</span>
+          </p>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-white">Access Token</label>
+            <Input
+              type="password"
+              placeholder={`Paste your ${patModalProvider?.name || ''} token here...`}
+              value={patInput}
+              onChange={(e) => setPatInput(e.target.value)}
+              disabled={savingPermissions}
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-glass-border">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setPatModalProvider(null);
+                setPatInput('');
+              }}
+              disabled={savingPermissions}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="glow"
+              onClick={handlePatSubmit}
+              disabled={savingPermissions || !patInput.trim()}
+            >
+              {savingPermissions ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Connecting...
+                </>
+              ) : (
+                'Connect'
+              )}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
     </div>
   );
 }
