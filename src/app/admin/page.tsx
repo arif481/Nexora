@@ -12,7 +12,8 @@ import {
     Trash2,
     ExternalLink,
     Calendar,
-    AlertCircle
+    AlertCircle,
+    Edit3,
 } from 'lucide-react';
 import { MainLayout, PageContainer } from '@/components/layout/MainLayout';
 import { Card, CardContent } from '@/components/ui/Card';
@@ -40,6 +41,7 @@ const TABS: { id: TabId; label: string; icon: any; color: string }[] = [
 export default function AdminPage() {
     const [activeTab, setActiveTab] = useState<TabId>('subscriptions');
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [editItem, setEditItem] = useState<any>(null);
 
     // Hooks
     const { items: subs, loading: subsLoading, remove: removeSub } = useSubscriptions();
@@ -47,7 +49,9 @@ export default function AdminPage() {
     const { items: meds, loading: medsLoading, remove: removeMed } = useMedications();
     const { items: pets, loading: petsLoading, remove: removePet } = usePets();
 
-    const handleAddClick = () => setIsModalOpen(true);
+    const handleAddClick = () => { setEditItem(null); setIsModalOpen(true); };
+    const handleEditClick = (item: any) => { setEditItem(item); setIsModalOpen(true); };
+    const handleModalClose = () => { setIsModalOpen(false); setEditItem(null); };
 
     // Render helpers
     const renderSubscriptions = () => {
@@ -72,7 +76,7 @@ export default function AdminPage() {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                     {subs.map(sub => (
-                        <div key={sub.id} className="bg-glass-light border border-glass-border rounded-xl p-4 hover:border-neon-cyan/30 transition-all group flex flex-col">
+                        <div key={sub.id} onClick={() => handleEditClick(sub)} className="bg-glass-light border border-glass-border rounded-xl p-4 hover:border-neon-cyan/30 transition-all group flex flex-col cursor-pointer">
                             <div className="flex justify-between items-start mb-4">
                                 <div>
                                     <h4 className="font-semibold text-white">{sub.name}</h4>
@@ -89,8 +93,9 @@ export default function AdminPage() {
                                     <span>Next: {format(new Date(sub.nextPaymentDate), 'MMM d, yyyy')}</span>
                                 </div>
                                 <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
-                                    {sub.url && <a href={sub.url} target="_blank" rel="noreferrer" className="p-1.5 text-white/40 hover:text-white"><ExternalLink className="w-4 h-4" /></a>}
-                                    <button onClick={() => removeSub(sub.id)} className="p-1.5 text-red-400/50 hover:text-red-400"><Trash2 className="w-4 h-4" /></button>
+                                    {sub.url && <a href={sub.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="p-1.5 text-white/40 hover:text-white"><ExternalLink className="w-4 h-4" /></a>}
+                                    <button onClick={(e) => { e.stopPropagation(); handleEditClick(sub); }} className="p-1.5 text-white/40 hover:text-neon-cyan"><Edit3 className="w-4 h-4" /></button>
+                                    <button onClick={(e) => { e.stopPropagation(); removeSub(sub.id); }} className="p-1.5 text-red-400/50 hover:text-red-400"><Trash2 className="w-4 h-4" /></button>
                                 </div>
                             </div>
                         </div>
@@ -107,7 +112,7 @@ export default function AdminPage() {
         return (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {vehicles.map(veh => (
-                    <div key={veh.id} className="bg-glass-light border border-glass-border rounded-xl p-5 hover:border-neon-purple/30 transition-all group">
+                    <div key={veh.id} onClick={() => handleEditClick(veh)} className="bg-glass-light border border-glass-border rounded-xl p-5 hover:border-neon-purple/30 transition-all group cursor-pointer">
                         <div className="flex justify-between items-start mb-4">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-full bg-neon-purple/20 text-neon-purple flex items-center justify-center">
@@ -118,9 +123,10 @@ export default function AdminPage() {
                                     <p className="text-sm text-white/60">{veh.model}</p>
                                 </div>
                             </div>
-                            <button onClick={() => removeVeh(veh.id)} className="p-2 text-red-400/30 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all">
-                                <Trash2 className="w-4 h-4" />
-                            </button>
+                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                                <button onClick={(e) => { e.stopPropagation(); handleEditClick(veh); }} className="p-2 text-white/30 hover:text-neon-purple"><Edit3 className="w-4 h-4" /></button>
+                                <button onClick={(e) => { e.stopPropagation(); removeVeh(veh.id); }} className="p-2 text-red-400/30 hover:text-red-400"><Trash2 className="w-4 h-4" /></button>
+                            </div>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4 mt-6 p-3 bg-dark-900/50 rounded-lg text-sm">
@@ -142,10 +148,13 @@ export default function AdminPage() {
         return (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {meds.map(med => (
-                    <div key={med.id} className="bg-glass-light border border-glass-border rounded-xl p-4 hover:border-neon-pink/30 transition-all group">
+                    <div key={med.id} onClick={() => handleEditClick(med)} className="bg-glass-light border border-glass-border rounded-xl p-4 hover:border-neon-pink/30 transition-all group cursor-pointer">
                         <div className="flex justify-between items-start mb-2">
                             <h4 className="font-bold text-white text-lg">{med.name}</h4>
-                            <button onClick={() => removeMed(med.id)} className="p-1 text-red-400/30 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"><Trash2 className="w-4 h-4" /></button>
+                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                                <button onClick={(e) => { e.stopPropagation(); handleEditClick(med); }} className="p-1 text-white/30 hover:text-neon-pink"><Edit3 className="w-4 h-4" /></button>
+                                <button onClick={(e) => { e.stopPropagation(); removeMed(med.id); }} className="p-1 text-red-400/30 hover:text-red-400"><Trash2 className="w-4 h-4" /></button>
+                            </div>
                         </div>
                         <div className="space-y-1 mt-3">
                             <p className="text-sm text-neon-pink font-medium bg-neon-pink/10 w-fit px-2 py-0.5 rounded-md">{med.dosage}</p>
@@ -164,7 +173,7 @@ export default function AdminPage() {
         return (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {pets.map(pet => (
-                    <div key={pet.id} className="bg-glass-light border border-glass-border rounded-xl p-5 hover:border-amber-400/30 transition-all group">
+                    <div key={pet.id} onClick={() => handleEditClick(pet)} className="bg-glass-light border border-glass-border rounded-xl p-5 hover:border-amber-400/30 transition-all group cursor-pointer">
                         <div className="flex justify-between items-start mb-4">
                             <div className="flex items-center gap-3">
                                 <div className="w-12 h-12 rounded-full bg-amber-400/20 text-amber-400 flex items-center justify-center">
@@ -175,9 +184,10 @@ export default function AdminPage() {
                                     <p className="text-sm text-white/60">{pet.breed ? `${pet.breed} (${pet.species})` : pet.species}</p>
                                 </div>
                             </div>
-                            <button onClick={() => removePet(pet.id)} className="p-2 text-red-400/30 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all">
-                                <Trash2 className="w-4 h-4" />
-                            </button>
+                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                                <button onClick={(e) => { e.stopPropagation(); handleEditClick(pet); }} className="p-2 text-white/30 hover:text-amber-400"><Edit3 className="w-4 h-4" /></button>
+                                <button onClick={(e) => { e.stopPropagation(); removePet(pet.id); }} className="p-2 text-red-400/30 hover:text-red-400"><Trash2 className="w-4 h-4" /></button>
+                            </div>
                         </div>
                     </div>
                 ))}
@@ -236,10 +246,10 @@ export default function AdminPage() {
             </PageContainer>
 
             {/* Render the appropriate modal based on active tab */}
-            {activeTab === 'subscriptions' && <AddSubscriptionModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />}
-            {activeTab === 'vehicles' && <AddVehicleModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />}
-            {activeTab === 'medications' && <AddMedicationModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />}
-            {activeTab === 'pets' && <AddPetModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />}
+            {activeTab === 'subscriptions' && <AddSubscriptionModal isOpen={isModalOpen} onClose={handleModalClose} editItem={editItem} />}
+            {activeTab === 'vehicles' && <AddVehicleModal isOpen={isModalOpen} onClose={handleModalClose} editItem={editItem} />}
+            {activeTab === 'medications' && <AddMedicationModal isOpen={isModalOpen} onClose={handleModalClose} editItem={editItem} />}
+            {activeTab === 'pets' && <AddPetModal isOpen={isModalOpen} onClose={handleModalClose} editItem={editItem} />}
 
         </MainLayout>
     );

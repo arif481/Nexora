@@ -13,7 +13,10 @@ import {
     CheckCircle2,
     Clock,
     LayoutGrid,
-    List as ListIcon
+    List as ListIcon,
+    Edit3,
+    Trash2,
+    MoreVertical,
 } from 'lucide-react';
 import { MainLayout, PageContainer, Section } from '@/components/layout/MainLayout';
 import { Card, CardContent } from '@/components/ui/Card';
@@ -30,6 +33,9 @@ export default function EntertainmentPage() {
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     const [searchQuery, setSearchQuery] = useState('');
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const [editingItem, setEditingItem] = useState<EntertainmentItem | null>(null);
+    const [showDeleteId, setShowDeleteId] = useState<string | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const filteredItems = useMemo(() => {
         return items.filter(item => {
@@ -160,7 +166,20 @@ export default function EntertainmentPage() {
                         >
                             <AnimatePresence>
                                 {filteredItems.map(item => (
-                                    <MediaCard key={item.id} item={item} viewMode={viewMode} />
+                                    <MediaCard
+                                        key={item.id}
+                                        item={item}
+                                        viewMode={viewMode}
+                                        onEdit={(item) => setEditingItem(item)}
+                                        onDelete={async (id) => {
+                                            setIsDeleting(true);
+                                            try { await deleteItem(id); } catch (e) { console.error(e); }
+                                            finally { setIsDeleting(false); setShowDeleteId(null); }
+                                        }}
+                                        onStatusChange={async (id, status) => {
+                                            try { await updateItem(id, { status }); } catch (e) { console.error(e); }
+                                        }}
+                                    />
                                 ))}
                             </AnimatePresence>
                         </motion.div>
@@ -169,14 +188,22 @@ export default function EntertainmentPage() {
             </PageContainer>
 
             <AddMediaModal
-                isOpen={isAddModalOpen}
-                onClose={() => setIsAddModalOpen(false)}
+                isOpen={isAddModalOpen || !!editingItem}
+                onClose={() => { setIsAddModalOpen(false); setEditingItem(null); }}
+                editItem={editingItem}
             />
         </MainLayout>
     );
 }
 
-function MediaCard({ item, viewMode }: { item: EntertainmentItem, viewMode: 'grid' | 'list' }) {
+function MediaCard({ item, viewMode, onEdit, onDelete, onStatusChange }: {
+    item: EntertainmentItem;
+    viewMode: 'grid' | 'list';
+    onEdit?: (item: EntertainmentItem) => void;
+    onDelete?: (id: string) => void;
+    onStatusChange?: (id: string, status: EntertainmentStatus) => void;
+}) {
+    const [showActions, setShowActions] = useState(false);
     const getIcon = () => {
         switch (item.type) {
             case 'movie': return <Film className="w-4 h-4" />;
@@ -200,6 +227,9 @@ function MediaCard({ item, viewMode }: { item: EntertainmentItem, viewMode: 'gri
         dropped: "Dropped",
     };
 
+    const statusCycle: EntertainmentStatus[] = ['planned', 'in_progress', 'completed', 'dropped'];
+    const nextStatus = statusCycle[(statusCycle.indexOf(item.status) + 1) % statusCycle.length];
+
     if (viewMode === 'list') {
         return (
             <motion.div
@@ -208,6 +238,7 @@ function MediaCard({ item, viewMode }: { item: EntertainmentItem, viewMode: 'gri
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 className="flex items-center gap-4 p-3 pr-5 bg-glass-light border border-glass-border rounded-xl hover:bg-glass-medium transition-colors group cursor-pointer"
+                onClick={() => onEdit?.(item)}
             >
                 <div className="w-12 h-16 rounded-md bg-dark-700 flex items-center justify-center flex-shrink-0 overflow-hidden relative">
                     {item.coverImage ? (
@@ -239,8 +270,19 @@ function MediaCard({ item, viewMode }: { item: EntertainmentItem, viewMode: 'gri
                     </div>
                 </div>
 
-                <div className={cn("px-2.5 py-1 rounded-full text-[10px] uppercase tracking-wider font-semibold border", statusColors[item.status])}>
-                    {statusLabels[item.status]}
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onStatusChange?.(item.id, nextStatus); }}
+                        className={cn("px-2.5 py-1 rounded-full text-[10px] uppercase tracking-wider font-semibold border hover:scale-105 transition-transform", statusColors[item.status])}
+                    >
+                        {statusLabels[item.status]}
+                    </button>
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onDelete?.(item.id); }}
+                        className="p-1.5 rounded-lg text-white/30 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+                    >
+                        <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                 </div>
             </motion.div>
         );
@@ -253,6 +295,7 @@ function MediaCard({ item, viewMode }: { item: EntertainmentItem, viewMode: 'gri
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
             className="group relative cursor-pointer"
+            onClick={() => onEdit?.(item)}
         >
             <div className="aspect-[2/3] rounded-2xl bg-dark-800 border border-glass-border overflow-hidden relative mb-3 hover:border-white/20 transition-colors shadow-glass-sm group-hover:shadow-glass-md">
                 {item.coverImage ? (
@@ -276,6 +319,22 @@ function MediaCard({ item, viewMode }: { item: EntertainmentItem, viewMode: 'gri
                 <div className="absolute top-2 left-2">
                     {item.status === 'completed' && <div className="w-6 h-6 rounded-full bg-neon-green/90 text-dark-950 flex items-center justify-center shadow-lg"><CheckCircle2 className="w-4 h-4" /></div>}
                     {item.status === 'in_progress' && <div className="w-6 h-6 rounded-full bg-neon-orange/90 text-dark-950 flex items-center justify-center shadow-lg"><Clock className="w-4 h-4" /></div>}
+                </div>
+
+                {/* Hover Actions */}
+                <div className="absolute inset-0 bg-dark-950/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-4 gap-2">
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onStatusChange?.(item.id, nextStatus); }}
+                        className="px-3 py-1.5 rounded-lg bg-dark-800/90 backdrop-blur-sm text-xs text-white border border-white/10 hover:border-neon-cyan/30 hover:text-neon-cyan transition-colors"
+                    >
+                        → {statusLabels[nextStatus]}
+                    </button>
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onDelete?.(item.id); }}
+                        className="p-1.5 rounded-lg bg-dark-800/90 backdrop-blur-sm text-white/60 hover:text-red-400 border border-white/10 hover:border-red-400/30 transition-colors"
+                    >
+                        <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                 </div>
 
                 {/* Progress Bar */}

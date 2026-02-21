@@ -55,6 +55,7 @@ import { useUIStore } from '@/stores/uiStore';
 import { useAuth } from '@/hooks/useAuth';
 import { useUser } from '@/hooks/useUser';
 import { useWellness, useRecentWellness, useWellnessStats } from '@/hooks/useWellness';
+import { useBodyMetrics } from '@/hooks/useFinance';
 import { cn } from '@/lib/utils';
 import type { Exercise, Meal, PeriodData, WellnessEntry } from '@/types';
 import { WorkoutLogger } from '@/components/features/wellness/WorkoutLogger';
@@ -151,6 +152,10 @@ export default function WellnessPage() {
   const [isAddWaterOpen, setIsAddWaterOpen] = useState(false);
   const [isUpdateMoodOpen, setIsUpdateMoodOpen] = useState(false);
   const [isUpdatePeriodOpen, setIsUpdatePeriodOpen] = useState(false);
+  const [isBodyMetricsOpen, setIsBodyMetricsOpen] = useState(false);
+  const [bmWeight, setBmWeight] = useState('');
+  const [bmBodyFat, setBmBodyFat] = useState('');
+  const { entries: bodyMetricEntries, addEntry: addBodyMetric } = useBodyMetrics();
   const { openAIPanel } = useUIStore();
 
   const loading = authLoading || wellnessLoading;
@@ -854,6 +859,91 @@ export default function WellnessPage() {
             </div>
           </div>
 
+          {/* Body Metrics Section */}
+          <div className="mt-6">
+            <Card variant="glass">
+              <CardHeader
+                title="Body Metrics"
+                icon={<TrendingUp className="w-5 h-5 text-neon-green" />}
+                action={
+                  <Button size="sm" variant="glass" onClick={() => setIsBodyMetricsOpen(true)}>
+                    <Plus className="w-3 h-3 mr-1" /> Log
+                  </Button>
+                }
+              />
+              <CardContent>
+                {bodyMetricEntries.length === 0 ? (
+                  <div className="text-center py-6">
+                    <p className="text-dark-400 text-sm">No body metrics logged yet</p>
+                    <Button variant="glass" size="sm" className="mt-3" onClick={() => setIsBodyMetricsOpen(true)}>
+                      Log Your First Entry
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Latest Entry */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="p-3 rounded-lg bg-dark-800/40 text-center">
+                        <p className="text-2xl font-bold text-white">
+                          {bodyMetricEntries[0]?.weight?.toFixed(1) || '—'}
+                        </p>
+                        <p className="text-xs text-dark-400 mt-1">
+                          {bodyMetricEntries[0]?.weightUnit === 'lbs' ? 'lbs' : 'kg'}
+                        </p>
+                      </div>
+                      <div className="p-3 rounded-lg bg-dark-800/40 text-center">
+                        <p className="text-2xl font-bold text-white">
+                          {bodyMetricEntries[0]?.bodyFatPct?.toFixed(1) || '—'}
+                        </p>
+                        <p className="text-xs text-dark-400 mt-1">Body Fat %</p>
+                      </div>
+                    </div>
+
+                    {/* Trend */}
+                    {bodyMetricEntries.length >= 2 && bodyMetricEntries[0]?.weight && bodyMetricEntries[1]?.weight && (
+                      <div className={cn(
+                        'p-3 rounded-lg border flex items-center gap-2',
+                        bodyMetricEntries[0].weight < bodyMetricEntries[1].weight
+                          ? 'bg-green-500/10 border-green-500/30'
+                          : bodyMetricEntries[0].weight > bodyMetricEntries[1].weight
+                            ? 'bg-red-500/10 border-red-500/30'
+                            : 'bg-dark-800/40 border-dark-700'
+                      )}>
+                        <TrendingUp className={cn(
+                          'w-4 h-4',
+                          bodyMetricEntries[0].weight < bodyMetricEntries[1].weight ? 'text-green-400 rotate-180' : 'text-red-400'
+                        )} />
+                        <span className="text-sm text-dark-300">
+                          {Math.abs(bodyMetricEntries[0].weight - bodyMetricEntries[1].weight).toFixed(1)}
+                          {bodyMetricEntries[0]?.weightUnit === 'lbs' ? ' lbs' : ' kg'} since last entry
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Recent History */}
+                    <div className="space-y-1">
+                      <p className="text-xs text-dark-500 uppercase tracking-wider mb-2">Recent</p>
+                      {bodyMetricEntries.slice(0, 5).map((e) => {
+                        const d = e.date instanceof Date ? e.date : new Date(e.date);
+                        return (
+                          <div key={e.id} className="flex items-center justify-between py-1.5 border-b border-dark-800/30 last:border-0">
+                            <span className="text-xs text-dark-400">
+                              {d.toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                            </span>
+                            <div className="flex items-center gap-4">
+                              {e.weight && <span className="text-sm text-white">{e.weight.toFixed(1)} {e.weightUnit === 'lbs' ? 'lbs' : 'kg'}</span>}
+                              {e.bodyFatPct && <span className="text-xs text-dark-400">{e.bodyFatPct}% BF</span>}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
           {/* Add Sleep Modal */}
           <Modal
             isOpen={isAddSleepOpen}
@@ -951,6 +1041,58 @@ export default function WellnessPage() {
                 setIsUpdatePeriodOpen(false);
               }}
             />
+          </Modal>
+
+          {/* Body Metrics Modal */}
+          <Modal
+            isOpen={isBodyMetricsOpen}
+            onClose={() => { setIsBodyMetricsOpen(false); setBmWeight(''); setBmBodyFat(''); }}
+            title="Log Body Metrics"
+          >
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-white/60 mb-2">Weight (kg)</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={bmWeight}
+                  onChange={(e) => setBmWeight(e.target.value)}
+                  placeholder="e.g. 72.5"
+                  className="w-full px-4 py-3 rounded-xl bg-glass-light border border-glass-border text-white placeholder-white/40 focus:outline-none focus:border-neon-cyan"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-white/60 mb-2">Body Fat % (optional)</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={bmBodyFat}
+                  onChange={(e) => setBmBodyFat(e.target.value)}
+                  placeholder="e.g. 18.5"
+                  className="w-full px-4 py-3 rounded-xl bg-glass-light border border-glass-border text-white placeholder-white/40 focus:outline-none focus:border-neon-cyan"
+                />
+              </div>
+              <Button
+                variant="glow"
+                className="w-full"
+                disabled={!bmWeight}
+                onClick={async () => {
+                  if (!bmWeight) return;
+                  await addBodyMetric({
+                    date: new Date(),
+                    weight: parseFloat(bmWeight),
+                    weightUnit: 'kg',
+                    ...(bmBodyFat ? { bodyFatPct: parseFloat(bmBodyFat) } : {}),
+                  });
+                  setBmWeight('');
+                  setBmBodyFat('');
+                  setIsBodyMetricsOpen(false);
+                }}
+              >
+                Save Entry
+              </Button>
+            </div>
           </Modal>
         </div>
       </PageContainer>

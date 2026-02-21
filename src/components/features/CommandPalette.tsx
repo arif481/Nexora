@@ -5,6 +5,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useUIStore } from '@/stores/uiStore';
+import { useTasks } from '@/hooks/useTasks';
+import { useNotes } from '@/hooks/useNotes';
+import { useGoals } from '@/hooks/useGoals';
+import { useContacts } from '@/hooks/useContacts';
 import {
   Search,
   Home,
@@ -31,6 +35,7 @@ import {
   PlaneTakeoff,
   Building2,
   MessageCircle,
+  User,
 } from 'lucide-react';
 
 interface CommandItem {
@@ -38,7 +43,7 @@ interface CommandItem {
   title: string;
   subtitle?: string;
   icon: React.ComponentType<{ className?: string }>;
-  category: 'navigation' | 'actions' | 'recent' | 'ai';
+  category: 'navigation' | 'actions' | 'recent' | 'ai' | 'results';
   action: () => void;
   shortcut?: string;
 }
@@ -48,6 +53,12 @@ export function CommandPalette() {
   const { commandPaletteOpen, toggleCommandPalette, openModal } = useUIStore();
   const [search, setSearch] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
+
+  // Data hooks for unified search
+  const { tasks } = useTasks();
+  const { notes } = useNotes();
+  const { goals } = useGoals();
+  const { contacts } = useContacts();
 
   const commands: CommandItem[] = useMemo(() => [
     // Navigation
@@ -79,18 +90,77 @@ export function CommandPalette() {
     { id: 'ai-insights', title: 'View AI Insights', subtitle: 'See personalized recommendations', icon: Zap, category: 'ai', action: () => router.push('/ai') },
   ], [router, openModal]);
 
+  // Build data search results when search query is ≥ 2 chars
+  const dataResults: CommandItem[] = useMemo(() => {
+    if (search.length < 2) return [];
+    const q = search.toLowerCase();
+    const results: CommandItem[] = [];
+
+    // Search tasks
+    (tasks || []).filter(t => t.title.toLowerCase().includes(q) || t.description?.toLowerCase().includes(q))
+      .slice(0, 5)
+      .forEach(t => results.push({
+        id: `task-${t.id}`,
+        title: t.title,
+        subtitle: `${t.status} · ${t.priority} priority`,
+        icon: CheckSquare,
+        category: 'results',
+        action: () => { openModal('edit-task', { taskId: t.id, task: t }); },
+      }));
+
+    // Search notes
+    (notes || []).filter(n => n.title.toLowerCase().includes(q) || n.content?.toLowerCase().includes(q))
+      .slice(0, 5)
+      .forEach(n => results.push({
+        id: `note-${n.id}`,
+        title: n.title,
+        subtitle: `Note · ${n.category || 'Uncategorized'}`,
+        icon: FileText,
+        category: 'results',
+        action: () => router.push('/notes'),
+      }));
+
+    // Search goals
+    (goals || []).filter(g => g.title.toLowerCase().includes(q) || g.description?.toLowerCase().includes(q))
+      .slice(0, 5)
+      .forEach(g => results.push({
+        id: `goal-${g.id}`,
+        title: g.title,
+        subtitle: `Goal · ${g.status} · ${g.progress}%`,
+        icon: Target,
+        category: 'results',
+        action: () => router.push('/goals'),
+      }));
+
+    // Search contacts
+    (contacts || []).filter(c => c.name.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q) || c.relationship?.toLowerCase().includes(q))
+      .slice(0, 5)
+      .forEach(c => results.push({
+        id: `contact-${c.id}`,
+        title: c.name,
+        subtitle: [c.relationship, c.email].filter(Boolean).join(' · ') || 'Contact',
+        icon: User,
+        category: 'results',
+        action: () => router.push('/contacts'),
+      }));
+
+    return results;
+  }, [search, tasks, notes, goals, contacts, router, openModal]);
+
   const filteredCommands = useMemo(() => {
-    if (!search) return commands;
+    const allItems = [...commands, ...dataResults];
+    if (!search) return commands; // No data results when no search
     const searchLower = search.toLowerCase();
-    return commands.filter(
+    return allItems.filter(
       (cmd) =>
         cmd.title.toLowerCase().includes(searchLower) ||
         cmd.subtitle?.toLowerCase().includes(searchLower)
     );
-  }, [commands, search]);
+  }, [commands, dataResults, search]);
 
   const groupedCommands = useMemo(() => {
     const groups: Record<string, CommandItem[]> = {
+      results: [],
       ai: [],
       actions: [],
       navigation: [],
@@ -226,6 +296,7 @@ export function CommandPalette() {
   }, [commandPaletteOpen]);
 
   const categoryLabels: Record<string, string> = {
+    results: '🔍 Search Results',
     ai: 'AI Assistant',
     actions: 'Actions',
     navigation: 'Navigation',
@@ -268,7 +339,7 @@ export function CommandPalette() {
                     setSearch(e.target.value);
                     setSelectedIndex(0);
                   }}
-                  placeholder="Type a command or search..."
+                  placeholder="Search tasks, notes, contacts, or type a command..."
                   className="flex-1 bg-transparent text-white placeholder-white/40 outline-none text-base"
                   autoFocus
                 />
@@ -324,10 +395,10 @@ export function CommandPalette() {
                                 >
                                   <Icon className="w-4 h-4" />
                                 </div>
-                                <div className="flex-1 text-left">
-                                  <p className="text-sm font-medium">{cmd.title}</p>
+                                <div className="flex-1 text-left min-w-0">
+                                  <p className="text-sm font-medium truncate">{cmd.title}</p>
                                   {cmd.subtitle && (
-                                    <p className="text-xs text-white/40">{cmd.subtitle}</p>
+                                    <p className="text-xs text-white/40 truncate">{cmd.subtitle}</p>
                                   )}
                                 </div>
                                 {cmd.shortcut && (

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, CreditCard, Calendar, Link as LinkIcon, Car, TestTube2, PawPrint } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -37,9 +37,9 @@ export function BaseModal({ isOpen, onClose, title, children, onSubmit, loading,
     );
 }
 
-// --- Add Subscription Modal ---
-export function AddSubscriptionModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
-    const { add } = useSubscriptions();
+// --- Add/Edit Subscription Modal ---
+export function AddSubscriptionModal({ isOpen, onClose, editItem }: { isOpen: boolean; onClose: () => void; editItem?: any }) {
+    const { add, update } = useSubscriptions();
     const [loading, setLoading] = useState(false);
     const [name, setName] = useState('');
     const [cost, setCost] = useState('');
@@ -48,25 +48,43 @@ export function AddSubscriptionModal({ isOpen, onClose }: { isOpen: boolean; onC
     const [nextPaymentDate, setNextPaymentDate] = useState('');
     const [url, setUrl] = useState('');
 
+    useEffect(() => {
+        if (editItem) {
+            setName(editItem.name || '');
+            setCost(String(editItem.cost || ''));
+            setBillingCycle(editItem.billingCycle || 'monthly');
+            setCategory(editItem.category || 'software');
+            setNextPaymentDate(editItem.nextPaymentDate ? new Date(editItem.nextPaymentDate).toISOString().split('T')[0] : '');
+            setUrl(editItem.url || '');
+        } else {
+            setName(''); setCost(''); setBillingCycle('monthly'); setCategory('software'); setNextPaymentDate(''); setUrl('');
+        }
+    }, [editItem]);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!name.trim() || !cost || !nextPaymentDate) return;
         setLoading(true);
         try {
-            await add({
+            const data = {
                 name: name.trim(),
                 cost: Number(cost),
                 billingCycle,
                 category,
                 nextPaymentDate: new Date(nextPaymentDate),
                 url: url.trim() || undefined,
-            });
+            };
+            if (editItem?.id) {
+                await update(editItem.id, data);
+            } else {
+                await add(data);
+            }
             onClose();
         } finally { setLoading(false); }
     };
 
     return (
-        <BaseModal isOpen={isOpen} onClose={onClose} title="Add Subscription" onSubmit={handleSubmit} loading={loading} valid={name && cost && nextPaymentDate}>
+        <BaseModal isOpen={isOpen} onClose={onClose} title={editItem ? 'Edit Subscription' : 'Add Subscription'} onSubmit={handleSubmit} loading={loading} valid={name && cost && nextPaymentDate}>
             <div className="space-y-4">
                 <div>
                     <label className="text-xs text-white/60 uppercase tracking-wider mb-1 block">Name *</label>
@@ -111,32 +129,48 @@ export function AddSubscriptionModal({ isOpen, onClose }: { isOpen: boolean; onC
     );
 }
 
-// --- Add Vehicle Modal ---
-export function AddVehicleModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
-    const { add } = useVehicles();
+// --- Add/Edit Vehicle Modal ---
+export function AddVehicleModal({ isOpen, onClose, editItem }: { isOpen: boolean; onClose: () => void; editItem?: any }) {
+    const { add, update } = useVehicles();
     const [loading, setLoading] = useState(false);
     const [make, setMake] = useState('');
     const [model, setModel] = useState('');
     const [year, setYear] = useState('');
     const [licensePlate, setLicensePlate] = useState('');
 
+    useEffect(() => {
+        if (editItem) {
+            setMake(editItem.make || '');
+            setModel(editItem.model || '');
+            setYear(String(editItem.year || ''));
+            setLicensePlate(editItem.licensePlate || '');
+        } else {
+            setMake(''); setModel(''); setYear(''); setLicensePlate('');
+        }
+    }, [editItem]);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!make.trim() || !model.trim() || !year) return;
         setLoading(true);
         try {
-            await add({
+            const data = {
                 make: make.trim(),
                 model: model.trim(),
                 year: Number(year),
                 licensePlate: licensePlate.trim() || undefined,
-            });
+            };
+            if (editItem?.id) {
+                await update(editItem.id, data);
+            } else {
+                await add(data);
+            }
             onClose();
         } finally { setLoading(false); }
     };
 
     return (
-        <BaseModal isOpen={isOpen} onClose={onClose} title="Add Vehicle" onSubmit={handleSubmit} loading={loading} valid={make && model && year}>
+        <BaseModal isOpen={isOpen} onClose={onClose} title={editItem ? 'Edit Vehicle' : 'Add Vehicle'} onSubmit={handleSubmit} loading={loading} valid={make && model && year}>
             <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                     <div>
@@ -163,30 +197,45 @@ export function AddVehicleModal({ isOpen, onClose }: { isOpen: boolean; onClose:
     );
 }
 
-// --- Add Medication Modal ---
-export function AddMedicationModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
-    const { add } = useMedications();
+// --- Add/Edit Medication Modal ---
+export function AddMedicationModal({ isOpen, onClose, editItem }: { isOpen: boolean; onClose: () => void; editItem?: any }) {
+    const { add, update } = useMedications();
     const [loading, setLoading] = useState(false);
     const [name, setName] = useState('');
     const [dosage, setDosage] = useState('');
     const [frequency, setFrequency] = useState('');
+
+    useEffect(() => {
+        if (editItem) {
+            setName(editItem.name || '');
+            setDosage(editItem.dosage || '');
+            setFrequency(editItem.frequency || '');
+        } else {
+            setName(''); setDosage(''); setFrequency('');
+        }
+    }, [editItem]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!name.trim() || !dosage.trim() || !frequency.trim()) return;
         setLoading(true);
         try {
-            await add({
+            const data = {
                 name: name.trim(),
                 dosage: dosage.trim(),
                 frequency: frequency.trim(),
-            });
+            };
+            if (editItem?.id) {
+                await update(editItem.id, data);
+            } else {
+                await add(data);
+            }
             onClose();
         } finally { setLoading(false); }
     };
 
     return (
-        <BaseModal isOpen={isOpen} onClose={onClose} title="Add Medication" onSubmit={handleSubmit} loading={loading} valid={name && dosage && frequency}>
+        <BaseModal isOpen={isOpen} onClose={onClose} title={editItem ? 'Edit Medication' : 'Add Medication'} onSubmit={handleSubmit} loading={loading} valid={name && dosage && frequency}>
             <div className="space-y-4">
                 <div>
                     <label className="text-xs text-white/60 uppercase tracking-wider mb-1 block">Name *</label>
@@ -207,30 +256,45 @@ export function AddMedicationModal({ isOpen, onClose }: { isOpen: boolean; onClo
     );
 }
 
-// --- Add Pet Modal ---
-export function AddPetModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
-    const { add } = usePets();
+// --- Add/Edit Pet Modal ---
+export function AddPetModal({ isOpen, onClose, editItem }: { isOpen: boolean; onClose: () => void; editItem?: any }) {
+    const { add, update } = usePets();
     const [loading, setLoading] = useState(false);
     const [name, setName] = useState('');
     const [species, setSpecies] = useState('');
     const [breed, setBreed] = useState('');
+
+    useEffect(() => {
+        if (editItem) {
+            setName(editItem.name || '');
+            setSpecies(editItem.species || '');
+            setBreed(editItem.breed || '');
+        } else {
+            setName(''); setSpecies(''); setBreed('');
+        }
+    }, [editItem]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!name.trim() || !species.trim()) return;
         setLoading(true);
         try {
-            await add({
+            const data = {
                 name: name.trim(),
                 species: species.trim(),
                 breed: breed.trim() || undefined,
-            });
+            };
+            if (editItem?.id) {
+                await update(editItem.id, data);
+            } else {
+                await add(data);
+            }
             onClose();
         } finally { setLoading(false); }
     };
 
     return (
-        <BaseModal isOpen={isOpen} onClose={onClose} title="Add Pet" onSubmit={handleSubmit} loading={loading} valid={name && species}>
+        <BaseModal isOpen={isOpen} onClose={onClose} title={editItem ? 'Edit Pet' : 'Add Pet'} onSubmit={handleSubmit} loading={loading} valid={name && species}>
             <div className="space-y-4">
                 <div>
                     <label className="text-xs text-white/60 uppercase tracking-wider mb-1 block">Name *</label>

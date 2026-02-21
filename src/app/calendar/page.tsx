@@ -134,7 +134,7 @@ export default function CalendarPage() {
   const { entries: recentWellnessEntries, loading: wellnessLoading } = useRecentWellness(90);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [viewMode, setViewMode] = useState<'month' | 'week'>('month');
+  const [viewMode, setViewMode] = useState<'month' | 'week' | 'day'>('month');
   const reminderCacheRef = useRef<Set<string>>(new Set());
 
   // Get a stable month range for fetching events and derived data.
@@ -671,6 +671,16 @@ export default function CalendarPage() {
               >
                 <List className="w-4 h-4" />
               </button>
+              <button
+                onClick={() => { setViewMode('day'); if (!selectedDate) setSelectedDate(new Date()); }}
+                className={cn(
+                  'p-2 rounded-lg transition-all',
+                  viewMode === 'day' ? 'bg-dark-700 text-white' : 'text-dark-400 hover:text-white'
+                )}
+                title="Day View"
+              >
+                <CalendarDays className="w-4 h-4" />
+              </button>
             </div>
             <Button variant="glow" onClick={() => setIsCreateModalOpen(true)}>
               <Plus className="w-4 h-4 mr-1" />
@@ -786,13 +796,82 @@ export default function CalendarPage() {
                   })}
                 </div>
               </Card>
-            ) : (
+            ) : viewMode === 'week' ? (
               <WeekView
                 currentDate={currentDate}
                 events={events}
                 onEventClick={handleEditEvent}
                 onTimeSlotClick={handleTimeSlotClick}
               />
+            ) : (
+              /* Day View — Time Blocking */
+              <Card variant="glass" className="p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-white">
+                    {(selectedDate || new Date()).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                  </h3>
+                  <div className="flex gap-1">
+                    <button onClick={() => { const d = new Date(selectedDate || new Date()); d.setDate(d.getDate() - 1); setSelectedDate(d); }} className="p-1.5 rounded-lg hover:bg-dark-700 text-dark-400 hover:text-white transition-colors"><ChevronLeft className="w-4 h-4" /></button>
+                    <button onClick={() => setSelectedDate(new Date())} className="px-2 py-1 text-xs rounded-lg bg-neon-cyan/10 text-neon-cyan hover:bg-neon-cyan/20 transition-colors">Today</button>
+                    <button onClick={() => { const d = new Date(selectedDate || new Date()); d.setDate(d.getDate() + 1); setSelectedDate(d); }} className="p-1.5 rounded-lg hover:bg-dark-700 text-dark-400 hover:text-white transition-colors"><ChevronRight className="w-4 h-4" /></button>
+                  </div>
+                </div>
+                <div className="space-y-0 max-h-[600px] overflow-y-auto scrollbar-thin">
+                  {Array.from({ length: 18 }, (_, i) => i + 6).map(hour => {
+                    const dayDate = selectedDate || new Date();
+                    const dayEvents = (events || []).filter(e => {
+                      const start = new Date(e.startTime);
+                      return start.getFullYear() === dayDate.getFullYear() &&
+                        start.getMonth() === dayDate.getMonth() &&
+                        start.getDate() === dayDate.getDate() &&
+                        start.getHours() === hour;
+                    });
+                    const isPast = (() => { const now = new Date(); const slotDate = new Date(dayDate); slotDate.setHours(hour, 0, 0, 0); return slotDate < now && dayDate.toDateString() === now.toDateString(); })();
+
+                    return (
+                      <div
+                        key={hour}
+                        onClick={() => { if (dayEvents.length === 0) handleTimeSlotClick(dayDate, hour); }}
+                        className={cn(
+                          'flex border-t border-glass-border min-h-[52px] group transition-colors',
+                          dayEvents.length === 0 && 'cursor-pointer hover:bg-neon-cyan/5',
+                          isPast && 'opacity-60'
+                        )}
+                      >
+                        <div className="w-16 flex-shrink-0 py-2 pr-3 text-right">
+                          <span className="text-xs font-mono text-dark-500">
+                            {hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`}
+                          </span>
+                        </div>
+                        <div className="flex-1 py-1 pl-3 border-l border-glass-border">
+                          {dayEvents.length > 0 ? (
+                            dayEvents.map(event => (
+                              <button
+                                key={event.id}
+                                onClick={(e) => { e.stopPropagation(); handleEditEvent(event); }}
+                                className={cn(
+                                  'w-full text-left px-3 py-2 rounded-lg mb-1 border transition-all hover:scale-[1.01]',
+                                  'bg-neon-cyan/10 border-neon-cyan/30 text-white'
+                                )}
+                                style={{ borderLeftColor: getCategoryHex(event.category), borderLeftWidth: '3px' }}
+                              >
+                                <p className="text-sm font-medium truncate">{event.title}</p>
+                                <p className="text-[10px] text-dark-400">
+                                  {new Date(event.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} — {new Date(event.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </p>
+                              </button>
+                            ))
+                          ) : (
+                            <div className="h-full flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                              <span className="text-xs text-dark-500 flex items-center gap-1"><Plus className="w-3 h-3" /> Add event</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Card>
             )}
           </motion.div>
 
