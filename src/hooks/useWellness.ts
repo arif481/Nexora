@@ -61,7 +61,7 @@ export function useWellness(date: Date = new Date()): UseWellnessReturn {
 
     setLoading(true);
     setError(null);
-    
+
     const unsubscribe = subscribeToWellnessEntry(
       user.uid,
       date,
@@ -84,7 +84,7 @@ export function useWellness(date: Date = new Date()): UseWellnessReturn {
   const handleInitializeEntry = useCallback(
     async (entryDate: Date = new Date()): Promise<WellnessEntry> => {
       if (!user) throw new Error('User not authenticated');
-      
+
       try {
         const newEntry = await getOrCreateWellnessEntry(user.uid, entryDate);
         return newEntry;
@@ -99,7 +99,7 @@ export function useWellness(date: Date = new Date()): UseWellnessReturn {
   const handleUpdateSleep = useCallback(
     async (entryDate: Date, data: Partial<SleepData>): Promise<void> => {
       if (!user) throw new Error('User not authenticated');
-      
+
       try {
         await updateSleepData(user.uid, entryDate, data);
       } catch (err: any) {
@@ -113,7 +113,7 @@ export function useWellness(date: Date = new Date()): UseWellnessReturn {
   const handleUpdateActivity = useCallback(
     async (entryDate: Date, data: Partial<ActivityData>): Promise<void> => {
       if (!user) throw new Error('User not authenticated');
-      
+
       try {
         await updateActivityData(user.uid, entryDate, data);
       } catch (err: any) {
@@ -127,7 +127,7 @@ export function useWellness(date: Date = new Date()): UseWellnessReturn {
   const handleAddExercise = useCallback(
     async (entryDate: Date, exercise: Exercise): Promise<void> => {
       if (!user) throw new Error('User not authenticated');
-      
+
       try {
         await addExercise(user.uid, entryDate, exercise);
       } catch (err: any) {
@@ -141,7 +141,7 @@ export function useWellness(date: Date = new Date()): UseWellnessReturn {
   const handleUpdateNutrition = useCallback(
     async (entryDate: Date, data: Partial<NutritionData>): Promise<void> => {
       if (!user) throw new Error('User not authenticated');
-      
+
       try {
         await updateNutritionData(user.uid, entryDate, data);
       } catch (err: any) {
@@ -155,7 +155,7 @@ export function useWellness(date: Date = new Date()): UseWellnessReturn {
   const handleAddMeal = useCallback(
     async (entryDate: Date, meal: Meal): Promise<void> => {
       if (!user) throw new Error('User not authenticated');
-      
+
       try {
         await addMeal(user.uid, entryDate, meal);
       } catch (err: any) {
@@ -169,7 +169,7 @@ export function useWellness(date: Date = new Date()): UseWellnessReturn {
   const handleAddWater = useCallback(
     async (entryDate: Date, amount: number): Promise<void> => {
       if (!user) throw new Error('User not authenticated');
-      
+
       try {
         await updateWaterIntake(user.uid, entryDate, amount);
       } catch (err: any) {
@@ -183,7 +183,7 @@ export function useWellness(date: Date = new Date()): UseWellnessReturn {
   const handleUpdateStress = useCallback(
     async (entryDate: Date, data: Partial<StressData>): Promise<void> => {
       if (!user) throw new Error('User not authenticated');
-      
+
       try {
         await updateStressData(user.uid, entryDate, data);
       } catch (err: any) {
@@ -197,7 +197,7 @@ export function useWellness(date: Date = new Date()): UseWellnessReturn {
   const handleAddFocusSession = useCallback(
     async (entryDate: Date, session: Omit<FocusSession, 'id'>): Promise<void> => {
       if (!user) throw new Error('User not authenticated');
-      
+
       try {
         await addFocusSession(user.uid, entryDate, session);
       } catch (err: any) {
@@ -315,8 +315,8 @@ export function useRecentWellness(days: number = 7) {
 // Hook for wellness statistics
 export function useWellnessStats(entries: WellnessEntry[]) {
   // Ensure entries is always an array - do this before useMemo to ensure stable reference
-  const safeEntries = Array.isArray(entries) ? entries : [];
-  
+  const safeEntries = useMemo(() => Array.isArray(entries) ? entries : [], [entries]);
+
   const stats = useMemo(() => {
     if (safeEntries.length === 0) {
       return {
@@ -341,14 +341,14 @@ export function useWellnessStats(entries: WellnessEntry[]) {
       : 0;
 
     const totalActiveMinutes = safeEntries.reduce((sum, e) => sum + (e.activity?.activeMinutes || 0), 0);
-    
+
     const stressEntries = safeEntries.filter((e) => e.stress?.level);
     const avgStressLevel = stressEntries.length > 0
       ? stressEntries.reduce((sum, e) => sum + e.stress.level, 0) / stressEntries.length
       : 0;
 
     const totalWaterIntake = safeEntries.reduce((sum, e) => sum + (e.nutrition?.waterIntake || 0), 0);
-    
+
     const totalFocusMinutes = safeEntries.reduce(
       (sum, e) => sum + (e.focusSessions || []).reduce((s, f) => s + f.duration, 0),
       0

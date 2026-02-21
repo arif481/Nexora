@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, Suspense } from 'react';
 import { motion } from 'framer-motion';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -14,20 +14,12 @@ import { GlobalModals } from '../GlobalModals';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { useNotificationTriggers } from '@/hooks/useNotificationTriggers';
 
-interface MainLayoutProps {
-  children: ReactNode;
-}
-
-export function MainLayout({ children }: MainLayoutProps) {
-  const { sidebarCollapsed, focusModeActive, openModal } = useUIStore();
+function QuickCaptureHandler() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
+  const { openModal } = useUIStore();
 
-  // Auto-check for due tasks and upcoming events
-  useNotificationTriggers();
-
-  // Handle Quick Capture redirects from bookmarklet
   useEffect(() => {
     if (searchParams.get('quickcapture') === '1') {
       const type = searchParams.get('qc_type');
@@ -51,8 +43,25 @@ export function MainLayout({ children }: MainLayoutProps) {
     }
   }, [searchParams, router, pathname, openModal]);
 
+  return null;
+}
+
+interface MainLayoutProps {
+  children: ReactNode;
+}
+
+export function MainLayout({ children }: MainLayoutProps) {
+  const { sidebarCollapsed, focusModeActive } = useUIStore();
+
+  // Auto-check for due tasks and upcoming events
+  useNotificationTriggers();
+
   return (
     <div className="min-h-screen bg-dark-950">
+      <Suspense fallback={null}>
+        <QuickCaptureHandler />
+      </Suspense>
+
       {/* Background Effects */}
       <div className="fixed inset-0 pointer-events-none">
         {/* Grid Pattern */}

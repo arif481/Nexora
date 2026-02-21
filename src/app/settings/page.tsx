@@ -1760,7 +1760,7 @@ function IntegrationsSection() {
           </p>
           <div className="flex items-center gap-4">
             <a
-              href={`javascript:void(window.open('${typeof window !== 'undefined' ? window.location.origin : ''}/api/quickcapture?url='+encodeURIComponent(location.href)+'&title='+encodeURIComponent(document.title)+'&type=task','nexora_capture','width=500,height=400'))`}
+              href={`javascript:void(window.open('${typeof window !== 'undefined' ? window.location.origin : ''}/?quickcapture=1&qc_url='+encodeURIComponent(location.href)+'&qc_title='+encodeURIComponent(document.title)+'&qc_type=task','nexora_capture','width=600,height=700'))`}
               onClick={(e) => e.preventDefault()}
               draggable
               className="inline-flex items-center gap-2 px-4 py-2 bg-neon-cyan/20 border border-neon-cyan/50 rounded-xl text-neon-cyan font-medium text-sm cursor-grab active:cursor-grabbing hover:bg-neon-cyan/30 transition-colors"
@@ -1772,7 +1772,7 @@ function IntegrationsSection() {
           </div>
           <div className="p-3 rounded-lg bg-dark-800/50 border border-dark-700">
             <p className="text-xs text-dark-400">
-              <strong className="text-white">How it works:</strong> When clicked, a small popup opens confirming the capture, then redirects to Nexora with the page title and URL pre-filled.
+              <strong className="text-white">How it works:</strong> When clicked from any web page, it opens Nexora in a small window with the page title and URL automatically extracted and ready to save.
             </p>
           </div>
         </CardContent>

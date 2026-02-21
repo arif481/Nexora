@@ -379,6 +379,7 @@ export default function FocusPage() {
         clearInterval(timerRef.current);
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
 
   const handleTimerComplete = async () => {

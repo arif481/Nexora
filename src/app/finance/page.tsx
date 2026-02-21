@@ -310,7 +310,7 @@ export default function FinancePage() {
   }, [personAccounts, selectedPersonAccount]);
 
   // Calculate monthly stats - MUST be called before any early returns
-  const safeTransactions = Array.isArray(transactions) ? transactions : [];
+  const safeTransactions = useMemo(() => Array.isArray(transactions) ? transactions : [], [transactions]);
   const monthlyStats = useMemo(() => {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);

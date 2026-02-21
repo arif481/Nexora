@@ -8,18 +8,17 @@ import type { Recipe } from '@/types';
  */
 export async function parseRecipeFromURL(url: string): Promise<Partial<Recipe> | null> {
     try {
-        // Step 1: Fetch the page HTML via our server-side proxy
-        const scrapeRes = await fetch('/api/scrape', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url }),
+        // Step 1: Fetch the page HTML via a public CORS proxy (since we're a static export)
+        const scrapeRes = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`, {
+            headers: { 'User-Agent': 'Mozilla/5.0 (compatible; NexoraBot/1.0)' },
         });
 
         if (!scrapeRes.ok) {
             throw new Error('Failed to fetch URL');
         }
 
-        const { html } = await scrapeRes.json();
+        let html = await scrapeRes.text();
+        html = html.substring(0, 15000); // Truncate to save tokens avoiding huge payloads
 
         // Step 2: Try Gemini API for smart extraction
         const geminiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
