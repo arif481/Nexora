@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
@@ -45,7 +45,22 @@ export default function NovaPage() {
     const { goals } = useGoals();
     const [activeTab, setActiveTab] = useState<Tab>('overview');
     const [dismissedNudges, setDismissedNudges] = useState<Set<string>>(new Set());
-    const [automationRules, setAutomationRules] = useState<AutomationRule[]>([]);
+    const [automationRules, setAutomationRules] = useState<AutomationRule[]>(() => {
+        if (typeof window === 'undefined') return [];
+        try {
+            const saved = localStorage.getItem('nexora_nova_rules');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                return parsed.map((r: any) => ({ ...r, createdAt: new Date(r.createdAt) }));
+            }
+        } catch { }
+        return [];
+    });
+
+    // Persist automation rules to localStorage
+    useEffect(() => {
+        try { localStorage.setItem('nexora_nova_rules', JSON.stringify(automationRules)); } catch { }
+    }, [automationRules]);
 
     // Build context from available data
     const aiContext: AIContext = useMemo(() => ({
@@ -68,7 +83,7 @@ export default function NovaPage() {
         setDismissedNudges(prev => new Set(prev).add(id));
     }, []);
 
-    // Automation rules handlers (stored locally for now)
+    // Automation rules handlers (persisted via localStorage)
     const handleAddRule = useCallback((rule: Omit<AutomationRule, 'id' | 'createdAt'>) => {
         setAutomationRules(prev => [
             { ...rule, id: `rule_${Date.now()}`, createdAt: new Date() },

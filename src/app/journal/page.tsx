@@ -18,6 +18,8 @@ import {
   Star,
   Loader2,
   Search,
+  Trash2,
+  Edit3,
 } from 'lucide-react';
 import { MainLayout, PageContainer } from '@/components/layout/MainLayout';
 import { Card, CardHeader, CardContent } from '@/components/ui/Card';
@@ -49,11 +51,14 @@ export default function JournalPage() {
   const { user, loading: authLoading } = useAuth();
   const { entries, loading, createEntry, updateEntry, deleteEntry } = useJournal();
   const moodTrend = useMoodTrend(7);
-  
+
   const [selectedEntry, setSelectedEntry] = useState<any | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const { openAIPanel } = useUIStore();
 
@@ -79,8 +84,8 @@ export default function JournalPage() {
   // Calculate stats
   const stats = useMemo(() => {
     const totalEntries = entries.length;
-    const avgMood = totalEntries > 0 
-      ? entries.reduce((sum, e) => sum + (e.mood?.score || 3), 0) / totalEntries 
+    const avgMood = totalEntries > 0
+      ? entries.reduce((sum, e) => sum + (e.mood?.score || 3), 0) / totalEntries
       : 0;
     const thisWeek = entries.filter(e => {
       const entryDate = new Date(e.date);
@@ -88,7 +93,7 @@ export default function JournalPage() {
       weekAgo.setDate(weekAgo.getDate() - 7);
       return entryDate >= weekAgo;
     }).length;
-    
+
     return {
       totalEntries,
       avgMood: avgMood.toFixed(1),
@@ -100,50 +105,55 @@ export default function JournalPage() {
   // Calculate journaling streak
   function calculateStreak(entries: any[]) {
     if (entries.length === 0) return 0;
-    
-    const sortedEntries = [...entries].sort((a, b) => 
+
+    const sortedEntries = [...entries].sort((a, b) =>
       new Date(b.date).getTime() - new Date(a.date).getTime()
     );
-    
+
     let streak = 0;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     for (let i = 0; i < sortedEntries.length; i++) {
       const entryDate = new Date(sortedEntries[i].date);
       entryDate.setHours(0, 0, 0, 0);
-      
+
       const expectedDate = new Date(today);
       expectedDate.setDate(expectedDate.getDate() - i);
-      
+
       if (entryDate.getTime() === expectedDate.getTime()) {
         streak++;
       } else {
         break;
       }
     }
-    
+
     return streak;
   }
 
-  // Create new entry
+  // Create or update entry
   const handleCreateEntry = async () => {
     if (!newEntry.content.trim()) return;
-    
+
     setIsSaving(true);
     try {
       const gratitudeItems = newEntry.gratitude.filter(g => g.trim());
-      
-      await createEntry({
+      const entryData = {
         content: newEntry.content,
         mood: { score: newEntry.moodScore, emotions: [], energyLevel: 5, stressLevel: 5 },
         tags: newEntry.tags ? newEntry.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
         gratitude: gratitudeItems,
         highlights: newEntry.highlights ? [newEntry.highlights] : [],
-        date: new Date(),
-      });
-      
+      };
+
+      if (editingEntryId) {
+        await updateEntry(editingEntryId, entryData);
+      } else {
+        await createEntry({ ...entryData, date: new Date() });
+      }
+
       setIsCreateModalOpen(false);
+      setEditingEntryId(null);
       setNewEntry({
         content: '',
         moodScore: 3,
@@ -152,7 +162,7 @@ export default function JournalPage() {
         highlights: '',
       });
     } catch (err) {
-      console.error('Failed to create entry:', err);
+      console.error('Failed to save entry:', err);
     } finally {
       setIsSaving(false);
     }
@@ -270,7 +280,7 @@ export default function JournalPage() {
                   const mood = getMoodIcon(entry.mood?.score || 3);
                   const MoodIcon = mood.icon;
                   const entryDate = new Date(entry.date);
-                  
+
                   return (
                     <motion.div
                       key={entry.id}
@@ -291,7 +301,7 @@ export default function JournalPage() {
                           )}>
                             <MoodIcon className={cn('w-6 h-6', mood.color)} />
                           </div>
-                          
+
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between mb-2">
                               <span className="text-sm text-dark-400">
@@ -301,11 +311,11 @@ export default function JournalPage() {
                                 {mood.label}
                               </Badge>
                             </div>
-                            
+
                             <p className="text-white line-clamp-3">
                               {entry.content}
                             </p>
-                            
+
                             {entry.tags && entry.tags.length > 0 && (
                               <div className="flex flex-wrap gap-1 mt-2">
                                 {entry.tags.slice(0, 3).map((tag: string) => (
@@ -359,12 +369,12 @@ export default function JournalPage() {
               <div className="flex items-end justify-between gap-2 h-24">
                 {moodTrend.data.map((day, i) => (
                   <div key={i} className="flex flex-col items-center gap-1 flex-1">
-                    <div 
+                    <div
                       className={cn(
                         'w-full rounded-t-lg transition-all',
                         day.mood.score >= 4 ? 'bg-neon-green' :
-                        day.mood.score >= 3 ? 'bg-neon-cyan' :
-                        day.mood.score >= 2 ? 'bg-neon-orange' : 'bg-red-500'
+                          day.mood.score >= 3 ? 'bg-neon-cyan' :
+                            day.mood.score >= 2 ? 'bg-neon-orange' : 'bg-red-500'
                       )}
                       style={{ height: `${(day.mood.score / 5) * 100}%`, minHeight: '4px' }}
                     />
@@ -388,10 +398,10 @@ export default function JournalPage() {
                     {entries.length === 0
                       ? "📝 Start journaling to receive personalized insights about your patterns and emotions."
                       : stats.streak >= 7
-                      ? "🎉 Amazing streak! Consistent journaling helps build self-awareness."
-                      : Number(stats.avgMood) >= 4
-                      ? "😊 Your mood has been great lately! Keep up the positive mindset."
-                      : "💭 Take a moment to reflect on what's affecting your mood."}
+                        ? "🎉 Amazing streak! Consistent journaling helps build self-awareness."
+                        : Number(stats.avgMood) >= 4
+                          ? "😊 Your mood has been great lately! Keep up the positive mindset."
+                          : "💭 Take a moment to reflect on what's affecting your mood."}
                   </p>
                 </div>
                 <Button
@@ -436,7 +446,7 @@ export default function JournalPage() {
         <Modal
           isOpen={isCreateModalOpen}
           onClose={() => setIsCreateModalOpen(false)}
-          title="New Journal Entry"
+          title={editingEntryId ? 'Edit Journal Entry' : 'New Journal Entry'}
           size="lg"
         >
           <div className="space-y-4">
@@ -461,7 +471,7 @@ export default function JournalPage() {
                 ))}
               </div>
             </div>
-            
+
             {/* Content */}
             <div>
               <label className="block text-sm font-medium text-dark-300 mb-2">What's on your mind?</label>
@@ -548,7 +558,7 @@ export default function JournalPage() {
                   {getMoodIcon(selectedEntry.mood?.score || 3).label}
                 </Badge>
               </div>
-              
+
               <div className="p-4 rounded-lg bg-dark-800/50">
                 <p className="text-white whitespace-pre-wrap">{selectedEntry.content}</p>
               </div>
@@ -575,17 +585,84 @@ export default function JournalPage() {
                 </div>
               )}
 
+              {/* Delete Confirmation */}
+              {showDeleteConfirm && (
+                <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30">
+                  <p className="text-sm text-red-400 mb-3">Delete this entry? This cannot be undone.</p>
+                  <div className="flex gap-2">
+                    <Button variant="ghost" size="sm" onClick={() => setShowDeleteConfirm(false)}>Cancel</Button>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      className="bg-red-600 hover:bg-red-700"
+                      onClick={async () => {
+                        if (!selectedEntry) return;
+                        setIsDeleting(true);
+                        try {
+                          await deleteEntry(selectedEntry.id);
+                          setIsViewModalOpen(false);
+                          setSelectedEntry(null);
+                          setShowDeleteConfirm(false);
+                        } catch (err) {
+                          console.error('Failed to delete entry:', err);
+                        } finally {
+                          setIsDeleting(false);
+                        }
+                      }}
+                      disabled={isDeleting}
+                    >
+                      <Trash2 className="w-3 h-3 mr-1" />
+                      {isDeleting ? 'Deleting...' : 'Delete'}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               <div className="flex gap-3 pt-4">
                 <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => {
-                    setIsViewModalOpen(false);
-                    setSelectedEntry(null);
-                  }}
+                  variant="ghost"
+                  className="text-red-400 hover:text-red-300"
+                  onClick={() => setShowDeleteConfirm(true)}
                 >
-                  Close
+                  <Trash2 className="w-4 h-4 mr-1" />
+                  Delete
                 </Button>
+                <div className="flex gap-3 flex-1 justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      if (selectedEntry) {
+                        setEditingEntryId(selectedEntry.id);
+                        setNewEntry({
+                          content: selectedEntry.content || '',
+                          moodScore: selectedEntry.mood?.score || 3,
+                          tags: selectedEntry.tags?.join(', ') || '',
+                          gratitude: [
+                            selectedEntry.gratitude?.[0] || '',
+                            selectedEntry.gratitude?.[1] || '',
+                            selectedEntry.gratitude?.[2] || '',
+                          ],
+                          highlights: '',
+                        });
+                        setIsViewModalOpen(false);
+                        setIsCreateModalOpen(true);
+                      }
+                    }}
+                  >
+                    <Edit3 className="w-4 h-4 mr-1" />
+                    Edit
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setIsViewModalOpen(false);
+                      setSelectedEntry(null);
+                      setShowDeleteConfirm(false);
+                    }}
+                  >
+                    Close
+                  </Button>
+                </div>
               </div>
             </div>
           )}

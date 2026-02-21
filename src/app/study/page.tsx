@@ -334,7 +334,15 @@ export default function StudyPage() {
 
   return (
     <MainLayout>
-      <PageContainer title="Study" subtitle="Track your academic progress">
+      <PageContainer
+        title="Study"
+        subtitle="Track your academic progress"
+        actions={
+          <Button variant="glass" leftIcon={<Timer className="w-4 h-4" />} onClick={() => router.push('/focus')}>
+            Focus Mode
+          </Button>
+        }
+      >
         {/* Stats Row */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}

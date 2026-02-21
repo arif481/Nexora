@@ -39,6 +39,8 @@ import {
   Moon,
   Sun,
   LogIn,
+  History,
+  Star,
 } from 'lucide-react';
 import { MainLayout, PageContainer } from '@/components/layout/MainLayout';
 import { Card, CardHeader, CardContent } from '@/components/ui/Card';
@@ -815,6 +817,63 @@ export default function FocusPage() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Session History */}
+            {sessions.length > 0 && (
+              <Card variant="glass">
+                <CardHeader
+                  title="Session History"
+                  icon={<History className="w-5 h-5 text-neon-purple" />}
+                />
+                <CardContent>
+                  <div className="space-y-2 max-h-[280px] overflow-y-auto scrollbar-thin pr-1">
+                    {sessions.slice(0, 20).map((session, idx) => {
+                      const startDate = session.startTime instanceof Date ? session.startTime : new Date(session.startTime);
+                      const isToday = startDate.toDateString() === new Date().toDateString();
+                      return (
+                        <div key={session.id || idx} className="flex items-center gap-3 p-2.5 rounded-lg bg-dark-800/40 hover:bg-dark-800/60 transition-colors">
+                          <div className="w-8 h-8 rounded-lg bg-neon-cyan/10 flex items-center justify-center flex-shrink-0">
+                            <Clock className="w-4 h-4 text-neon-cyan" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-white">
+                                {formatDuration(session.duration)}
+                              </span>
+                              <span className={cn(
+                                "text-[10px] px-1.5 py-0.5 rounded-full uppercase font-bold tracking-wider",
+                                session.type === 'pomodoro' ? "bg-neon-orange/15 text-neon-orange" :
+                                  session.type === 'deep-work' ? "bg-neon-cyan/15 text-neon-cyan" :
+                                    "bg-neon-purple/15 text-neon-purple"
+                              )}>
+                                {session.type.replace('-', ' ')}
+                              </span>
+                            </div>
+                            <p className="text-xs text-dark-400">
+                              {isToday ? `Today at ${startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` :
+                                startDate.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' · ' +
+                                startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          </div>
+                          {session.quality > 0 && (
+                            <div className="flex gap-0.5">
+                              {Array.from({ length: 5 }).map((_, i) => (
+                                <Star key={i} className={cn("w-3 h-3", i < session.quality ? "text-neon-yellow fill-neon-yellow" : "text-dark-600")} />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {sessions.length > 20 && (
+                    <p className="text-xs text-dark-500 text-center mt-2">
+                      Showing 20 of {sessions.length} sessions
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             {/* Tasks */}
             <Card variant="glass">

@@ -1,21 +1,22 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Film, Tv, BookOpen, Gamepad2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useEntertainment } from '@/hooks/useEntertainment';
 import { cn } from '@/lib/utils';
-import type { EntertainmentType, EntertainmentStatus } from '@/types';
+import type { EntertainmentType, EntertainmentStatus, EntertainmentItem } from '@/types';
 
 interface AddMediaModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSuccess?: () => void;
+    editItem?: EntertainmentItem | null;
 }
 
-export function AddMediaModal({ isOpen, onClose, onSuccess }: AddMediaModalProps) {
-    const { createItem } = useEntertainment();
+export function AddMediaModal({ isOpen, onClose, onSuccess, editItem }: AddMediaModalProps) {
+    const { createItem, updateItem } = useEntertainment();
     const [loading, setLoading] = useState(false);
 
     const [type, setType] = useState<EntertainmentType>('movie');
@@ -26,6 +27,20 @@ export function AddMediaModal({ isOpen, onClose, onSuccess }: AddMediaModalProps
     const [progress, setProgress] = useState('');
     const [totalProgress, setTotalProgress] = useState('');
     const [coverImage, setCoverImage] = useState('');
+
+    // Pre-fill when editing
+    useEffect(() => {
+        if (editItem) {
+            setType(editItem.type);
+            setTitle(editItem.title);
+            setCreator(editItem.creator || '');
+            setStatus(editItem.status);
+            setRating(editItem.rating ? String(editItem.rating) : '');
+            setProgress(editItem.progress !== undefined ? String(editItem.progress) : '');
+            setTotalProgress(editItem.totalProgress ? String(editItem.totalProgress) : '');
+            setCoverImage(editItem.coverImage || '');
+        }
+    }, [editItem]);
 
     const types: { id: EntertainmentType; label: string; icon: any }[] = [
         { id: 'movie', label: 'Movie', icon: Film },
@@ -47,7 +62,7 @@ export function AddMediaModal({ isOpen, onClose, onSuccess }: AddMediaModalProps
 
         setLoading(true);
         try {
-            await createItem({
+            const data = {
                 type,
                 title: title.trim(),
                 creator: creator.trim() || undefined,
@@ -58,11 +73,17 @@ export function AddMediaModal({ isOpen, onClose, onSuccess }: AddMediaModalProps
                 coverImage: coverImage.trim() || undefined,
                 startedAt: status === 'in_progress' ? new Date() : undefined,
                 completedAt: status === 'completed' ? new Date() : undefined,
-            });
+            };
+
+            if (editItem) {
+                await updateItem(editItem.id, data);
+            } else {
+                await createItem(data);
+            }
             if (onSuccess) onSuccess();
             handleClose();
         } catch (error) {
-            console.error('Failed to create item:', error);
+            console.error('Failed to save item:', error);
         } finally {
             setLoading(false);
         }
@@ -97,7 +118,7 @@ export function AddMediaModal({ isOpen, onClose, onSuccess }: AddMediaModalProps
                         className="relative w-full max-w-lg bg-dark-800 border border-glass-border rounded-2xl shadow-glass-lg overflow-hidden flex flex-col max-h-[90vh]"
                     >
                         <div className="flex items-center justify-between p-6 border-b border-glass-border">
-                            <h2 className="text-xl font-semibold text-white">Add to Library</h2>
+                            <h2 className="text-xl font-semibold text-white">{editItem ? 'Edit Media' : 'Add to Library'}</h2>
                             <button
                                 onClick={handleClose}
                                 className="p-2 text-white/50 hover:text-white hover:bg-glass-medium rounded-xl transition-colors"
@@ -257,7 +278,7 @@ export function AddMediaModal({ isOpen, onClose, onSuccess }: AddMediaModalProps
                                 variant="glow"
                                 disabled={!title.trim() || loading}
                             >
-                                {loading ? 'Adding...' : 'Add to Library'}
+                                {loading ? (editItem ? 'Saving...' : 'Adding...') : (editItem ? 'Save Changes' : 'Add to Library')}
                             </Button>
                         </div>
                     </motion.div>
