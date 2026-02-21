@@ -106,7 +106,7 @@ export function useCalendar(): UseCalendarReturn {
   const handleCreateEvent = useCallback(
     async (data: CreateEventData): Promise<string> => {
       if (!user) throw new Error('User not authenticated');
-      
+
       try {
         const eventId = await createCalendarEvent(user.uid, data);
         return eventId;
@@ -145,7 +145,7 @@ export function useCalendar(): UseCalendarReturn {
   const handleCreateFocusBlock = useCallback(
     async (data: CreateFocusBlockData): Promise<string> => {
       if (!user) throw new Error('User not authenticated');
-      
+
       try {
         const blockId = await createFocusBlock(user.uid, data);
         return blockId;
@@ -206,7 +206,7 @@ export function useEventsInRange(startDate: Date, endDate: Date) {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Memoize date strings to prevent infinite re-renders
   const startDateStr = startDate.toISOString();
   const endDateStr = endDate.toISOString();
@@ -257,7 +257,7 @@ export function useTodayEvents() {
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
@@ -293,6 +293,7 @@ export function useEventsByCategory(events: CalendarEvent[]) {
     social: [],
     learning: [],
     rest: [],
+    exam: [],
     other: [],
   });
 
@@ -304,6 +305,7 @@ export function useEventsByCategory(events: CalendarEvent[]) {
       social: [],
       learning: [],
       rest: [],
+      exam: [],
       other: [],
     };
 

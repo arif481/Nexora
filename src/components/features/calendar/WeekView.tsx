@@ -49,10 +49,11 @@ export function WeekView({ currentDate, events, onEventClick, onTimeSlotClick }:
             work: 'bg-neon-cyan/20 border-neon-cyan text-neon-cyan',
             personal: 'bg-neon-purple/20 border-neon-purple text-neon-purple',
             health: 'bg-neon-green/20 border-neon-green text-neon-green',
-            social: 'bg-neon-orange/20 border-neon-orange text-neon-orange',
-            learning: 'bg-neon-pink/20 border-neon-pink text-neon-pink',
-            rest: 'bg-blue-500/20 border-blue-500 text-blue-500',
-            other: 'bg-gray-500/20 border-gray-500 text-gray-500',
+            social: 'bg-neon-pink/20 border-neon-pink text-neon-pink',
+            learning: 'bg-emerald-500/20 border-emerald-500 text-emerald-400',
+            rest: 'bg-indigo-500/20 border-indigo-500 text-indigo-400',
+            exam: 'bg-red-500/20 border-red-500 text-red-500',
+            other: 'bg-dark-600 border-dark-500 text-gray-300'
         };
         return map[category] || map['other'];
     };

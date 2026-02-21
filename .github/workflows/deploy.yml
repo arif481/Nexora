@@ -41,6 +41,7 @@ jobs:
           NEXT_PUBLIC_GEMINI_API_KEY: ${{ secrets.NEXT_PUBLIC_GEMINI_API_KEY }}
           NEXT_PUBLIC_TMDB_API_KEY: ${{ secrets.NEXT_PUBLIC_TMDB_API_KEY }}
           NEXT_PUBLIC_EDUPLANR_API_URL: ${{ secrets.NEXT_PUBLIC_EDUPLANR_API_URL }}
+          NEXT_PUBLIC_EDUPLANR_PUSH_URL: ${{ secrets.NEXT_PUBLIC_EDUPLANR_PUSH_URL }}
         run: npm run build
       - name: Add .nojekyll
         run: touch ./out/.nojekyll
