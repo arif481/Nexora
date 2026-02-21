@@ -191,9 +191,9 @@ export function Sidebar() {
           'lg:translate-x-0'
         )}
       >
-        {/* Logo */}
+        {/* Logo (Fixed at Top) */}
         <div className={cn(
-          'flex items-center gap-3 p-4 border-b border-glass-border',
+          'flex-shrink-0 flex items-center gap-3 p-4 border-b border-glass-border',
           sidebarCollapsed ? 'justify-center' : 'px-5'
         )}>
           <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-neon-cyan to-neon-purple flex items-center justify-center">
@@ -208,16 +208,16 @@ export function Sidebar() {
           )}
         </div>
 
-        {/* Navigation */}
-        <div className="flex-1 overflow-y-auto scrollbar-thin scroll-smooth p-3">
+        {/* Navigation (Scrollable Middle Section) */}
+        <div className="flex-1 overflow-y-auto scrollbar-thin scroll-smooth p-3 pb-24">
           <NavSection title="Main" items={mainNavItems} />
           <NavSection title="Productivity" items={productivityItems} />
           <NavSection title="Wellness" items={wellnessItems} />
           <NavSection title="Other" items={otherItems} />
         </div>
 
-        {/* Bottom Section */}
-        <div className="p-3 border-t border-glass-border">
+        {/* Bottom Section (Fixed at Bottom) */}
+        <div className="flex-shrink-0 p-3 border-t border-glass-border bg-dark-900/50 backdrop-blur-md">
           {/* Collapse Button */}
           <button
             onClick={toggleSidebarCollapsed}
