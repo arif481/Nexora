@@ -1750,6 +1750,33 @@ function IntegrationsSection() {
           )}
         </CardContent>
       </Card>
+
+      {/* Quick Capture Bookmarklet */}
+      <Card variant="glass">
+        <CardHeader title="Quick Capture Bookmarklet" icon={<Zap className="w-5 h-5 text-neon-green" />} />
+        <CardContent className="p-6 space-y-4">
+          <p className="text-sm text-dark-400">
+            Drag the button below to your browser&apos;s bookmark bar. Click it on any page to instantly capture the URL as a task, note, or recipe in Nexora.
+          </p>
+          <div className="flex items-center gap-4">
+            <a
+              href={`javascript:void(window.open('${typeof window !== 'undefined' ? window.location.origin : ''}/api/quickcapture?url='+encodeURIComponent(location.href)+'&title='+encodeURIComponent(document.title)+'&type=task','nexora_capture','width=500,height=400'))`}
+              onClick={(e) => e.preventDefault()}
+              draggable
+              className="inline-flex items-center gap-2 px-4 py-2 bg-neon-cyan/20 border border-neon-cyan/50 rounded-xl text-neon-cyan font-medium text-sm cursor-grab active:cursor-grabbing hover:bg-neon-cyan/30 transition-colors"
+            >
+              <Zap className="w-4 h-4" />
+              📌 Capture to Nexora
+            </a>
+            <p className="text-xs text-dark-500">← Drag this to your bookmark bar</p>
+          </div>
+          <div className="p-3 rounded-lg bg-dark-800/50 border border-dark-700">
+            <p className="text-xs text-dark-400">
+              <strong className="text-white">How it works:</strong> When clicked, a small popup opens confirming the capture, then redirects to Nexora with the page title and URL pre-filled.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

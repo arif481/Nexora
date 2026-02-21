@@ -36,6 +36,7 @@ import {
   Building2,
   MessageCircle,
   User,
+  Upload,
 } from 'lucide-react';
 
 interface CommandItem {
@@ -84,6 +85,7 @@ export function CommandPalette() {
     { id: 'action-new-note', title: 'Create New Note', subtitle: 'Capture your thoughts', icon: FileText, category: 'actions', action: () => openModal('create-note'), shortcut: 'N N' },
     { id: 'action-journal', title: 'Write Journal Entry', subtitle: 'Reflect on your day', icon: BookOpen, category: 'actions', action: () => openModal('journal-entry'), shortcut: 'N J' },
     { id: 'action-focus', title: 'Start Focus Session', subtitle: 'Enter deep work mode', icon: Brain, category: 'actions', action: () => router.push('/focus'), shortcut: 'F' },
+    { id: 'action-import', title: 'Import Data', subtitle: 'Import CSV/JSON from other apps', icon: Upload, category: 'actions', action: () => openModal('bulk-import') },
 
     // AI
     { id: 'ai-chat', title: 'Ask AI Assistant', subtitle: 'Get help with anything', icon: Sparkles, category: 'ai', action: () => router.push('/ai'), shortcut: 'A' },

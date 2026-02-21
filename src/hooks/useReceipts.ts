@@ -9,6 +9,7 @@ import {
 } from '@/lib/services/receipts';
 import { generateGeminiResponse } from '@/lib/services/gemini';
 import { uploadFile } from '@/lib/services/storage';
+import { parseReceiptPhoto } from '@/lib/parsers/foodPhotoParser';
 
 export function useReceipts() {
     const { user } = useAuth();
@@ -59,47 +60,21 @@ export function useReceipts() {
                 // in this scope, but let's implement the prompt logic for text at least
                 // A complete Gemini Vision implementation would pass the image bytes.
 
-                const base64Data = await new Promise<string>((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.readAsDataURL(file);
-                    reader.onload = () => resolve(reader.result as string);
-                    reader.onerror = reject;
-                });
+                const parsed = await parseReceiptPhoto(file);
 
-                // Use standard Gemini call, assuming standard text context if vision unavailable,
-                // (If full multimodal was set up in the service, we'd use gemini-1.5-pro for vision)
-                const prompt = `You are a receipt parser AI. Analyze this receipt image (provided as base64 data).
-Extract and return ONLY a valid JSON object with no extra text:
-{
-  "merchantName": "string",
-  "totalAmount": number,
-  "date": "YYYY-MM-DD",
-  "lineItems": [{"description": "string", "amount": number, "quantity": number}]
-}
-If you cannot fully read the receipt, extract what you can and estimate the rest based on common receipt patterns.`;
-
-                // Pass the prompt to Gemini. Full multimodal vision would pass the image
-                // bytes directly; here we rely on the text-based Gemini call.
-                const response = await generateGeminiResponse(prompt);
-                let parsed;
-                try {
-                    const jsonStr = response.content.replace(/```json/g, '').replace(/```/g, '').trim();
-                    parsed = JSON.parse(jsonStr);
-                } catch (e) {
-                    // fallback generic
-                    parsed = {
-                        merchantName: "Scanned Receipt",
-                        totalAmount: 0,
-                        date: new Date().toISOString().split('T')[0],
-                        lineItems: []
-                    }
+                if (!parsed) {
+                    throw new Error('Failed to parse receipt image using AI Vision.');
                 }
 
                 const newReceipt: Omit<ReceiptScan, 'id' | 'userId' | 'createdAt'> = {
-                    merchantName: parsed.merchantName || 'Unknown',
-                    totalAmount: parsed.totalAmount || 0,
+                    merchantName: parsed.merchant || 'Unknown',
+                    totalAmount: parsed.total || 0,
                     date: parsed.date ? new Date(parsed.date) : new Date(),
-                    lineItems: parsed.lineItems || [],
+                    lineItems: (parsed.items || []).map((item: any) => ({
+                        description: item.name || 'Unknown Item',
+                        amount: item.price || 0,
+                        quantity: 1,
+                    })),
                     imageUrl,
                     status: 'processed'
                 };

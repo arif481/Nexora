@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Film, Tv, BookOpen, Gamepad2 } from 'lucide-react';
+import { X, Film, Tv, BookOpen, Gamepad2, Search, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useEntertainment } from '@/hooks/useEntertainment';
 import { cn } from '@/lib/utils';
 import type { EntertainmentType, EntertainmentStatus, EntertainmentItem } from '@/types';
+import { searchMedia, type MediaSearchResult } from '@/lib/parsers/mediaLookup';
 
 interface AddMediaModalProps {
     isOpen: boolean;
@@ -27,6 +28,10 @@ export function AddMediaModal({ isOpen, onClose, onSuccess, editItem }: AddMedia
     const [progress, setProgress] = useState('');
     const [totalProgress, setTotalProgress] = useState('');
     const [coverImage, setCoverImage] = useState('');
+    const [searchResults, setSearchResults] = useState<MediaSearchResult[]>([]);
+    const [searching, setSearching] = useState(false);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const searchTimeout = useRef<NodeJS.Timeout>();
 
     // Pre-fill when editing
     useEffect(() => {
@@ -158,16 +163,69 @@ export function AddMediaModal({ isOpen, onClose, onSuccess, editItem }: AddMedia
                                 </div>
 
                                 {/* Title */}
-                                <div className="space-y-2">
+                                <div className="space-y-2 relative">
                                     <label className="text-sm font-medium text-white/70">Title *</label>
                                     <input
                                         type="text"
                                         required
                                         value={title}
-                                        onChange={(e) => setTitle(e.target.value)}
+                                        onChange={(e) => {
+                                            setTitle(e.target.value);
+                                            // Debounced media search
+                                            const q = e.target.value.trim();
+                                            if (searchTimeout.current) clearTimeout(searchTimeout.current);
+                                            if (q.length >= 3 && (type === 'movie' || type === 'tv' || type === 'book')) {
+                                                setSearching(true);
+                                                searchTimeout.current = setTimeout(async () => {
+                                                    const results = await searchMedia(q, type === 'tv' ? 'tv' : type === 'book' ? 'book' : 'movie');
+                                                    setSearchResults(results);
+                                                    setShowSuggestions(results.length > 0);
+                                                    setSearching(false);
+                                                }, 500);
+                                            } else {
+                                                setSearchResults([]);
+                                                setShowSuggestions(false);
+                                                setSearching(false);
+                                            }
+                                        }}
+                                        onFocus={() => searchResults.length > 0 && setShowSuggestions(true)}
                                         placeholder="e.g., Inception, The Great Gatsby..."
                                         className="w-full bg-glass-light border border-glass-border rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-neon-cyan/50 transition-colors"
                                     />
+                                    {/* Search indicator */}
+                                    {searching && (
+                                        <div className="absolute right-3 top-[38px]">
+                                            <Loader2 className="w-4 h-4 text-neon-cyan animate-spin" />
+                                        </div>
+                                    )}
+                                    {/* Auto-fill suggestions */}
+                                    {showSuggestions && searchResults.length > 0 && (
+                                        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-dark-800 border border-dark-600 rounded-xl overflow-hidden shadow-xl">
+                                            {searchResults.map((result, i) => (
+                                                <button
+                                                    key={result.externalId || i}
+                                                    type="button"
+                                                    className="flex items-center gap-3 w-full px-3 py-2 hover:bg-dark-700 transition-colors text-left"
+                                                    onClick={() => {
+                                                        setTitle(result.title);
+                                                        if (result.creator) setCreator(result.creator);
+                                                        if (result.coverImage) setCoverImage(result.coverImage);
+                                                        setShowSuggestions(false);
+                                                    }}
+                                                >
+                                                    {result.coverImage && (
+                                                        <img src={result.coverImage} alt="" className="w-8 h-12 object-cover rounded" />
+                                                    )}
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-sm text-white truncate">{result.title}</p>
+                                                        <p className="text-xs text-dark-400">
+                                                            {[result.creator, result.year].filter(Boolean).join(' · ')}
+                                                        </p>
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Creator (Director, Author, Studio) */}

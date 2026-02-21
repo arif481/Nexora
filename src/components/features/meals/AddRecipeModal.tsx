@@ -2,9 +2,10 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Utensils, Clock, Users, Link as LinkIcon, Image as ImageIcon, Plus, Trash2 } from 'lucide-react';
+import { X, Utensils, Clock, Users, Link as LinkIcon, Image as ImageIcon, Plus, Trash2, Loader2, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useRecipes } from '@/hooks/useMeals';
+import { parseRecipeFromURL } from '@/lib/parsers/recipeParser';
 
 interface AddRecipeModalProps {
     isOpen: boolean;
@@ -26,6 +27,27 @@ export function AddRecipeModal({ isOpen, onClose, onSuccess }: AddRecipeModalPro
     const [ingredients, setIngredients] = useState<string[]>([]);
     const [instructionInput, setInstructionInput] = useState('');
     const [instructions, setInstructions] = useState<string[]>([]);
+    const [importing, setImporting] = useState(false);
+
+    const handleImportFromURL = async () => {
+        if (!sourceUrl.trim()) return;
+        setImporting(true);
+        try {
+            const result = await parseRecipeFromURL(sourceUrl.trim());
+            if (result) {
+                if (result.title && !title) setTitle(result.title);
+                if (result.prepTime) setPrepTime(String(result.prepTime));
+                if (result.cookTime) setCookTime(String(result.cookTime));
+                if (result.servings) setServings(String(result.servings));
+                if (result.ingredients?.length) setIngredients(result.ingredients);
+                if (result.instructions?.length) setInstructions(result.instructions);
+            }
+        } catch (err) {
+            console.error('Failed to parse recipe URL:', err);
+        } finally {
+            setImporting(false);
+        }
+    };
 
     const handleAddIngredient = (e: React.FormEvent) => {
         e.preventDefault();
@@ -186,6 +208,22 @@ export function AddRecipeModal({ isOpen, onClose, onSuccess }: AddRecipeModalPro
                                                 className="w-full pl-9 pr-4 py-3 bg-glass-light border border-glass-border rounded-xl text-white placeholder-white/30 focus:outline-none focus:border-neon-cyan/50 transition-colors text-sm"
                                             />
                                         </div>
+                                        {sourceUrl.trim() && (
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={handleImportFromURL}
+                                                disabled={importing}
+                                                className="mt-1 text-xs"
+                                            >
+                                                {importing ? (
+                                                    <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Parsing...</>
+                                                ) : (
+                                                    <><Wand2 className="w-3 h-3 mr-1" /> Auto-fill from URL</>
+                                                )}
+                                            </Button>
+                                        )}
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium text-white/70">Image URL</label>
