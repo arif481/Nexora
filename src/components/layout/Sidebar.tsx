@@ -209,7 +209,7 @@ export function Sidebar() {
         </div>
 
         {/* Navigation */}
-        <div className="flex-1 overflow-y-auto scrollbar-thin p-3">
+        <div className="flex-1 overflow-y-auto scrollbar-thin scroll-smooth p-3">
           <NavSection title="Main" items={mainNavItems} />
           <NavSection title="Productivity" items={productivityItems} />
           <NavSection title="Wellness" items={wellnessItems} />
@@ -218,38 +218,11 @@ export function Sidebar() {
 
         {/* Bottom Section */}
         <div className="p-3 border-t border-glass-border">
-          {/* AI Quick Access */}
-          {!sidebarCollapsed && (
-            <Link
-              href="/ai"
-              className="block mb-3 p-3 rounded-xl bg-gradient-to-r from-neon-cyan/10 to-neon-purple/10 border border-neon-cyan/20 hover:border-neon-cyan/40 transition-colors"
-            >
-              <div className="flex items-center gap-2 mb-1">
-                <Sparkles className="w-4 h-4 text-neon-cyan" />
-                <span className="text-sm font-medium text-white">AI Assistant</span>
-              </div>
-              <p className="text-xs text-white/50">Get personalized suggestions</p>
-            </Link>
-          )}
-
-          {/* Settings Link */}
-          <Link
-            href="/settings"
-            className={cn(
-              'flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200',
-              'text-white/60 hover:text-white hover:bg-glass-medium',
-              pathname === '/settings' && 'bg-neon-cyan/10 text-neon-cyan'
-            )}
-          >
-            <Settings className="w-5 h-5" />
-            {!sidebarCollapsed && <span className="text-sm font-medium">Settings</span>}
-          </Link>
-
           {/* Collapse Button */}
           <button
             onClick={toggleSidebarCollapsed}
             className={cn(
-              'hidden lg:flex items-center justify-center mt-2 w-full py-2 rounded-xl',
+              'hidden lg:flex items-center justify-center w-full py-2 rounded-xl',
               'text-white/40 hover:text-white/60 hover:bg-glass-medium transition-colors'
             )}
           >
