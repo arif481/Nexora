@@ -52,7 +52,7 @@ export default function DashboardPage() {
   // Combine errors for display
   const dataError = tasksError || habitsError || eventsError;
 
-  const today = new Date();
+  const today = useMemo(() => new Date(), []);
   const todayKey = today.toISOString().split('T')[0];
   const dayOfWeek = today.getDay();
 

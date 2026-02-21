@@ -716,8 +716,8 @@ export function usePersonAccountTypes(): UsePersonAccountTypesReturn {
 
 export function useFinanceStats(transactions: Transaction[], budgets: Budget[]) {
   // Ensure arrays are always valid - do this before useMemo
-  const safeTransactions = Array.isArray(transactions) ? transactions : [];
-  const safeBudgets = Array.isArray(budgets) ? budgets : [];
+  const safeTransactions = useMemo(() => Array.isArray(transactions) ? transactions : [], [transactions]);
+  const safeBudgets = useMemo(() => Array.isArray(budgets) ? budgets : [], [budgets]);
 
   const stats = useMemo(() => {
     if (safeTransactions.length === 0 && safeBudgets.length === 0) {
