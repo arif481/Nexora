@@ -42,6 +42,7 @@ import { EduPlanrWidget } from '@/components/features/dashboard/EduPlanrWidget';
 import { useAutoEduPlanrSync } from '@/hooks/useAutoEduPlanrSync';
 import SyncMonitor from '@/components/features/integrations/SyncMonitor';
 import '@/lib/cleanupDuplicates';
+import '@/lib/restoreEduplanr';
 
 export default function DashboardPage() {
   const router = useRouter();
