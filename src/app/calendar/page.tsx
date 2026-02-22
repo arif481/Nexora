@@ -290,6 +290,11 @@ export default function CalendarPage() {
       days.push(new Date(year, month, i));
     }
 
+    // Add empty slots at the end to complete the final week
+    while (days.length % 7 !== 0) {
+      days.push(null);
+    }
+
     return days;
   }, [currentDate]);
 
@@ -737,61 +742,143 @@ export default function CalendarPage() {
                   ))}
                 </div>
 
-                {/* Calendar Days */}
-                <div className="grid grid-cols-7 gap-1">
-                  {calendarDays.map((date, index) => {
-                    if (!date) {
-                      return <div key={index} className="aspect-square p-1" />;
-                    }
+                {/* Calendar Weeks */}
+                <div className="flex flex-col gap-1">
+                  {Array.from({ length: calendarDays.length / 7 }).map((_, weekIndex) => {
+                    const week = calendarDays.slice(weekIndex * 7, (weekIndex + 1) * 7);
 
-                    const isToday = date.toDateString() === new Date().toDateString();
-                    const isSelected = selectedDate?.toDateString() === date.toDateString();
-                    const dayEvents = getEventsForDay(date);
-                    const dayLinkedItems = getLinkedItemsForDay(date);
-                    const holidayForDay = dayLinkedItems.find(item => item.type === 'holiday');
-                    const linkedCount = dayLinkedItems.filter(item => item.type !== 'holiday').length;
+                    const validDays = week.filter(Boolean) as Date[];
+                    if (validDays.length === 0) return null;
+                    const weekStartTime = new Date(validDays[0]).setHours(0, 0, 0, 0);
+                    const weekEndTime = new Date(validDays[validDays.length - 1]).setHours(23, 59, 59, 999);
+
+                    const weekEvents = events.filter(e => {
+                      const eStart = new Date(e.startTime).getTime();
+                      const eEnd = new Date(e.endTime).getTime();
+                      return eStart <= weekEndTime && eEnd >= weekStartTime;
+                    }).sort((a, b) => {
+                      const aStart = new Date(a.startTime).getTime();
+                      const bStart = new Date(b.startTime).getTime();
+                      if (aStart !== bStart) return aStart - bStart;
+                      const aDur = new Date(a.endTime).getTime() - aStart;
+                      const bDur = new Date(b.endTime).getTime() - bStart;
+                      return bDur - aDur;
+                    });
+
+                    const tracks: CalendarEvent[][] = [];
+                    const eventPositions = new Map<string, { track: number, startCol: number, span: number }>();
+
+                    weekEvents.forEach(event => {
+                      const eStart = new Date(event.startTime);
+                      const eEnd = new Date(event.endTime);
+
+                      let startCol = 0;
+                      const dayIdx = week.findIndex(d => d && d.toDateString() === eStart.toDateString());
+                      if (dayIdx !== -1) startCol = dayIdx;
+
+                      let endCol = 6;
+                      const endDayIdx = week.findIndex(d => d && d.toDateString() === eEnd.toDateString());
+                      if (endDayIdx !== -1) endCol = endDayIdx;
+
+                      const span = endCol - startCol + 1;
+
+                      let trackIdx = 0;
+                      while (true) {
+                        if (!tracks[trackIdx]) tracks[trackIdx] = [];
+                        let overlaps = false;
+                        for (const placed of tracks[trackIdx]) {
+                          const pos = eventPositions.get(placed.id)!;
+                          const placedStart = pos.startCol;
+                          const placedEnd = pos.startCol + pos.span - 1;
+                          const myEnd = startCol + span - 1;
+                          if (!(myEnd < placedStart || startCol > placedEnd)) {
+                            overlaps = true;
+                            break;
+                          }
+                        }
+                        if (!overlaps) {
+                          tracks[trackIdx].push(event);
+                          eventPositions.set(event.id, { track: trackIdx, startCol, span });
+                          break;
+                        }
+                        trackIdx++;
+                      }
+                    });
+
+                    const trackHeight = 24;
+                    const minCellHeight = 90;
+                    const totalHeight = Math.max(minCellHeight, 36 + tracks.length * trackHeight);
 
                     return (
-                      <button
-                        key={index}
-                        onClick={() => setSelectedDate(date)}
-                        className={cn(
-                          'aspect-square p-1 rounded-lg transition-all text-left',
-                          'hover:bg-dark-800/50',
-                          isToday && 'ring-2 ring-neon-cyan',
-                          isSelected && 'bg-neon-cyan/20'
-                        )}
-                      >
-                        <div className={cn(
-                          'text-sm font-medium mb-1',
-                          isToday ? 'text-neon-cyan' : 'text-white'
-                        )}>
-                          {date.getDate()}
-                        </div>
-                        {holidayForDay && (
-                          <div className="text-[10px] px-1 py-0.5 rounded bg-neon-orange/20 text-neon-orange truncate mb-0.5">
-                            {holidayForDay.title}
-                          </div>
-                        )}
-                        <div className="space-y-0.5">
-                          {dayEvents.slice(0, 2).map(event => (
-                            <div
-                              key={event.id}
+                      <div key={weekIndex} className="relative grid grid-cols-7 gap-1" style={{ minHeight: `${totalHeight}px` }}>
+                        {/* Day Cells */}
+                        {week.map((date, index) => {
+                          if (!date) return <div key={index} className="rounded-lg bg-dark-800/10" style={{ minHeight: `${totalHeight}px` }} />;
+
+                          const isToday = date.toDateString() === new Date().toDateString();
+                          const isSelected = selectedDate?.toDateString() === date.toDateString();
+                          const dayLinkedItems = getLinkedItemsForDay(date);
+                          const holidayForDay = dayLinkedItems.find(item => item.type === 'holiday');
+                          const linkedCount = dayLinkedItems.filter(item => item.type !== 'holiday').length;
+
+                          return (
+                            <button
+                              key={index}
+                              onClick={() => setSelectedDate(date)}
                               className={cn(
-                                'text-[10px] px-1 py-0.5 rounded truncate text-white',
-                                getCategoryColor(event.category)
+                                'p-2 rounded-lg text-left transition-all hover:bg-dark-800/50 flex flex-col',
+                                isToday && 'ring-2 ring-neon-cyan',
+                                isSelected && 'bg-neon-cyan/20'
                               )}
+                              style={{ minHeight: `${totalHeight}px` }}
                             >
-                              {event.title}
-                            </div>
-                          ))}
-                          {(dayEvents.length > 2 || linkedCount > 0) && (
-                            <div className="text-[10px] text-dark-400 px-1">
-                              +{Math.max(0, dayEvents.length - 2) + linkedCount} linked
-                            </div>
-                          )}
-                        </div>
-                      </button>
+                              <div className={cn('text-sm font-medium mb-1 z-10 relative', isToday ? 'text-neon-cyan' : 'text-white')}>
+                                {date.getDate()}
+                              </div>
+                              {holidayForDay && (
+                                <div className="text-[10px] px-1 py-0.5 rounded bg-neon-orange/20 text-neon-orange truncate mb-0.5 z-10 relative mt-1">
+                                  {holidayForDay.title}
+                                </div>
+                              )}
+                              {linkedCount > 0 && (
+                                <div className="text-[10px] text-dark-400 px-1 z-10 relative mt-auto pt-1">
+                                  +{linkedCount} linked
+                                </div>
+                              )}
+                            </button>
+                          );
+                        })}
+
+                        {/* Spanning Event Blocks */}
+                        {weekEvents.map(event => {
+                          const pos = eventPositions.get(event.id)!;
+                          const categoryColorClass = getCategoryColor(event.category) || 'bg-gray-500';
+
+                          return (
+                            <motion.div
+                              layoutId={`event-${event.id}`}
+                              key={`${event.id}-${weekIndex}`}
+                              onClick={(e) => { e.stopPropagation(); handleEditEvent(event); }}
+                              className={cn(
+                                'absolute h-[20px] rounded px-1.5 text-[10px] font-medium truncate flex items-center shadow-sm cursor-pointer transition-transform hover:scale-[1.02] z-20 text-white',
+                                categoryColorClass,
+                                'border border-white/10 backdrop-blur-sm shadow-black/20'
+                              )}
+                              style={{
+                                left: `calc(${(pos.startCol / 7) * 100}% + 4px)`,
+                                width: `calc(${(pos.span / 7) * 100}% - 8px)`,
+                                top: `${34 + pos.track * trackHeight}px`
+                              }}
+                            >
+                              <span className="truncate drop-shadow-md">
+                                {(!event.allDay && pos.startCol === week.findIndex(d => d && d.toDateString() === new Date(event.startTime).toDateString()))
+                                  ? `${new Date(event.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ${event.title}`
+                                  : event.title}
+                              </span>
+                            </motion.div>
+                          );
+                        })}
+                      </div>
                     );
                   })}
                 </div>
