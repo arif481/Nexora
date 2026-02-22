@@ -96,6 +96,13 @@ export function useAutoEduPlanrSync() {
             unsubscribers.push(onSnapshot(habitsQ, () => schedulePush(), () => { }));
         } catch { /* ignore */ }
 
+        // Watch subject changes (for real-time push)
+        try {
+            const subjectsRef = collection(db, COLLECTIONS.SUBJECTS);
+            const subjectsQ = query(subjectsRef, where('userId', '==', user.uid));
+            unsubscribers.push(onSnapshot(subjectsQ, () => schedulePush(), () => { }));
+        } catch { /* ignore */ }
+
         return () => {
             unsubscribers.forEach(unsub => unsub());
             if (debounceTimer.current) clearTimeout(debounceTimer.current);

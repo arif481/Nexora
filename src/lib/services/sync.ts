@@ -25,7 +25,7 @@ import {
 
 export type SyncJobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'partial';
 export type SyncLogLevel = 'info' | 'warning' | 'error';
-export type MappingEntityType = 'transaction' | 'calendarEvent' | 'wellnessEntry' | 'task';
+export type MappingEntityType = 'transaction' | 'calendarEvent' | 'wellnessEntry' | 'task' | 'subject';
 export type InboxEntityType = 'transaction' | 'wellnessSnapshot' | 'calendarEvent' | 'task';
 export type InboxStatus = 'pending' | 'processing' | 'processed' | 'failed';
 

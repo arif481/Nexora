@@ -1,6 +1,7 @@
 import { getIntegrationMapping, upsertIntegrationMapping, addSyncLog, updateSyncJobStatus } from './sync';
 import { createCalendarEvent, updateCalendarEvent } from './calendar';
 import { createTask, updateTask } from './tasks';
+import { createSubject, updateSubject } from './study';
 import { getDoc, doc, getDocs, collection, query, where, Timestamp } from 'firebase/firestore';
 import { db, COLLECTIONS } from '../firebase';
 
@@ -39,6 +40,30 @@ async function pullFromEduPlanr(userId: string, email: string, syncToken: string
     let syncedEvents = 0;
     let syncedTasks = 0;
     let syncedExams = 0;
+    let syncedSubjects = 0;
+
+    // Sync Subjects
+    for (const subject of subjects) {
+        const existingMapping = await getIntegrationMapping(userId, 'eduplanr', 'subject', subject.id);
+
+        const subjectData = {
+            name: subject.name,
+            description: subject.description || '',
+            color: subject.color || '#06b6d4',
+            topics: subject.topics || [],
+            resources: subject.resources || [],
+            examDates: subject.examDates || [],
+            grades: subject.grades || [],
+        };
+
+        if (existingMapping) {
+            await updateSubject(existingMapping.internalId, subjectData);
+        } else {
+            const newId = await createSubject(userId, subjectData);
+            await upsertIntegrationMapping(userId, 'eduplanr', 'subject', subject.id, newId);
+        }
+        syncedSubjects++;
+    }
 
     // Sync Calendar Events (Study Sessions)
     for (const event of events) {
@@ -122,7 +147,7 @@ async function pullFromEduPlanr(userId: string, email: string, syncToken: string
         syncedExams++;
     }
 
-    return { syncedEvents, syncedTasks, syncedExams, subjects, syllabi };
+    return { syncedEvents, syncedTasks, syncedExams, syncedSubjects, syllabi };
 }
 
 // ─── PUSH: Send Nexora data TO EduPlanr ───
@@ -237,7 +262,39 @@ async function pushToEduPlanr(userId: string, email: string, syncToken: string) 
         console.warn('Could not collect task updates for push:', e);
     }
 
-    // 6. Send the payload to EduPlanr
+    // 6. Collect all Subjects and Exam Dates
+    try {
+        const subjectsRef = collection(db, COLLECTIONS.SUBJECTS);
+        const subjectsQ = query(subjectsRef, where('userId', '==', userId));
+        const subjectsSnap = await getDocs(subjectsQ);
+
+        payload.subjects = subjectsSnap.docs.map(d => {
+            const data = d.data();
+            return {
+                id: d.id, // We'll map this on EduPlanr's side
+                ...data,
+                // Serialize any dates/timestamps
+                createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt,
+                updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : data.updatedAt,
+                topics: data.topics?.map((t: any) => ({
+                    ...t,
+                    lastStudied: t.lastStudied?.toDate ? t.lastStudied.toDate().toISOString() : t.lastStudied
+                })) || [],
+                examDates: data.examDates?.map((e: any) => ({
+                    ...e,
+                    date: e.date?.toDate ? e.date.toDate().toISOString() : e.date
+                })) || [],
+                grades: data.grades?.map((g: any) => ({
+                    ...g,
+                    date: g.date?.toDate ? g.date.toDate().toISOString() : g.date
+                })) || [],
+            };
+        });
+    } catch (e) {
+        console.warn('Could not collect subjects for push:', e);
+    }
+
+    // 7. Send the payload to EduPlanr
     const response = await fetch(EDUPLANR_PUSH_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -275,7 +332,7 @@ export async function runEduPlanrSync(userId: string, jobId: string) {
             pushResult = { message: 'Push skipped due to error' };
         }
 
-        const summaryMsg = `✅ Synced ${pullResult.syncedEvents} sessions, ${pullResult.syncedTasks} tasks, ${pullResult.syncedExams} exams. Push: ${pushResult.message || 'OK'}`;
+        const summaryMsg = `✅ Synced ${pullResult.syncedEvents} sessions, ${pullResult.syncedTasks} tasks, ${pullResult.syncedSubjects} subjects. Push: ${pushResult.message || 'OK'}`;
         await updateSyncJobStatus(jobId, 'succeeded', { summary: summaryMsg });
         await addSyncLog(userId, 'eduplanr', 'info', summaryMsg);
 
