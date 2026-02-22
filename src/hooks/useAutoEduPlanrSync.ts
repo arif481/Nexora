@@ -4,7 +4,8 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db, COLLECTIONS } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
-import { pushEduPlanrData } from '@/lib/services/eduplanrSync';
+import { pushEduPlanrData, runEduPlanrSync } from '@/lib/services/eduplanrSync';
+import { queueIntegrationSyncJob } from '@/lib/services/integrations';
 
 export type SyncStatus = 'idle' | 'syncing' | 'success' | 'error';
 export type SyncDirection = 'pull' | 'push' | 'bidirectional';
@@ -64,6 +65,37 @@ export function useAutoEduPlanrSync() {
         }
     }, [user?.uid]);
 
+    const syncAll = useCallback(async (reason: 'manual' | 'scheduled' | 'webhook' = 'scheduled') => {
+        if (!user?.uid) return;
+
+        setSyncState(prev => ({ ...prev, status: 'syncing', direction: 'bidirectional' }));
+
+        try {
+            const jobId = await queueIntegrationSyncJob(user.uid, 'eduplanr', reason);
+            await runEduPlanrSync(user.uid, jobId);
+
+            setSyncState(prev => ({
+                ...prev,
+                status: 'success',
+                lastPullAt: new Date(),
+                lastPushAt: new Date(),
+                pullCount: prev.pullCount + 1,
+                pushCount: prev.pushCount + 1,
+                lastError: null,
+            }));
+
+            setTimeout(() => {
+                setSyncState(prev => prev.status === 'success' ? { ...prev, status: 'idle' } : prev);
+            }, 3000);
+        } catch (e: any) {
+            setSyncState(prev => ({
+                ...prev,
+                status: 'error',
+                lastError: e.message || 'Sync failed',
+            }));
+        }
+    }, [user?.uid]);
+
     const schedulePush = useCallback(() => {
         if (debounceTimer.current) clearTimeout(debounceTimer.current);
         debounceTimer.current = setTimeout(doPush, DEBOUNCE_MS);
@@ -109,18 +141,22 @@ export function useAutoEduPlanrSync() {
         };
     }, [user?.uid, schedulePush]);
 
-    // Periodic full sync
+
+    // Periodic full sync and sync on mount
     useEffect(() => {
         if (!user?.uid) return;
 
+        // Perform full sync on visit
+        syncAll('scheduled');
+
         autoSyncTimer.current = setInterval(() => {
-            schedulePush();
+            syncAll('scheduled');
         }, AUTO_SYNC_INTERVAL_MS);
 
         return () => {
             if (autoSyncTimer.current) clearInterval(autoSyncTimer.current);
         };
-    }, [user?.uid, schedulePush]);
+    }, [user?.uid, syncAll]);
 
     return syncState;
 }
