@@ -44,6 +44,8 @@ async function pullFromEduPlanr(userId: string, email: string, syncToken: string
 
     // Sync Subjects
     for (const subject of subjects) {
+        if (subject.source === 'nexora') continue; // Prevent infinite sync duplication
+
         const existingMapping = await getIntegrationMapping(userId, 'eduplanr', 'subject', subject.id);
 
         const subjectData = {
