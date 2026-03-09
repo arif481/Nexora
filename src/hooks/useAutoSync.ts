@@ -11,7 +11,6 @@ import {
   type IntegrationSyncLog,
 } from '@/lib/services/sync';
 import { queueIntegrationSyncJob } from '@/lib/services/integrations';
-import { runEduPlanrSync } from '@/lib/services/eduplanrSync';
 
 interface UseAutoSyncReturn {
   jobs: IntegrationSyncJob[];
@@ -56,10 +55,6 @@ export function useAutoSync(maxJobs: number = 12, maxLogs: number = 24): UseAuto
 
     const jobId = await queueIntegrationSyncJob(user.uid, provider, 'manual');
     await addSyncLog(user.uid, provider, 'info', 'Manual sync requested', { jobId });
-
-    if (provider === 'eduplanr') {
-      runEduPlanrSync(user.uid, jobId).catch(console.error);
-    }
 
     return jobId;
   }, [user]);

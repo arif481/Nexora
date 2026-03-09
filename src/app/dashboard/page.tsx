@@ -37,12 +37,7 @@ import { DashboardBentoGrid } from '@/components/features/dashboard/DashboardBen
 import { LifeScoreWidget } from '@/components/features/LifeScoreWidget';
 import { AIDailyBrief } from '@/components/features/AIDailyBrief';
 import { generateAIResponse } from '@/lib/services/ai';
-import { useIntegrations } from '@/hooks/useIntegrations';
-import { EduPlanrWidget } from '@/components/features/dashboard/EduPlanrWidget';
-import { useAutoEduPlanrSync } from '@/hooks/useAutoEduPlanrSync';
-import SyncMonitor from '@/components/features/integrations/SyncMonitor';
 import '@/lib/cleanupDuplicates';
-import '@/lib/restoreEduplanr';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -53,9 +48,7 @@ export default function DashboardPage() {
   const completionData = useHabitCompletions(habits as any, 1);
   const { events: todayEvents, loading: eventsLoading, error: eventsError } = useTodayEvents();
   const { openAIPanel } = useUIStore();
-  const { integrations } = useIntegrations();
-  const isEduplanrConnected = integrations?.eduplanr?.connected;
-  const syncState = useAutoEduPlanrSync();
+
 
   // Combine errors for display
   const dataError = tasksError || habitsError || eventsError;
@@ -199,16 +192,6 @@ export default function DashboardPage() {
         <DashboardBentoGrid
           storageKey="nexora_dashboard_layout"
           widgets={[
-            ...(isEduplanrConnected ? [{
-              id: 'eduplanr-summary',
-              className: 'md:col-span-1 lg:col-span-1',
-              content: <EduPlanrWidget />
-            },
-            {
-              id: 'sync-monitor',
-              className: 'md:col-span-1 lg:col-span-1',
-              content: <SyncMonitor syncState={syncState} isConnected={!!isEduplanrConnected} />
-            }] : []),
             {
               id: 'daily-brief',
               className: 'md:col-span-2 lg:col-span-2',
@@ -381,15 +364,9 @@ export default function DashboardPage() {
                             key={event.id}
                             className={cn(
                               "p-4 rounded-xl border",
-                              event.source === 'eduplanr'
-                                ? "bg-dark-800/40 border-neon-cyan/20 cursor-pointer hover:bg-dark-800/60"
-                                : "bg-dark-800/40 border-dark-700/50"
+                              "bg-dark-800/40 border-dark-700/50"
                             )}
-                            onClick={() => {
-                              if (event.source === 'eduplanr' && event.externalId) {
-                                window.open(`https://eduplanr.app/session/${event.externalId}`, '_blank');
-                              }
-                            }}
+
                           >
                             <div className="flex items-start justify-between mb-2">
                               <Badge

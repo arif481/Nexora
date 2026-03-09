@@ -58,20 +58,6 @@ export async function cleanupDuplicateSubjects() {
 
         console.log(`Cleanup complete. Deleted ${deletedCount} duplicate subjects.`);
 
-        // Cleanup integration mappings pointing to deleted subjects
-        const mappingsRef = collection(db, COLLECTIONS.INTEGRATION_MAPPINGS);
-        const mapSnap = await getDocs(query(mappingsRef, where('userId', '==', userId), where('provider', '==', 'eduplanr')));
-
-        let deletedMapsCount = 0;
-        for (const mDoc of mapSnap.docs) {
-            const data = mDoc.data();
-            if (data.entityType === 'subject' && toDeleteIds.has(data.internalId)) {
-                await deleteDoc(mDoc.ref);
-                deletedMapsCount++;
-            }
-        }
-        console.log(`Deleted ${deletedMapsCount} invalid integration mappings.`);
-
     } catch (e) {
         console.error('Error during cleanup:', e);
     }
