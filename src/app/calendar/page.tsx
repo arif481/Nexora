@@ -42,7 +42,6 @@ import { getCountryHolidaysInRange, supportsLocalHolidays, type HolidayItem } fr
 import { createNotification } from '@/lib/services/notifications';
 import { downloadAppleCalendarEvent, getGoogleCalendarAddLink } from '@/lib/externalCalendar';
 import { createNote } from '@/lib/services/notes';
-import { useAutoEduPlanrSync } from '@/hooks/useAutoEduPlanrSync';
 import type { CalendarEvent, EventCategory } from '@/types';
 
 const categoryOptions: { label: string; value: EventCategory; color: string; hex: string }[] = [
@@ -138,8 +137,7 @@ export default function CalendarPage() {
   const [viewMode, setViewMode] = useState<'month' | 'week' | 'day'>('month');
   const reminderCacheRef = useRef<Set<string>>(new Set());
 
-  // Trigger auto-sync on visit
-  useAutoEduPlanrSync();
+
 
   // Get a stable month range for fetching events and derived data.
   const { monthStart, monthEnd, monthStartTime, monthEndTime } = useMemo(() => {
@@ -877,7 +875,7 @@ export default function CalendarPage() {
                                 'absolute h-[20px] rounded px-1.5 text-[10px] font-medium truncate flex items-center shadow-sm cursor-pointer transition-all hover:scale-[1.02] z-20 text-white',
                                 categoryColorClass,
                                 'border border-white/10 backdrop-blur-sm shadow-black/20',
-                                event.source === 'eduplanr' && 'ring-1 ring-white/30'
+
                               )}
                               style={{
                                 left: `calc(${(pos.startCol / 7) * 100}% + 4px)`,
@@ -886,9 +884,6 @@ export default function CalendarPage() {
                               }}
                             >
                               <span className="truncate drop-shadow-md flex items-center gap-1">
-                                {event.source === 'eduplanr' && (
-                                  <Sparkles className="w-2.5 h-2.5 text-white/80 shrink-0" />
-                                )}
                                 <span className="truncate">
                                   {(!event.allDay && pos.startCol === week.findIndex(d => d && d.toDateString() === new Date(event.startTime).toDateString()))
                                     ? `${new Date(event.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ${event.title}`

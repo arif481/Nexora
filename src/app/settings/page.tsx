@@ -1326,7 +1326,6 @@ function IntegrationsSection() {
     todoist: Check,
     notion: FileText,
     mobileBridge: Smartphone,
-    eduplanr: BookOpen,
   };
 
   const providerDefaults: Record<IntegrationKey, Record<string, unknown>> = {
@@ -1393,11 +1392,6 @@ function IntegrationsSection() {
       appInstalled: false,
       platforms: ['ios', 'android'],
       autoImport: { wellness: true, calendar: true },
-    },
-    eduplanr: {
-      syncMode: 'pull',
-      platform: 'cloud',
-      autoImport: { calendar: true, tasks: true },
     },
   };
 
@@ -1467,15 +1461,9 @@ function IntegrationsSection() {
 
   const handlePatSubmit = async () => {
     if (!patModalProvider || !patInput.trim()) return;
-    if (patModalProvider.key === 'eduplanr' && !patEmailInput.trim()) return;
-
     setSavingPermissions(true);
     try {
-      if (patModalProvider.key === 'eduplanr') {
-        await connectProvider(patModalProvider.key, { email: patEmailInput.trim() }, patInput.trim());
-      } else {
-        await connectProvider(patModalProvider.key, providerDefaults[patModalProvider.key], patInput.trim());
-      }
+      await connectProvider(patModalProvider.key, providerDefaults[patModalProvider.key], patInput.trim());
       setPatModalProvider(null);
       setPatInput('');
       setPatEmailInput('');
@@ -1835,19 +1823,6 @@ function IntegrationsSection() {
             <br /><br />
             <span className="text-neon-cyan">This token is encrypted and stored safely in your own personal Firebase profile.</span>
           </p>
-
-          {patModalProvider?.key === 'eduplanr' && (
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-white">EduPlanr Email Address</label>
-              <Input
-                type="email"
-                placeholder="you@example.com"
-                value={patEmailInput}
-                onChange={(e) => setPatEmailInput(e.target.value)}
-                disabled={savingPermissions}
-              />
-            </div>
-          )}
 
           <div className="space-y-2">
             <label className="text-sm font-medium text-white">Access Token / Sync Token</label>

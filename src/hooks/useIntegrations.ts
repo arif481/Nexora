@@ -100,13 +100,9 @@ export function useIntegrations() {
     try {
       const config = { ...overrides };
       if (customToken) {
-        if (provider === 'eduplanr') {
-          config.syncToken = customToken;
-        } else {
-          config.credentials = {
-            accessToken: customToken,
-          };
-        }
+        config.credentials = {
+          accessToken: customToken,
+        };
       }
       await connectDataIntegration(user.uid, provider, config);
     } catch (error) {
