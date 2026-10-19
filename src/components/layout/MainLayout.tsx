@@ -119,7 +119,7 @@ export function MainLayout({ children }: MainLayoutProps) {
               </a>
               <span>•</span>
               <a
-                href="https://iamarif.me/portfolio"
+                href="https://arif481.github.io/portfolio/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:text-neon-cyan transition-colors"
