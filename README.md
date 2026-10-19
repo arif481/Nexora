@@ -3,7 +3,7 @@
 <p align="center">
   A personal assistant that keeps tasks, calendar, notes, habits, money, meals and wellness in one app, with Gemini doing the parsing and the chat.
   <br />
-  <a href="https://iamarif.me/Nexora/"><strong>Live app</strong></a>
+  <a href="https://arif481.github.io/Nexora/"><strong>Live app</strong></a>
 </p>
 
 ## Features
