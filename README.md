@@ -8,20 +8,19 @@
 
 ## Features
 
-- **Dashboard** with the day's tasks, events and a short AI summary.
-- **Tasks** with priorities and suggested next actions.
-- **Calendar** synced with Google Calendar.
-- **Notes** in a rich-text editor.
-- **Journal** with mood tracking and sentiment analysis of entries.
-- **Habits** with streaks.
-- **Focus mode**: a Pomodoro timer with ambient sounds.
-- **Study**: flashcards with spaced repetition.
-- **Goals** broken into milestones.
-- **Finance**: expense tracking, currency conversion, and receipt scanning with Gemini's vision model.
-- **Wellness**: sleep, activity and nutrition logs.
-- **Meal planner** that pulls recipes from a URL and builds a grocery list.
-- **Quick capture**: a bookmarklet that saves the current page into Nexora, and automatic film, TV and book details from TMDB and Open Library.
-- **AI chat** on Gemini 2.5 Flash, falling back to Gemini 2.0 Flash-Lite.
+The dashboard shows the day's tasks and events with a short AI summary. Around it:
+
+- tasks with priorities and suggested next actions
+- a calendar synced with Google Calendar
+- rich-text notes, and a journal with mood tracking and sentiment analysis of entries
+- habits with streaks, and goals broken into milestones
+- a Pomodoro focus timer with ambient sounds
+- flashcards with spaced repetition
+- expense tracking with currency conversion and receipt scanning through Gemini's vision model
+- sleep, activity and nutrition logs
+- a meal planner that pulls a recipe from a URL and builds a grocery list
+- a bookmarklet that saves the current page into Nexora, with film, TV and book details filled in from TMDB and Open Library
+- AI chat on Gemini 2.5 Flash, falling back to Gemini 2.0 Flash-Lite
 
 ## Tech stack
 
@@ -43,7 +42,7 @@ Then open http://localhost:3000.
 
 ## Contributing
 
-Bug reports and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) covers the commit conventions and review process, and the project follows a [code of conduct](CODE_OF_CONDUCT.md).
+Bug reports and pull requests are welcome.
 
 ## License
 
